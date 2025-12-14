@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyperstellar"
+version = "0.1.0"
+description = "GPU-accelerated physics simulation engine"
+readme = "README.md"
+authors = [{name = "Aiden Jabari", email = "Jabariaiden15@email.com"}]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+keywords = ["physics", "simulation", "gpu", "opengl"]
+dependencies = []
+requires-python = "==3.13.*"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"hyperstellar._native" = ["**/*"]
+"hyperstellar" = ["py.typed", "*.pyi", "__init__.pyi"]
