@@ -1,0 +1,10 @@
+^C:\USERS\USER\HYPERSTELLAR-PUBLIC\_BUILD\CMAKEFILES\11A1CAE47E6815A3A857EE8B3DEC4044\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/user/hyperstellar-public/python_module -BC:/Users/user/hyperstellar-public/_build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/user/hyperstellar-public/_build/stellar_python.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

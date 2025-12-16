@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/user/hyperstellar-public/_build/cmake_install.cmake",
+		"C:/Users/user/hyperstellar-public/_build/pybind11/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

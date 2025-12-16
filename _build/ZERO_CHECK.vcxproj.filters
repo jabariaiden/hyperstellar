@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\user\hyperstellar-public\_build\CMakeFiles\11a1cae47e6815a3a857ee8b3dec4044\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{64CE730A-8761-3E6A-B4A3-9683A76646EF}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

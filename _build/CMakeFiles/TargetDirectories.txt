@@ -1,0 +1,4 @@
+C:/Users/user/hyperstellar-public/_build/CMakeFiles/stellar.dir
+C:/Users/user/hyperstellar-public/_build/CMakeFiles/ALL_BUILD.dir
+C:/Users/user/hyperstellar-public/_build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/user/hyperstellar-public/_build/pybind11/CMakeFiles/ALL_BUILD.dir
