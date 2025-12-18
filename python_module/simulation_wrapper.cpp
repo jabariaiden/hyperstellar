@@ -99,10 +99,11 @@ GLuint CreateAxisShader()
     return shaderProgram;
 }
 
-SimulationWrapper::SimulationWrapper(bool headless, int width, int height, std::string title)
+SimulationWrapper::SimulationWrapper(bool headless, int width, int height, std::string title, bool enable_grid)
     : m_headless(headless), m_initialized(false), m_paused(false),
     m_window(nullptr), m_currentBuffer(0), m_title(title),
-    m_width(width), m_height(height), m_simulationTime(0.0f)
+    m_width(width), m_height(height), m_simulationTime(0.0f),
+    m_enable_grid(enable_grid)
 {
     try
     {
@@ -255,37 +256,41 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string& 
 
     g_camera.Reset();
 
-    if (!g_axisInitialized)
+    // Only initialize axis if grid is enabled
+    if (m_enable_grid)
     {
-        Axis::Init();
-        g_axisInitialized = true;
+        if (!g_axisInitialized)
+        {
+            Axis::Init();
+            g_axisInitialized = true;
 
-        Axis::Style& style = Axis::GetStyle();
-        style.majorGridColor = glm::vec3(0.4f, 0.4f, 0.6f);
-        style.minorGridColor = glm::vec3(0.25f, 0.25f, 0.35f);
-        style.subMinorGridColor = glm::vec3(0.15f, 0.15f, 0.25f);
-        style.axisColor = glm::vec3(1.0f, 1.0f, 1.0f);
+            Axis::Style& style = Axis::GetStyle();
+            style.majorGridColor = glm::vec3(0.4f, 0.4f, 0.6f);
+            style.minorGridColor = glm::vec3(0.25f, 0.25f, 0.35f);
+            style.subMinorGridColor = glm::vec3(0.15f, 0.15f, 0.25f);
+            style.axisColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        style.majorGridWidth = 1.5f;
-        style.minorGridWidth = 1.0f;
-        style.subMinorGridWidth = 0.5f;
-        style.axisWidth = 2.0f;
+            style.majorGridWidth = 1.5f;
+            style.minorGridWidth = 1.0f;
+            style.subMinorGridWidth = 0.5f;
+            style.axisWidth = 2.0f;
 
-        style.showMajorGrid = true;
-        style.showMinorGrid = true;
-        style.showSubMinorGrid = false;
-        style.smoothZoom = false;
-        style.fadeLines = false;
+            style.showMajorGrid = true;
+            style.showMinorGrid = true;
+            style.showSubMinorGrid = false;
+            style.smoothZoom = false;
+            style.fadeLines = false;
 
-        style.minorDivisions = 5.0f;
-        style.subMinorDivisions = 5.0f;
-    }
+            style.minorDivisions = 5.0f;
+            style.subMinorDivisions = 5.0f;
+        }
 
-    g_axisShaderProgram = CreateAxisShader();
-    if (g_axisShaderProgram == 0)
-    {
-        std::cerr << "Failed to create axis shader!" << std::endl;
-        return false;
+        g_axisShaderProgram = CreateAxisShader();
+        if (g_axisShaderProgram == 0)
+        {
+            std::cerr << "Failed to create axis shader!" << std::endl;
+            return false;
+        }
     }
 
     if (!Objects::Init(m_window))
@@ -412,7 +417,8 @@ void SimulationWrapper::render()
 
     while (glGetError() != GL_NO_ERROR);
 
-    if (g_axisInitialized && g_axisShaderProgram)
+    // Only render axis if grid is enabled
+    if (m_enable_grid && g_axisInitialized && g_axisShaderProgram)
     {
         glUseProgram(g_axisShaderProgram);
         GLenum err = glGetError();
@@ -649,6 +655,121 @@ void SimulationWrapper::set_rotation(int index, float rotation)
         p.visualData.z = rotation;
         Objects::UpdateObjectCPU(index, p);
     }
+}
+
+std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int>& indices) const {
+    ensure_initialized();
+
+    std::vector<BatchGetData> results;
+    results.reserve(indices.size());
+
+    if (indices.empty()) {
+        return results;
+    }
+
+    // Fetch ALL objects at once
+    std::vector<Object> allObjects;
+    Objects::FetchToCPU(m_currentBuffer, allObjects);
+
+    for (int index : indices) {
+        if (index < 0 || index >= static_cast<int>(allObjects.size())) {
+            throw std::runtime_error("Invalid object index in batch_get: " + std::to_string(index));
+        }
+
+        const Object& p = allObjects[index];
+        BatchGetData data;
+
+        data.x = p.position.x;
+        data.y = p.position.y;
+        data.vx = p.velocity.x;
+        data.vy = p.velocity.y;
+        data.mass = p.mass;
+        data.charge = p.charge;
+        data.rotation = p.visualData.z;
+        data.angular_velocity = p.visualData.w;
+        data.skin_type = p.visualSkinType;
+
+        if (p.visualSkinType == 0) { // CIRCLE
+            data.radius = p.visualData.x;
+            data.width = p.visualData.x * 2.0f;
+            data.height = p.visualData.x * 2.0f;
+            data.polygon_sides = 0;
+        }
+        else if (p.visualSkinType == 1) { // RECTANGLE
+            data.width = p.visualData.x;
+            data.height = p.visualData.y;
+            data.radius = 0.0f;
+            data.polygon_sides = 0;
+        }
+        else if (p.visualSkinType == 2) { // POLYGON
+            data.radius = p.visualData.x;
+            data.width = p.visualData.x * 2.0f;
+            data.height = p.visualData.x * 2.0f;
+            data.polygon_sides = static_cast<int>(p.visualData.y);
+        }
+
+        data.r = p.color.r;
+        data.g = p.color.g;
+        data.b = p.color.b;
+        data.a = p.color.a;
+
+        results.push_back(data);
+    }
+
+    return results;
+}
+
+void SimulationWrapper::batch_update(const std::vector<BatchUpdateData>& updates) {
+    ensure_initialized();
+
+    if (updates.empty()) {
+        return;
+    }
+
+    // Fetch current objects
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+
+    // Apply all updates
+    for (const auto& update : updates) {
+        int index = update.index;
+
+        if (index < 0 || index >= static_cast<int>(objects.size())) {
+            throw std::runtime_error("Invalid object index in batch_update: " + std::to_string(index));
+        }
+
+        Object& p = objects[index];
+
+        p.position = glm::vec2(update.x, update.y);
+        p.velocity = glm::vec2(update.vx, update.vy);
+        p.mass = update.mass;
+        p.charge = update.charge;
+        p.color = glm::vec4(update.r, update.g, update.b, update.a);
+
+        if (p.visualSkinType == 0) { // CIRCLE
+            p.visualData.x = update.width;
+            p.visualData.z = update.rotation;
+            p.visualData.w = update.angular_velocity;
+        }
+        else if (p.visualSkinType == 1) { // RECTANGLE
+            p.visualData.x = update.width;
+            p.visualData.y = update.height;
+            p.visualData.z = update.rotation;
+            p.visualData.w = update.angular_velocity;
+        }
+        else if (p.visualSkinType == 2) { // POLYGON
+            p.visualData.x = update.width;
+            p.visualData.z = update.rotation;
+            p.visualData.w = update.angular_velocity;
+        }
+
+        // Update the object in GPU memory
+        Objects::UpdateObjectCPU(index, p);
+    }
+
+    // Ensure GPU synchronization
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glFlush();
 }
 
 void SimulationWrapper::set_angular_velocity(int index, float angular_velocity)

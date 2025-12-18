@@ -28,25 +28,25 @@ static std::vector<std::string> presetEquations = {
     "0, 0, 0, 1, 1, 1, 1",
     "-k*x/m - b*vx/m, -k*y/m - b*vy/m, 0, 1, 1, 1, 1",
     "-k*x/m, -k*y/m, 0, 1, 1, 1, 1",
-    "uExternalForce.x, uExternalForce.y, 0, 1, 1, 1, 1"};
+    "uExternalForce.x, uExternalForce.y, 0, 1, 1, 1, 1" };
 
-static const char *presetNames[] = {
+static const char* presetNames[] = {
     "Damped Spring + Gravity + External",
     "Zero Acceleration",
     "Damped 2D Spring",
     "Simple 2D Oscillator",
-    "Constant External Force"};
+    "Constant External Force" };
 
-static const char *SkinTypeNames[] = {
+static const char* SkinTypeNames[] = {
     "Circle",
     "Rectangle",
-    "Polygon"};
+    "Polygon" };
 
-static const char *CollisionTypeNames[] = {
+static const char* CollisionTypeNames[] = {
     "None",
     "Circle",
     "Rectangle",
-    "Polygon"};
+    "Polygon" };
 
 // UI State
 static std::string userEquation = presetEquations[0];
@@ -78,21 +78,21 @@ static void AddObjectFromLoadedData(const Object& objectData, int skinType)
     {
         // Set default object type
         Objects::SetDefaultObjectType(skinType);
-        
+
         // Add object (this creates a new object with defaults)
         Objects::AddObject();
         int newIndex = Objects::GetNumObjects() - 1;
-        
+
         // Now update it with our loaded data
         Objects::UpdateObjectCPU(newIndex, objectData);
-        
+
         // Upload to GPU
         Objects::UploadCpuDataToGpu();
-        
+
         // Initialize equation for new object
         objectEquations[newIndex] = presetEquations[0];
         objectPresets[newIndex] = 0;
-        
+
         std::cout << "[UI] Added loaded object " << newIndex << std::endl;
     }
     else
@@ -107,18 +107,18 @@ static bool SaveCurrentProject(const std::string& filepath)
     try
     {
         std::cout << "[UI] Saving project to: " << filepath << std::endl;
-        
+
         std::ofstream file(filepath);
         if (!file.is_open())
         {
             std::cerr << "[UI] Failed to open file for writing: " << filepath << std::endl;
             return false;
         }
-        
+
         // Fetch current objects
         std::vector<Object> objects;
         Objects::FetchToCPU(Renderer::GetCurrentObjectBuffer(), objects);
-        
+
         // Write header
         file << "# Simulation State File\n";
         file << "# Created with Classical Physics Simulator\n";
@@ -128,7 +128,7 @@ static bool SaveCurrentProject(const std::string& filepath)
         if (!saveDescription.empty())
             file << "# Description: " << saveDescription << "\n";
         file << "# Version: 1.0\n\n";
-        
+
         // Write system parameters
         file << "[SYSTEM_PARAMETERS]\n";
         file << "gravity = " << g_physics.gravity << "\n";
@@ -136,16 +136,16 @@ static bool SaveCurrentProject(const std::string& filepath)
         file << "stiffness = " << g_physics.stiffness << "\n";
         file << "restitution = " << g_physics.restitution << "\n";
         file << "coupling = " << g_physics.coupling << "\n\n";
-        
+
         // Write camera state
         file << "[CAMERA]\n";
         file << "position = " << g_camera.position.x << " " << g_camera.position.y << "\n";
         file << "zoom = " << g_camera.zoom << "\n\n";
-        
+
         // Write objects
         file << "[OBJECTS]\n";
         file << "count = " << objects.size() << "\n\n";
-        
+
         for (size_t i = 0; i < objects.size(); ++i)
         {
             const Object& p = objects[i];
@@ -155,11 +155,11 @@ static bool SaveCurrentProject(const std::string& filepath)
             file << "mass = " << p.mass << "\n";
             file << "charge = " << p.charge << "\n";
             file << "skin_type = " << p.visualSkinType << "\n";
-            file << "color = " << p.color.r << " " << p.color.g << " " 
-                 << p.color.b << " " << p.color.a << "\n";
+            file << "color = " << p.color.r << " " << p.color.g << " "
+                << p.color.b << " " << p.color.a << "\n";
             file << "rotation = " << p.visualData.z << "\n";
             file << "angular_velocity = " << p.visualData.w << "\n";
-            
+
             // Type-specific dimensions
             if (p.visualSkinType == 0) // Circle
             {
@@ -175,15 +175,15 @@ static bool SaveCurrentProject(const std::string& filepath)
                 file << "radius = " << p.visualData.x << "\n";
                 file << "sides = " << static_cast<int>(p.visualData.y) << "\n";
             }
-            
+
             file << "\n";
         }
-        
+
         file.close();
-        
+
         // Update current file path
         currentFilePath = filepath;
-        
+
         // Extract filename for title
         std::string filename = fs::path(filepath).filename().string();
         size_t dotPos = filename.find_last_of('.');
@@ -195,10 +195,10 @@ static bool SaveCurrentProject(const std::string& filepath)
         {
             saveTitle = filename;
         }
-        
-        std::cout << "[UI] Successfully saved " << objects.size() 
-                  << " objects to " << filepath << std::endl;
-        
+
+        std::cout << "[UI] Successfully saved " << objects.size()
+            << " objects to " << filepath << std::endl;
+
         return true;
     }
     catch (const std::exception& e)
@@ -214,50 +214,50 @@ static bool LoadProject(const std::string& filepath)
     try
     {
         std::cout << "[UI] Loading project from: " << filepath << std::endl;
-        
+
         std::ifstream file(filepath);
         if (!file.is_open())
         {
             std::cerr << "[UI] Failed to open file: " << filepath << std::endl;
             return false;
         }
-        
+
         // Clear current simulation
         Objects::ResetToInitialConditions();
         while (Objects::GetNumObjects() > 0)
         {
             Objects::RemoveObject(0);
         }
-        
+
         // Clear UI state
         selectedObjectIndex = -1;
         lastSelectedObjectIndex = -1;
         objectEquations.clear();
         objectPresets.clear();
         UIManager::objectConstraintWidgets.clear();
-        
+
         std::string line;
         std::string currentSection;
         Object currentObject;
         int currentObjectID = -1;
-        
+
         while (std::getline(file, line))
         {
             // Trim whitespace
             line.erase(0, line.find_first_not_of(" \t\r\n"));
             line.erase(line.find_last_not_of(" \t\r\n") + 1);
-            
+
             // Skip empty lines and comments
             if (line.empty() || line[0] == '#')
                 continue;
-            
+
             // Check for section headers
             if (line.size() > 1 && line[0] == '[' && line[line.size() - 1] == ']')
             {
                 currentSection = line.substr(1, line.size() - 2);
                 continue;
             }
-            
+
             // Parse based on current section
             if (currentSection == "SYSTEM_PARAMETERS")
             {
@@ -266,11 +266,11 @@ static bool LoadProject(const std::string& filepath)
                 {
                     std::string key = line.substr(0, eqPos);
                     std::string value = line.substr(eqPos + 1);
-                    
+
                     // Trim
                     key.erase(key.find_last_not_of(" \t") + 1);
                     value.erase(0, value.find_first_not_of(" \t"));
-                    
+
                     if (key == "gravity")
                         g_physics.gravity = std::stof(value);
                     else if (key == "damping")
@@ -290,11 +290,11 @@ static bool LoadProject(const std::string& filepath)
                 {
                     std::string key = line.substr(0, eqPos);
                     std::string value = line.substr(eqPos + 1);
-                    
+
                     // Trim
                     key.erase(key.find_last_not_of(" \t") + 1);
                     value.erase(0, value.find_first_not_of(" \t"));
-                    
+
                     if (key == "position")
                     {
                         size_t spacePos = value.find(' ');
@@ -320,7 +320,7 @@ static bool LoadProject(const std::string& filepath)
                     {
                         AddObjectFromLoadedData(currentObject, currentObject.visualSkinType);
                     }
-                    
+
                     // Parse object ID
                     size_t spacePos = line.find(' ');
                     if (spacePos != std::string::npos)
@@ -338,11 +338,11 @@ static bool LoadProject(const std::string& filepath)
                     {
                         std::string key = line.substr(0, eqPos);
                         std::string value = line.substr(eqPos + 1);
-                        
+
                         // Trim
                         key.erase(key.find_last_not_of(" \t") + 1);
                         value.erase(0, value.find_first_not_of(" \t"));
-                        
+
                         if (key == "position")
                         {
                             size_t spacePos = value.find(' ');
@@ -414,19 +414,19 @@ static bool LoadProject(const std::string& filepath)
                 }
             }
         }
-        
+
         // Add the last object if there is one
         if (currentObjectID >= 0)
         {
             AddObjectFromLoadedData(currentObject, currentObject.visualSkinType);
         }
-        
+
         // Upload all data to GPU
         Objects::UploadCpuDataToGpu();
-        
+
         // Update current file path
         currentFilePath = filepath;
-        
+
         // Extract filename for title
         std::string filename = fs::path(filepath).filename().string();
         size_t dotPos = filename.find_last_of('.');
@@ -438,20 +438,20 @@ static bool LoadProject(const std::string& filepath)
         {
             saveTitle = filename;
         }
-        
+
         // Initialize equations for loaded objects
         std::vector<Object> objects;
         Objects::FetchToCPU(Renderer::GetCurrentObjectBuffer(), objects);
-        
+
         for (size_t i = 0; i < objects.size(); ++i)
         {
             objectEquations[i] = presetEquations[0];
             objectPresets[i] = 0;
         }
-        
-        std::cout << "[UI] Successfully loaded " << objects.size() 
-                  << " objects from " << filepath << std::endl;
-        
+
+        std::cout << "[UI] Successfully loaded " << objects.size()
+            << " objects from " << filepath << std::endl;
+
         return true;
     }
     catch (const std::exception& e)
@@ -473,7 +473,7 @@ void UIManager::Initialize()
     objectEquations.clear();
     objectPresets.clear();
     objectConstraintWidgets.clear();
-    
+
     // Initialize file dialog state
     showOpenDialog = false;
     showSaveDialog = false;
@@ -500,30 +500,30 @@ void UIManager::RenderMainUI()
                 }
                 g_physics.globalTime = 0.0f;
                 g_camera.Reset();
-                
+
                 // Clear UI state
                 selectedObjectIndex = -1;
                 lastSelectedObjectIndex = -1;
                 objectEquations.clear();
                 objectPresets.clear();
                 objectConstraintWidgets.clear();
-                
+
                 // Reset file state
                 currentFilePath = "";
                 saveTitle = "Untitled Project";
                 saveAuthor = "";
                 saveDescription = "";
-                
+
                 std::cout << "[UI] Created new project" << std::endl;
             }
-            
+
             ImGui::Separator();
-            
+
             if (ImGui::MenuItem("Open Project...", "Ctrl+O"))
             {
                 showOpenDialog = true;
             }
-            
+
             if (ImGui::MenuItem("Save Project", "Ctrl+S"))
             {
                 if (currentFilePath.empty())
@@ -539,23 +539,23 @@ void UIManager::RenderMainUI()
                     }
                 }
             }
-            
+
             if (ImGui::MenuItem("Save Project As...", "Ctrl+Shift+S"))
             {
                 showSaveDialog = true;
             }
-            
+
             ImGui::Separator();
-            
+
             if (ImGui::MenuItem("Exit", "Alt+F4"))
             {
                 // Signal to close the window (you'll need to implement this)
                 // glfwSetWindowShouldClose(window, true);
             }
-            
+
             ImGui::EndMenu();
         }
-        
+
         if (ImGui::BeginMenu("Edit"))
         {
             if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {}
@@ -566,37 +566,37 @@ void UIManager::RenderMainUI()
             if (ImGui::MenuItem("Paste", "Ctrl+V", false, false)) {}
             ImGui::EndMenu();
         }
-        
+
         if (ImGui::BeginMenu("View"))
         {
             ImGui::MenuItem("Control Panel", NULL, true);  // Always open
             ImGui::MenuItem("Phase Space", NULL, &g_physics.showPhaseSpace);
             ImGui::EndMenu();
         }
-        
+
         if (ImGui::BeginMenu("Help"))
         {
             if (ImGui::MenuItem("About")) {}
             if (ImGui::MenuItem("Documentation")) {}
             ImGui::EndMenu();
         }
-        
+
         // Show current project in menu bar
         ImGui::SameLine(ImGui::GetWindowWidth() - 300);
-        ImGui::TextDisabled("%s%s", 
-            saveTitle.c_str(), 
+        ImGui::TextDisabled("%s%s",
+            saveTitle.c_str(),
             currentFilePath.empty() ? " [Unsaved]" : "");
-        
+
         ImGui::EndMainMenuBar();
     }
-    
+
     // Main dockspace (adjusted for menu bar height)
     ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetFrameHeight()));
-    ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, 
-                                   ImGui::GetIO().DisplaySize.y - ImGui::GetFrameHeight()));
+    ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x,
+        ImGui::GetIO().DisplaySize.y - ImGui::GetFrameHeight()));
     ImGui::Begin("MainDockSpace", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground);
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground);
     ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockspaceId, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::End();
@@ -699,9 +699,9 @@ void UIManager::RenderSimulationView()
     if (g_simulationViewportSize.y <= 0)
         g_simulationViewportSize.y = 480;
 
-    ImGui::Image((void *)(intptr_t)Renderer::GetMainFramebufferTexture(),
-                 ImVec2(g_simulationViewportSize.x, g_simulationViewportSize.y),
-                 ImVec2(0, 1), ImVec2(1, 0));
+    ImGui::Image((void*)(intptr_t)Renderer::GetMainFramebufferTexture(),
+        ImVec2(g_simulationViewportSize.x, g_simulationViewportSize.y),
+        ImVec2(0, 1), ImVec2(1, 0));
     ImGui::End();
 }
 
@@ -717,9 +717,9 @@ void UIManager::RenderPhaseSpaceView()
     if (phaseSpaceSize.y <= 0)
         phaseSpaceSize.y = 480;
 
-    ImGui::Image((void *)(intptr_t)Renderer::GetPhaseSpaceFramebufferTexture(),
-                 ImVec2(phaseSpaceSize.x, phaseSpaceSize.y),
-                 ImVec2(0, 1), ImVec2(1, 0));
+    ImGui::Image((void*)(intptr_t)Renderer::GetPhaseSpaceFramebufferTexture(),
+        ImVec2(phaseSpaceSize.x, phaseSpaceSize.y),
+        ImVec2(0, 1), ImVec2(1, 0));
     ImGui::End();
 }
 
@@ -732,12 +732,12 @@ void UIManager::RenderFileDialogs()
         config.path = ".";
         config.countSelectionMax = 1;
         config.flags = ImGuiFileDialogFlags_Modal;
-        
-        ImGuiFileDialog::Instance()->OpenDialog("OpenProjectDialog", "Open Project", 
-                                                ".stellar,.txt", config);
+
+        ImGuiFileDialog::Instance()->OpenDialog("OpenProjectDialog", "Open Project",
+            ".stellar,.txt", config);
         showOpenDialog = false;
     }
-    
+
     // Save File Dialog
     if (showSaveDialog)
     {
@@ -745,7 +745,7 @@ void UIManager::RenderFileDialogs()
         config.path = ".";
         config.countSelectionMax = 1;
         config.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ConfirmOverwrite;
-        
+
         // Suggest a filename
         if (currentFilePath.empty())
         {
@@ -755,15 +755,15 @@ void UIManager::RenderFileDialogs()
         {
             config.fileName = fs::path(currentFilePath).filename().string();
         }
-        
-        ImGuiFileDialog::Instance()->OpenDialog("SaveProjectDialog", "Save Project As", 
-                                                ".stellar", config);
+
+        ImGuiFileDialog::Instance()->OpenDialog("SaveProjectDialog", "Save Project As",
+            ".stellar", config);
         showSaveDialog = false;
     }
-    
+
     // Display and handle Open dialog
-    if (ImGuiFileDialog::Instance()->Display("OpenProjectDialog", ImGuiWindowFlags_NoCollapse, 
-                                              ImVec2(600, 400)))
+    if (ImGuiFileDialog::Instance()->Display("OpenProjectDialog", ImGuiWindowFlags_NoCollapse,
+        ImVec2(600, 400)))
     {
         if (ImGuiFileDialog::Instance()->IsOk())
         {
@@ -779,21 +779,21 @@ void UIManager::RenderFileDialogs()
         }
         ImGuiFileDialog::Instance()->Close();
     }
-    
+
     // Display and handle Save dialog
-    if (ImGuiFileDialog::Instance()->Display("SaveProjectDialog", ImGuiWindowFlags_NoCollapse, 
-                                              ImVec2(600, 400)))
+    if (ImGuiFileDialog::Instance()->Display("SaveProjectDialog", ImGuiWindowFlags_NoCollapse,
+        ImVec2(600, 400)))
     {
         if (ImGuiFileDialog::Instance()->IsOk())
         {
             std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-            
+
             // Ensure .stellar extension
             if (fs::path(filePathName).extension() != ".stellar")
             {
                 filePathName += ".stellar";
             }
-            
+
             if (SaveCurrentProject(filePathName))
             {
                 std::cout << "[UI] Successfully saved project: " << filePathName << std::endl;
@@ -882,7 +882,7 @@ void UIManager::RenderObjectsTab()
             ImGui::SameLine();
 
             // Show skin type icon
-            const char *skinIcon = "●"; // Circle
+            const char* skinIcon = "●"; // Circle
             if (currentCpuObjects[i].visualSkinType == SKIN_RECTANGLE)
                 skinIcon = "■";
             else if (currentCpuObjects[i].visualSkinType == SKIN_POLYGON)
@@ -892,8 +892,8 @@ void UIManager::RenderObjectsTab()
 
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 90);
             ImGui::TextDisabled("(%.1f, %.1f)",
-                                currentCpuObjects[i].position.x,
-                                currentCpuObjects[i].position.y);
+                currentCpuObjects[i].position.x,
+                currentCpuObjects[i].position.y);
 
             ImGui::PopID();
         }
@@ -957,14 +957,14 @@ void UIManager::RenderPropertiesTab()
     ImGui::Text("Editing Object %d", selectedObjectIndex);
     ImGui::SameLine();
 
-    const char *skinIcon = "●";
+    const char* skinIcon = "●";
     if (p_copy.visualSkinType == SKIN_RECTANGLE)
         skinIcon = "■";
     else if (p_copy.visualSkinType == SKIN_POLYGON)
         skinIcon = "⬡";
 
     ImGui::TextColored(ImVec4(0.8f, 0.4f, 0.1f, 1.0f), "%s %s",
-                       skinIcon, SkinTypeNames[p_copy.visualSkinType]);
+        skinIcon, SkinTypeNames[p_copy.visualSkinType]);
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -1035,7 +1035,7 @@ void UIManager::RenderPropertiesTab()
 
         ImGui::Text("Color (RGBA)");
         ImGui::SetNextItemWidth(-1);
-        float color[4] = {p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a};
+        float color[4] = { p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a };
         if (ImGui::ColorEdit4("##CircleColor", color))
         {
             p_copy.color.r = color[0];
@@ -1094,7 +1094,7 @@ void UIManager::RenderPropertiesTab()
 
         ImGui::Text("Color (RGBA)");
         ImGui::SetNextItemWidth(-1);
-        float color[4] = {p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a};
+        float color[4] = { p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a };
         if (ImGui::ColorEdit4("##RectColor", color))
         {
             p_copy.color.r = color[0];
@@ -1154,7 +1154,7 @@ void UIManager::RenderPropertiesTab()
 
         ImGui::Text("Color (RGBA)");
         ImGui::SetNextItemWidth(-1);
-        float color[4] = {p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a};
+        float color[4] = { p_copy.color.r, p_copy.color.g, p_copy.color.b, p_copy.color.a };
         if (ImGui::ColorEdit4("##PolyColor", color))
         {
             p_copy.color.r = color[0];
@@ -1231,7 +1231,7 @@ void UIManager::RenderPropertiesTab()
 
         // Load existing constraints from object system
         auto existingConstraints = Objects::GetConstraints(selectedObjectIndex);
-        for (const auto &c : existingConstraints)
+        for (const auto& c : existingConstraints)
         {
             ConstraintWidget widget;
             widget.type = c.type;
@@ -1273,8 +1273,8 @@ void UIManager::RenderPropertiesTab()
     ImGui::Text("Custom Equation");
     ImGui::SetNextItemWidth(-1);
     if (ImGui::InputTextMultiline("##ObjectEquation",
-                                  &objectEquations[selectedObjectIndex],
-                                  ImVec2(-1, 80)))
+        &objectEquations[selectedObjectIndex],
+        ImVec2(-1, 80)))
     {
         objectPresets[selectedObjectIndex] = 0;
     }
@@ -1301,28 +1301,22 @@ void UIManager::RenderPropertiesTab()
             Objects::SetEquation(objectEquations[selectedObjectIndex], parsed, selectedObjectIndex);
 
             CheckGLError("After SetEquation");
-            Objects::DebugPrintObjectEquation(selectedObjectIndex);
-
-            if (!Objects::DebugValidateEquationSystem())
-            {
-                std::cerr << "WARNING: Equation system validation failed after applying equation!" << std::endl;
-            }
 
             Objects::FetchToCPU(Renderer::GetCurrentObjectBuffer(), currentCpuObjects);
 
             if (selectedObjectIndex < (int)currentCpuObjects.size())
             {
                 std::cout << "Equation applied! ID: "
-                          << currentCpuObjects[selectedObjectIndex].equationID << std::endl;
+                    << currentCpuObjects[selectedObjectIndex].equationID << std::endl;
                 p_copy = currentCpuObjects[selectedObjectIndex];
             }
         }
-        catch (std::exception &e)
+        catch (std::exception& e)
         {
             std::cerr << "Equation parse error: " << e.what() << "\n";
         }
         std::cout << "========================================\n"
-                  << std::endl;
+            << std::endl;
     }
     ImGui::PopStyleColor(3);
 }
@@ -1461,11 +1455,11 @@ void UIManager::RenderProjectTab()
     ImGui::Spacing();
     ImGui::Text("Current Project");
     ImGui::Spacing();
-    
+
     ImGui::Text("Title:");
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "%s", saveTitle.c_str());
-    
+
     if (!currentFilePath.empty())
     {
         ImGui::Text("File:");
@@ -1476,60 +1470,60 @@ void UIManager::RenderProjectTab()
     {
         ImGui::TextDisabled("(Unsaved project)");
     }
-    
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     ImGui::Text("Project Info");
     ImGui::Spacing();
-    
+
     ImGui::Text("Title:");
     ImGui::InputText("##ProjectTitle", &saveTitle);
-    
+
     ImGui::Text("Author:");
     ImGui::InputText("##ProjectAuthor", &saveAuthor);
-    
+
     ImGui::Text("Description:");
     ImGui::InputTextMultiline("##ProjectDesc", &saveDescription, ImVec2(-1, 80));
-    
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     ImGui::Text("Statistics");
     ImGui::Spacing();
-    
+
     std::vector<Object> objects;
     Objects::FetchToCPU(Renderer::GetCurrentObjectBuffer(), objects);
-    
+
     ImGui::Text("Objects: %d", (int)objects.size());
     ImGui::Text("Simulation Time: %.2fs", g_physics.globalTime);
-    
+
     // File operations
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    
+
     ImGui::Text("File Operations");
     ImGui::Spacing();
-    
+
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
     if (ImGui::Button("Open Project...", ImVec2(ImGui::GetContentRegionAvail().x * 0.48f, 30)))
     {
         showOpenDialog = true;
     }
     ImGui::PopStyleColor();
-    
+
     ImGui::SameLine();
-    
+
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.1f, 1.0f));
     if (ImGui::Button("Save Project As...", ImVec2(-1, 30)))
     {
         showSaveDialog = true;
     }
     ImGui::PopStyleColor();
-    
+
     // Quick save if we have a file path
     if (!currentFilePath.empty())
     {

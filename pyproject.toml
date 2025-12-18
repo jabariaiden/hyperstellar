@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hyperstellar"
-version = "0.1.9"
+version = "0.1.21"
 description = "GPU-accelerated physics simulation engine"
 readme = "README.md"
 authors = [{name = "Aiden Jabari", email = "Jabariaiden15@email.com"}]
@@ -31,6 +31,18 @@ where = ["hyperstellar/src"]
 [tool.setuptools.package-data]
 "hyperstellar._native" = ["**/*"]
 "hyperstellar" = ["py.typed", "__init__.pyi"]
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

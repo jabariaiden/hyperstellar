@@ -80,6 +80,49 @@ class BatchConfig:
     
     def __init__(self) -> None: ...
 
+# NEW: Batch data structures
+class BatchGetData:
+    """Batch get data structure for fetching multiple objects at once."""
+    x: float
+    y: float
+    vx: float
+    vy: float
+    mass: float
+    charge: float
+    rotation: float
+    angular_velocity: float
+    width: float
+    height: float
+    radius: float
+    polygon_sides: int
+    skin_type: int
+    r: float
+    g: float
+    b: float
+    a: float
+    
+    def __init__(self) -> None: ...
+
+class BatchUpdateData:
+    """Batch update data structure for updating multiple objects at once."""
+    index: int
+    x: float
+    y: float
+    vx: float
+    vy: float
+    mass: float
+    charge: float
+    rotation: float
+    angular_velocity: float
+    width: float
+    height: float
+    r: float
+    g: float
+    b: float
+    a: float
+    
+    def __init__(self) -> None: ...
+
 class DistanceConstraint:
     """Maintain distance between two objects."""
     target_object: int
@@ -102,12 +145,21 @@ class BoundaryConstraint:
 class Simulation:
     """Main physics simulation class."""
     
-    def __init__(self, headless: bool = True, width: int = 1280, height: int = 720, title: str = "Physics Simulation") -> None: ...
+    def __init__(self, 
+                 headless: bool = True, 
+                 width: int = 1280, 
+                 height: int = 720, 
+                 title: str = "Physics Simulation",
+                 enable_grid: bool = True) -> None: ...
     
     # Window management
     def render(self) -> None: ...
     def process_input(self) -> None: ...
     def should_close(self) -> bool: ...
+    
+    # NEW: Grid control
+    def set_grid_enabled(self, enabled: bool) -> None: ...
+    def get_grid_enabled(self) -> bool: ...
     
     # Core simulation
     def update(self, dt: float = 0.016) -> None: ...
@@ -144,6 +196,10 @@ class Simulation:
         width: float, height: float,
         r: float, g: float, b: float, a: float
     ) -> None: ...
+    
+    # NEW: Batch operations
+    def batch_get(self, indices: List[int]) -> List[BatchGetData]: ...
+    def batch_update(self, updates: List[BatchUpdateData]) -> None: ...
     
     def remove_object(self, index: int) -> None: ...
     def object_count(self) -> int: ...

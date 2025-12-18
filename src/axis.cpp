@@ -10,7 +10,9 @@
 #include <iostream>
 #include <algorithm>
 
-// Static member initialization
+// ============================================================================
+// Static Member Definitions
+// ============================================================================
 GLuint Axis::VAO = 0;
 GLuint Axis::VBO = 0;
 GLuint Axis::ColorVBO = 0;
@@ -19,6 +21,7 @@ GLuint Axis::AxisVAO = 0;
 GLuint Axis::AxisVBO = 0;
 GLuint Axis::AxisColorVBO = 0;
 GLuint Axis::AxisWidthVBO = 0;
+
 std::vector<glm::vec2> Axis::vertices;
 std::vector<glm::vec3> Axis::colors;
 std::vector<float> Axis::widths;
@@ -27,6 +30,7 @@ std::vector<glm::vec3> Axis::axisColors;
 std::vector<float> Axis::axisWidths;
 std::vector<Axis::GridLabel> Axis::labels;
 Axis::Style Axis::style;
+
 // ============================================================================
 // Init / Cleanup
 // ============================================================================
@@ -162,16 +166,59 @@ float Axis::CalculateLineOpacity(float zoom, float spacing, int level) {
 }
 
 // ============================================================================
-// Grid Generation
+// Dynamic Buffer Calculation - THE FIX
+// ============================================================================
+float Axis::CalculateDynamicBuffer(const Camera& camera, float halfWidth, float halfHeight) {
+    // Camera movement formula from camera.cpp:
+    // movement = moveSpeed * zoom * deltaTime
+
+    // Constants matching camera.cpp
+    const float MOVE_SPEED = 5.0f;           // Camera::moveSpeed
+    const float MAX_ZOOM = 100.0f;           // Camera::ProcessInput clamp
+    const float WORST_DELTA_TIME = 0.05f;    // 20 FPS during lag
+
+    // How many frames ahead we need to cover
+    // At 60 FPS, holding key for 1 second = 60 frames
+    // We'll be conservative and cover 2 seconds of movement
+    const int FRAMES_TO_COVER = 120;  // 2 seconds at 60 FPS
+
+    // Calculate worst-case pan distance
+    // Maximum zoom (100.0) * moveSpeed * worst delta time * frames
+    float maxPanDistance = MOVE_SPEED * camera.zoom * WORST_DELTA_TIME * FRAMES_TO_COVER;
+
+    // Convert to viewport units
+    float panBufferX = maxPanDistance / halfWidth;
+    float panBufferY = maxPanDistance / halfHeight;
+
+    // Base buffer for normal viewing (in viewport units)
+    float baseBuffer = 1.5f;
+
+    // Buffer must scale with zoom for consistency
+    // When zoomed out (zoom > 1.0), we need larger buffer
+    float zoomScale = std::max(1.0f, camera.zoom / 10.0f);
+    float zoomBuffer = baseBuffer * std::sqrt(zoomScale); // sqrt for smooth scaling
+
+    // Use the maximum of all buffer calculations
+    float finalBuffer = std::max({ baseBuffer, zoomBuffer, panBufferX, panBufferY });
+
+    // Cap at reasonable maximum
+    finalBuffer = std::min(finalBuffer, 15.0f);
+
+    return finalBuffer;
+}
+
+// ============================================================================
+// Grid Generation - WITH FIXED BUFFER CALCULATION
 // ============================================================================
 void Axis::GenerateGridLines(const Camera& camera, float viewportWidth, float viewportHeight) {
     float aspect = viewportWidth / viewportHeight;
     float halfHeight = camera.zoom;
     float halfWidth = halfHeight * aspect;
 
-    // ONLY generate what's visible + small buffer
-    // This is the key to infinite grid - we regenerate based on camera position every frame
-    float buffer = 1.2f; // Small buffer to prevent popping at edges
+    // Calculate dynamic buffer based on camera movement physics
+    float buffer = CalculateDynamicBuffer(camera, halfWidth, halfHeight);
+
+    // Calculate generation bounds
     float left = camera.position.x - halfWidth * buffer;
     float right = camera.position.x + halfWidth * buffer;
     float bottom = camera.position.y - halfHeight * buffer;
@@ -232,8 +279,10 @@ void Axis::GenerateAxes(const Camera& camera, float viewportWidth, float viewpor
     float halfHeight = camera.zoom;
     float halfWidth = halfHeight * aspect;
 
-    // Axes extend across entire visible viewport + buffer
-    float buffer = 1.2f;
+    // Use the same dynamic buffer calculation for consistency
+    float buffer = CalculateDynamicBuffer(camera, halfWidth, halfHeight);
+
+    // Axes extend across the entire generated area
     float left = camera.position.x - halfWidth * buffer;
     float right = camera.position.x + halfWidth * buffer;
     float bottom = camera.position.y - halfHeight * buffer;
@@ -257,7 +306,7 @@ void Axis::GenerateAxes(const Camera& camera, float viewportWidth, float viewpor
 }
 
 // ============================================================================
-// Label Generation (Text rendering optional)
+// Label Generation
 // ============================================================================
 std::string Axis::FormatLabel(float value, float spacing) {
     if (std::abs(value) < 0.0001f) return "0";
@@ -288,15 +337,15 @@ void Axis::GenerateLabels(const Camera& camera, float viewportWidth, float viewp
     labels.clear();
 
     // Labels are optional - skip if text rendering is disabled
-    // We'll still generate label data, but DrawLabels will decide whether to render them
     float majorSpacing = CalculateOptimalSpacing(camera.zoom, 0);
 
     float aspect = viewportWidth / viewportHeight;
     float halfHeight = camera.zoom;
     float halfWidth = halfHeight * aspect;
 
-    // Generate labels only for visible area
-    float buffer = 1.2f;
+    // Use the same dynamic buffer for labels
+    float buffer = CalculateDynamicBuffer(camera, halfWidth, halfHeight);
+
     float left = camera.position.x - halfWidth * buffer;
     float right = camera.position.x + halfWidth * buffer;
     float bottom = camera.position.y - halfHeight * buffer;
@@ -348,8 +397,6 @@ void Axis::GenerateLabels(const Camera& camera, float viewportWidth, float viewp
 // Main Update
 // ============================================================================
 void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeight) {
-    std::cout << "[Axis::Update] Starting update" << std::endl;
-
     // Clear all buffers
     vertices.clear();
     colors.clear();
@@ -359,22 +406,10 @@ void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeigh
     axisWidths.clear();
     labels.clear();
 
-    std::cout << "[Axis::Update] Buffers cleared" << std::endl;
-
     // Generate grid and axes based on CURRENT camera position
     GenerateGridLines(camera, viewportWidth, viewportHeight);
     GenerateAxes(camera, viewportWidth, viewportHeight);
     GenerateLabels(camera, viewportWidth, viewportHeight);
-
-    std::cout << "[Axis::Update] Generated "
-        << vertices.size() << " vertices, "
-        << axisVertices.size() << " axis vertices, "
-        << labels.size() << " labels" << std::endl;
-
-    // =====================================================================
-    // CRITICAL FIX: Validate buffer sizes BEFORE uploading to GPU
-    // Intel iGPU rejects zero-sized buffers with GL_INVALID_VALUE
-    // =====================================================================
 
     // Upload grid to GPU (only if we have data)
     glBindVertexArray(VAO);
@@ -391,12 +426,9 @@ void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeigh
         glBindBuffer(GL_ARRAY_BUFFER, WidthVBO);
         glBufferData(GL_ARRAY_BUFFER, widths.size() * sizeof(float),
             widths.data(), GL_DYNAMIC_DRAW);
-
-        std::cout << "[Axis::Update] Uploaded grid data to GPU" << std::endl;
     }
     else {
         // Upload minimal valid buffers to prevent GL errors
-        // Intel drivers need buffers to exist even if empty
         glm::vec2 dummyVert(0.0f, 0.0f);
         glm::vec3 dummyColor(0.0f, 0.0f, 0.0f);
         float dummyWidth = 0.0f;
@@ -409,8 +441,6 @@ void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeigh
 
         glBindBuffer(GL_ARRAY_BUFFER, WidthVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(float), &dummyWidth, GL_DYNAMIC_DRAW);
-
-        std::cout << "[Axis::Update] Uploaded dummy grid buffers" << std::endl;
     }
 
     glBindVertexArray(0);
@@ -430,8 +460,6 @@ void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeigh
         glBindBuffer(GL_ARRAY_BUFFER, AxisWidthVBO);
         glBufferData(GL_ARRAY_BUFFER, axisWidths.size() * sizeof(float),
             axisWidths.data(), GL_DYNAMIC_DRAW);
-
-        std::cout << "[Axis::Update] Uploaded axis data to GPU" << std::endl;
     }
     else {
         // Upload minimal valid buffers
@@ -447,28 +475,15 @@ void Axis::Update(const Camera& camera, float viewportWidth, float viewportHeigh
 
         glBindBuffer(GL_ARRAY_BUFFER, AxisWidthVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(float), &dummyWidth, GL_DYNAMIC_DRAW);
-
-        std::cout << "[Axis::Update] Uploaded dummy axis buffers" << std::endl;
     }
 
     glBindVertexArray(0);
-
-    // Clear any errors that might have occurred
-    GLenum err = glGetError();
-    if (err != GL_NO_ERROR) {
-        std::cerr << "[Axis::Update] OpenGL error after buffer upload: " << err << std::endl;
-    }
-    else {
-        std::cout << "[Axis::Update] Update completed successfully" << std::endl;
-    }
 }
 
 // ============================================================================
 // Drawing
 // ============================================================================
 void Axis::Draw(GLuint program, const glm::mat4& projView) {
-    std::cout << "[Axis::Draw] Starting draw" << std::endl;
-
     glUseProgram(program);
 
     // Set projection matrix
@@ -480,26 +495,16 @@ void Axis::Draw(GLuint program, const glm::mat4& projView) {
     // Draw grid FIRST
     if (!vertices.empty()) {
         glBindVertexArray(VAO);
-        std::cout << "[Axis::Draw] Drawing " << vertices.size() << " grid vertices" << std::endl;
         glDrawArrays(GL_LINES, 0, (GLsizei)vertices.size());
         glBindVertexArray(0);
-    }
-    else {
-        std::cout << "[Axis::Draw] No grid vertices to draw" << std::endl;
     }
 
     // Draw axes SECOND (on top of grid)
     if (!axisVertices.empty()) {
         glBindVertexArray(AxisVAO);
-        std::cout << "[Axis::Draw] Drawing " << axisVertices.size() << " axis vertices" << std::endl;
         glDrawArrays(GL_LINES, 0, (GLsizei)axisVertices.size());
         glBindVertexArray(0);
     }
-    else {
-        std::cout << "[Axis::Draw] No axis vertices to draw" << std::endl;
-    }
-
-    std::cout << "[Axis::Draw] Draw completed" << std::endl;
 }
 
 // ============================================================================
@@ -546,17 +551,12 @@ bool Axis::IsNearXAxis(float yWorld, const Camera& cam, float vw, float vh, floa
 }
 
 // ============================================================================
-// Label Drawing (Text rendering optional)
+// Label Drawing
 // ============================================================================
 void Axis::DrawLabels(TextRenderer& textRenderer, const Camera& camera,
     float viewportWidth, float viewportHeight) {
 
-    std::cout << "[Axis::DrawLabels] Function called" << std::endl;
-
-    // Check if we should skip text rendering
-    // This can be controlled by a compile-time flag or runtime flag
 #ifdef NO_TEXT_RENDERING
-    std::cout << "[Axis::DrawLabels] Text rendering disabled (NO_TEXT_RENDERING defined)" << std::endl;
     return;
 #endif
 
@@ -566,77 +566,5 @@ void Axis::DrawLabels(TextRenderer& textRenderer, const Camera& camera,
     (void)viewportWidth;
     (void)viewportHeight;
 
-    std::cout << "[Axis::DrawLabels] Would draw " << labels.size() << " labels if text rendering enabled" << std::endl;
-
-    // For now, just return - text rendering is optional
-    // To enable text rendering, remove NO_TEXT_RENDERING from compiler flags
-    // and implement the actual text rendering code below
-
     return;
-
-    // ============================================================================
-    // ORIGINAL TEXT RENDERING CODE BELOW (preserved for later re-enabling)
-    // ============================================================================
-    /*
-    const float bottomMargin = 25.0f;    // Distance from bottom for x-axis labels
-    const float leftMargin = 35.0f;      // Distance from left for y-axis labels
-    const float edgeBuffer = 60.0f;      // Buffer from screen edges
-
-    // Calculate where the actual axes are on screen
-    float xAxisScreenY = WorldToScreenY(0.0f, camera, viewportHeight);
-    float yAxisScreenX = WorldToScreenX(0.0f, camera, viewportWidth, viewportHeight);
-
-    for (const auto& label : labels) {
-        glm::vec2 screenPos;
-
-        if (label.isXAxis) {
-            // X-axis labels: position at bottom but horizontally aligned with grid line
-            screenPos.x = WorldToScreenX(label.position.x, camera, viewportWidth, viewportHeight);
-            screenPos.y = bottomMargin; // Fixed at bottom
-
-            // Skip if too close to screen edges or if the grid line is off-screen
-            if (screenPos.x < edgeBuffer || screenPos.x > viewportWidth - edgeBuffer) continue;
-
-            // Center the label horizontally under the grid line
-            screenPos.x -= 6.0f * label.text.length();
-
-        }
-        else {
-            // Y-axis labels: position at left but vertically aligned with grid line
-            screenPos.x = leftMargin; // Fixed at left
-            screenPos.y = WorldToScreenY(label.position.y, camera, viewportHeight);
-
-            // Skip if too close to screen edges or if the grid line is off-screen
-            if (screenPos.y < edgeBuffer || screenPos.y > viewportHeight - edgeBuffer) continue;
-
-            // Center the label vertically aligned with grid line
-            screenPos.y -= 8.0f;
-        }
-
-        // Style settings
-        glm::vec3 color = glm::vec3(0.9f, 0.9f, 0.9f);
-        float fontSize = 0.35f;
-
-        // Special styling for origin - position it at the actual axis intersection
-        if (label.text == "0") {
-            color = glm::vec3(1.0f, 1.0f, 1.0f);
-            fontSize = 0.4f;
-
-            // Position origin at the actual axis intersection point
-            screenPos.x = yAxisScreenX - 8.0f; // Left of Y-axis
-            screenPos.y = xAxisScreenY + 20.0f; // Below X-axis
-
-            // Clamp to ensure it stays visible
-            screenPos.x = glm::clamp(screenPos.x, leftMargin + 10.0f, viewportWidth - 30.0f);
-            screenPos.y = glm::clamp(screenPos.y, bottomMargin + 5.0f, viewportHeight - 30.0f);
-        }
-
-        textRenderer.RenderText(label.text, screenPos.x, screenPos.y,
-            fontSize, color, label.opacity,
-            viewportWidth, viewportHeight);
-    }
-    */
-    // ============================================================================
-    // END OF TEXT RENDERING CODE
-    // ============================================================================
 }

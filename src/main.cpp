@@ -214,21 +214,8 @@ int main()
 
         static int debugFrame = 0;
         if (debugFrame % 60 == 0)
-        { // Every second
-            std::cout << "=== FRAME " << debugFrame << " ===" << std::endl;
-            std::cout << "Paused: " << Renderer::IsSimulationPaused() << std::endl;
-            std::cout << "Object count: " << Objects::GetNumObjects() << std::endl;
-
-            // Read back object data to see if it's changing
-            std::vector<Object> debugObjects;
-            Objects::FetchToCPU(0, debugObjects);
-            for (size_t i = 0; i < std::min(debugObjects.size(), size_t(5)); ++i)
-            {
-                std::cout << "Object " << i << " position: (" << debugObjects[i].position.x
-                          << ", " << debugObjects[i].position.y << ")" << std::endl;
-            }
-            std::cout << "\n DIAGNOSTIC POINT 4: During Simulation (frame " << debugFrame << ")\n";
-            Objects::RunFullDiagnostic();
+        { 
+            //stuff to debug... 
         }
         debugFrame++;
     }

@@ -41,6 +41,45 @@ struct ObjectState
     float r, g, b, a;
 };
 
+// Add these structs to simulation_wrapper.h
+struct BatchUpdateData {
+    int index;
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float mass;
+    float charge;
+    float rotation;
+    float angular_velocity;
+    float width;
+    float height;
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
+struct BatchGetData {
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float mass;
+    float charge;
+    float rotation;
+    float angular_velocity;
+    float width;
+    float height;
+    float radius;
+    int polygon_sides;
+    int skin_type;
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
 // Constraint types for Python
 struct DistanceConstraint
 {
@@ -107,6 +146,7 @@ private:
     std::string m_title;
     int m_width, m_height;
     float m_simulationTime = 0.0f;
+    bool m_enable_grid;
 
     bool init_headless();
     bool init_windowed(int width, int height, const std::string &title);
@@ -117,8 +157,11 @@ private:
 
 public:
     SimulationWrapper(bool headless = true, int width = 1280, int height = 720,
-                      std::string title = "Physics Simulation");
+        std::string title = "Physics Simulation", bool enable_grid = true);
     ~SimulationWrapper();
+
+    void set_grid_enabled(bool enabled) { m_enable_grid = enabled; }
+    bool get_grid_enabled() const { return m_enable_grid; }
 
     // Core simulation
     void update(float dt);
@@ -148,6 +191,10 @@ public:
         float rotation, float angular_velocity,
         float width, float height,
         float r, float g, float b, float a);
+
+    //batch get and update
+    std::vector<BatchGetData> batch_get(const std::vector<int>& indices) const;
+    void batch_update(const std::vector<BatchUpdateData>& updates);
 
     // NEW: Convenience methods for specific properties
     void set_rotation(int index, float rotation);

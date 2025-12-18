@@ -95,11 +95,11 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("g", &ObjectState::g, "Green color component (0.0-1.0)")
         .def_readwrite("b", &ObjectState::b, "Blue color component (0.0-1.0)")
         .def_readwrite("a", &ObjectState::a, "Alpha/opacity (0.0-1.0)")
-        .def("__repr__", [](const ObjectState &p) {
-            return "<ObjectState pos=(" + std::to_string(p.x) + ", " +
-                   std::to_string(p.y) + ") vel=(" + std::to_string(p.vx) +
-                   ", " + std::to_string(p.vy) + ") mass=" + std::to_string(p.mass) + ">";
-        });
+        .def("__repr__", [](const ObjectState& p) {
+        return "<ObjectState pos=(" + std::to_string(p.x) + ", " +
+            std::to_string(p.y) + ") vel=(" + std::to_string(p.vx) +
+            ", " + std::to_string(p.vy) + ") mass=" + std::to_string(p.mass) + ">";
+            });
 
     // =========================================================================
     // OBJECT CONFIG (for batch mode)
@@ -135,10 +135,10 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("a", &ObjectConfig::a, "Alpha/opacity")
         .def_readwrite("polygon_sides", &ObjectConfig::polygon_sides, "Polygon sides")
         .def_readwrite("equation", &ObjectConfig::equation, "Physics equation")
-        .def("__repr__", [](const ObjectConfig &p) {
-            return "<ObjectConfig pos=(" + std::to_string(p.x) + ", " +
-                   std::to_string(p.y) + ") mass=" + std::to_string(p.mass) + ">";
-        });
+        .def("__repr__", [](const ObjectConfig& p) {
+        return "<ObjectConfig pos=(" + std::to_string(p.x) + ", " +
+            std::to_string(p.y) + ") mass=" + std::to_string(p.mass) + ">";
+            });
 
     py::class_<ConstraintConfig>(m, "ConstraintConfig", "Constraint configuration for batch mode")
         .def(py::init<>(), "Create default constraint config")
@@ -165,6 +165,47 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("output_file", &BatchConfig::output_file, "Output file path (optional)");
 
     // =========================================================================
+    // BATCH DATA STRUCTURES
+    // =========================================================================
+    py::class_<BatchGetData>(m, "BatchGetData", "Batch get data structure")
+        .def(py::init<>())
+        .def_readwrite("x", &BatchGetData::x)
+        .def_readwrite("y", &BatchGetData::y)
+        .def_readwrite("vx", &BatchGetData::vx)
+        .def_readwrite("vy", &BatchGetData::vy)
+        .def_readwrite("mass", &BatchGetData::mass)
+        .def_readwrite("charge", &BatchGetData::charge)
+        .def_readwrite("rotation", &BatchGetData::rotation)
+        .def_readwrite("angular_velocity", &BatchGetData::angular_velocity)
+        .def_readwrite("width", &BatchGetData::width)
+        .def_readwrite("height", &BatchGetData::height)
+        .def_readwrite("radius", &BatchGetData::radius)
+        .def_readwrite("polygon_sides", &BatchGetData::polygon_sides)
+        .def_readwrite("skin_type", &BatchGetData::skin_type)
+        .def_readwrite("r", &BatchGetData::r)
+        .def_readwrite("g", &BatchGetData::g)
+        .def_readwrite("b", &BatchGetData::b)
+        .def_readwrite("a", &BatchGetData::a);
+
+    py::class_<BatchUpdateData>(m, "BatchUpdateData", "Batch update data structure")
+        .def(py::init<>())
+        .def_readwrite("index", &BatchUpdateData::index)
+        .def_readwrite("x", &BatchUpdateData::x)
+        .def_readwrite("y", &BatchUpdateData::y)
+        .def_readwrite("vx", &BatchUpdateData::vx)
+        .def_readwrite("vy", &BatchUpdateData::vy)
+        .def_readwrite("mass", &BatchUpdateData::mass)
+        .def_readwrite("charge", &BatchUpdateData::charge)
+        .def_readwrite("rotation", &BatchUpdateData::rotation)
+        .def_readwrite("angular_velocity", &BatchUpdateData::angular_velocity)
+        .def_readwrite("width", &BatchUpdateData::width)
+        .def_readwrite("height", &BatchUpdateData::height)
+        .def_readwrite("r", &BatchUpdateData::r)
+        .def_readwrite("g", &BatchUpdateData::g)
+        .def_readwrite("b", &BatchUpdateData::b)
+        .def_readwrite("a", &BatchUpdateData::a);
+
+    // =========================================================================
     // CONSTRAINT TYPES
     // =========================================================================
     py::class_<DistanceConstraint>(m, "DistanceConstraint", R"pbdoc(
@@ -176,17 +217,17 @@ PYBIND11_MODULE(stellar, m)
             stiffness (float): Constraint stiffness (higher = stronger)
         )pbdoc")
         .def(py::init<int, float, float>(),
-             py::arg("target_object") = 0,
-             py::arg("rest_length") = 5.0f,
-             py::arg("stiffness") = 100.0f,
-             "Create distance constraint")
+            py::arg("target_object") = 0,
+            py::arg("rest_length") = 5.0f,
+            py::arg("stiffness") = 100.0f,
+            "Create distance constraint")
         .def_readwrite("target_object", &DistanceConstraint::target_object, "Target object ID")
         .def_readwrite("rest_length", &DistanceConstraint::rest_length, "Desired distance")
         .def_readwrite("stiffness", &DistanceConstraint::stiffness, "Constraint stiffness")
-        .def("__repr__", [](const DistanceConstraint &c) {
-            return "<DistanceConstraint target=" + std::to_string(c.target_object) +
-                   " length=" + std::to_string(c.rest_length) + ">";
-        });
+        .def("__repr__", [](const DistanceConstraint& c) {
+        return "<DistanceConstraint target=" + std::to_string(c.target_object) +
+            " length=" + std::to_string(c.rest_length) + ">";
+            });
 
     py::class_<BoundaryConstraint>(m, "BoundaryConstraint", R"pbdoc(
         Keep object within a rectangular boundary.
@@ -198,20 +239,20 @@ PYBIND11_MODULE(stellar, m)
             max_y (float): Maximum Y boundary
         )pbdoc")
         .def(py::init<float, float, float, float>(),
-             py::arg("min_x") = -10.0f,
-             py::arg("max_x") = 10.0f,
-             py::arg("min_y") = -10.0f,
-             py::arg("max_y") = 10.0f,
-             "Create boundary constraint")
+            py::arg("min_x") = -10.0f,
+            py::arg("max_x") = 10.0f,
+            py::arg("min_y") = -10.0f,
+            py::arg("max_y") = 10.0f,
+            "Create boundary constraint")
         .def_readwrite("min_x", &BoundaryConstraint::min_x, "Minimum X")
         .def_readwrite("max_x", &BoundaryConstraint::max_x, "Maximum X")
         .def_readwrite("min_y", &BoundaryConstraint::min_y, "Minimum Y")
         .def_readwrite("max_y", &BoundaryConstraint::max_y, "Maximum Y")
-        .def("__repr__", [](const BoundaryConstraint &c) {
-            return "<BoundaryConstraint x=[" + std::to_string(c.min_x) + "," +
-                   std::to_string(c.max_x) + "] y=[" + std::to_string(c.min_y) +
-                   "," + std::to_string(c.max_y) + "]>";
-        });
+        .def("__repr__", [](const BoundaryConstraint& c) {
+        return "<BoundaryConstraint x=[" + std::to_string(c.min_x) + "," +
+            std::to_string(c.max_x) + "] y=[" + std::to_string(c.min_y) +
+            "," + std::to_string(c.max_y) + "]>";
+            });
 
     // =========================================================================
     // MAIN SIMULATION CLASS
@@ -222,12 +263,13 @@ PYBIND11_MODULE(stellar, m)
         Provides real-time physics simulation with GPU acceleration.
         Can run in headless mode (no window) or with OpenGL visualization.
         )pbdoc")
-        .def(py::init<bool, int, int, std::string>(),
-             py::arg("headless") = true,
-             py::arg("width") = 1280,
-             py::arg("height") = 720,
-             py::arg("title") = "Physics Simulation",
-             R"pbdoc(
+        .def(py::init<bool, int, int, std::string, bool>(),
+            py::arg("headless") = true,
+            py::arg("width") = 1280,
+            py::arg("height") = 720,
+            py::arg("title") = "Physics Simulation",
+            py::arg("enable_grid") = true,  // New parameter
+            R"pbdoc(
              Create a new simulation instance.
              
              Args:
@@ -235,24 +277,43 @@ PYBIND11_MODULE(stellar, m)
                  width (int): Window width in pixels. Default: 1280.
                  height (int): Window height in pixels. Default: 720.
                  title (str): Window title. Default: "Physics Simulation".
+                 enable_grid (bool): Enable grid/axis rendering. Default: True.
                  
              Example:
-                 >>> sim = Simulation(headless=True)
-                 >>> sim = Simulation(width=1920, height=1080, title="My Simulation")
+                 >>> sim = Simulation(headless=True, enable_grid=False)
+                 >>> sim = Simulation(width=1920, height=1080, title="My Simulation", enable_grid=True)
              )pbdoc")
 
         // Window management
         .def("render", &SimulationWrapper::render,
-             "Render the current frame to the window (visual mode only)")
+            "Render the current frame to the window (visual mode only)")
         .def("process_input", &SimulationWrapper::process_input,
-             "Process window input and camera controls (visual mode only)")
+            "Process window input and camera controls (visual mode only)")
         .def("should_close", &SimulationWrapper::should_close,
-             "Check if window should close (visual mode only)")
+            "Check if window should close (visual mode only)")
+
+        // Grid control
+        .def("set_grid_enabled", &SimulationWrapper::set_grid_enabled,
+            py::arg("enabled"),
+            R"pbdoc(
+             Enable or disable grid/axis rendering.
+             
+             Args:
+                 enabled (bool): True to enable grid, False to disable
+             )pbdoc")
+
+        .def("get_grid_enabled", &SimulationWrapper::get_grid_enabled,
+            R"pbdoc(
+             Check if grid/axis rendering is enabled.
+             
+             Returns:
+                 bool: True if grid is enabled, False otherwise
+             )pbdoc")
 
         // Core simulation
         .def("update", &SimulationWrapper::update,
-             py::arg("dt") = 0.016f,
-             R"pbdoc(
+            py::arg("dt") = 0.016f,
+            R"pbdoc(
              Update physics simulation by dt seconds.
              
              Args:
@@ -264,17 +325,17 @@ PYBIND11_MODULE(stellar, m)
 
         // Object management
         .def("add_object", &SimulationWrapper::add_object,
-             py::arg("x") = 0.0f, py::arg("y") = 0.0f,
-             py::arg("vx") = 0.0f, py::arg("vy") = 0.0f,
-             py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
-             py::arg("rotation") = 0.0f, py::arg("angular_velocity") = 0.0f,
-             py::arg("skin") = PySkinType::PY_SKIN_CIRCLE,
-             py::arg("size") = 0.3f,
-             py::arg("width") = 0.5f, py::arg("height") = 0.3f,
-             py::arg("r") = 1.0f, py::arg("g") = 1.0f,
-             py::arg("b") = 1.0f, py::arg("a") = 1.0f,
-             py::arg("polygon_sides") = 6,
-             R"pbdoc(
+            py::arg("x") = 0.0f, py::arg("y") = 0.0f,
+            py::arg("vx") = 0.0f, py::arg("vy") = 0.0f,
+            py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
+            py::arg("rotation") = 0.0f, py::arg("angular_velocity") = 0.0f,
+            py::arg("skin") = PySkinType::PY_SKIN_CIRCLE,
+            py::arg("size") = 0.3f,
+            py::arg("width") = 0.5f, py::arg("height") = 0.3f,
+            py::arg("r") = 1.0f, py::arg("g") = 1.0f,
+            py::arg("b") = 1.0f, py::arg("a") = 1.0f,
+            py::arg("polygon_sides") = 6,
+            R"pbdoc(
              Add an object with full property control.
              
              Args:
@@ -298,14 +359,14 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("update_object", &SimulationWrapper::update_object,
-             py::arg("index"),
-             py::arg("x"), py::arg("y"),
-             py::arg("vx"), py::arg("vy"),
-             py::arg("mass"), py::arg("charge"),
-             py::arg("rotation"), py::arg("angular_velocity"),
-             py::arg("width"), py::arg("height"),
-             py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a"),
-             R"pbdoc(
+            py::arg("index"),
+            py::arg("x"), py::arg("y"),
+            py::arg("vx"), py::arg("vy"),
+            py::arg("mass"), py::arg("charge"),
+            py::arg("rotation"), py::arg("angular_velocity"),
+            py::arg("width"), py::arg("height"),
+            py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a"),
+            R"pbdoc(
              Update all properties of an existing object.
              
              Args:
@@ -315,16 +376,50 @@ PYBIND11_MODULE(stellar, m)
                  r,g,b,a: Updated color
              )pbdoc")
 
+        // Batch operations
+        .def("batch_get", &SimulationWrapper::batch_get,
+            py::arg("indices"),
+            R"pbdoc(
+             Get properties for multiple objects at once.
+             
+             Args:
+                 indices (list[int]): List of object indices to fetch
+                 
+             Returns:
+                 list: List of BatchGetData objects for each index
+                 
+             Example:
+                 >>> states = sim.batch_get([0, 1, 2, 3])
+                 >>> for state in states:
+                 >>>     print(f"x={state.x}, y={state.y}")
+             )pbdoc")
+
+        .def("batch_update", &SimulationWrapper::batch_update,
+            py::arg("updates"),
+            R"pbdoc(
+             Update multiple objects at once.
+             
+             Args:
+                 updates (list[BatchUpdateData]): List of update data objects
+                 
+             Example:
+                 >>> updates = [
+                 >>>     BatchUpdateData(index=0, x=1.0, y=2.0, ...),
+                 >>>     BatchUpdateData(index=1, x=3.0, y=4.0, ...)
+                 >>> ]
+                 >>> sim.batch_update(updates)
+             )pbdoc")
+
         .def("remove_object", &SimulationWrapper::remove_object,
-             py::arg("index"),
-             "Remove an object by ID")
+            py::arg("index"),
+            "Remove an object by ID")
 
         .def("object_count", &SimulationWrapper::object_count,
-             "Get number of objects in simulation")
+            "Get number of objects in simulation")
 
         .def("get_object", &SimulationWrapper::get_object,
-             py::arg("index"),
-             R"pbdoc(
+            py::arg("index"),
+            R"pbdoc(
              Get complete object state.
              
              Args:
@@ -336,33 +431,33 @@ PYBIND11_MODULE(stellar, m)
 
         // Convenience methods
         .def("set_rotation", &SimulationWrapper::set_rotation,
-             py::arg("index"), py::arg("rotation"),
-             "Set rotation angle in radians")
+            py::arg("index"), py::arg("rotation"),
+            "Set rotation angle in radians")
 
         .def("set_angular_velocity", &SimulationWrapper::set_angular_velocity,
-             py::arg("index"), py::arg("angular_velocity"),
-             "Set angular velocity in rad/s")
+            py::arg("index"), py::arg("angular_velocity"),
+            "Set angular velocity in rad/s")
 
         .def("set_dimensions", &SimulationWrapper::set_dimensions,
-             py::arg("index"), py::arg("width"), py::arg("height"),
-             "Set width and height for rectangle objects")
+            py::arg("index"), py::arg("width"), py::arg("height"),
+            "Set width and height for rectangle objects")
 
         .def("set_radius", &SimulationWrapper::set_radius,
-             py::arg("index"), py::arg("radius"),
-             "Set radius for circle/polygon objects")
+            py::arg("index"), py::arg("radius"),
+            "Set radius for circle/polygon objects")
 
         .def("get_rotation", &SimulationWrapper::get_rotation,
-             py::arg("index"),
-             "Get rotation angle in radians")
+            py::arg("index"),
+            "Get rotation angle in radians")
 
         .def("get_angular_velocity", &SimulationWrapper::get_angular_velocity,
-             py::arg("index"),
-             "Get angular velocity in rad/s")
+            py::arg("index"),
+            "Get angular velocity in rad/s")
 
         // Equations
         .def("set_equation", &SimulationWrapper::set_equation,
-             py::arg("object_index"), py::arg("equation_string"),
-             R"pbdoc(
+            py::arg("object_index"), py::arg("equation_string"),
+            R"pbdoc(
              Set physics equation for object.
              
              Args:
@@ -381,36 +476,38 @@ PYBIND11_MODULE(stellar, m)
 
         // Constraints
         .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint,
-             py::arg("object_index"), py::arg("constraint"),
-             "Add distance constraint between objects")
+            py::arg("object_index"), py::arg("constraint"),
+            "Add distance constraint between objects")
 
         .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint,
-             py::arg("object_index"), py::arg("constraint"),
-             "Add boundary constraint to object")
+            py::arg("object_index"), py::arg("constraint"),
+            "Add boundary constraint to object")
 
         .def("clear_constraints", &SimulationWrapper::clear_constraints,
-             py::arg("object_index"),
-             "Clear all constraints from object")
+            py::arg("object_index"),
+            "Clear all constraints from object")
 
         .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints,
-             "Clear all constraints from all objects")
+            "Clear all constraints from all objects")
 
         // Batch processing
-        .def("run_batch", [](SimulationWrapper &self, const std::vector<BatchConfig> &configs, py::object callback)
-             {
+        .def("run_batch", [](SimulationWrapper& self, const std::vector<BatchConfig>& configs, py::object callback)
+            {
                 py::gil_scoped_release release;
-                
+
                 if (callback.is_none()) {
                     self.run_batch(configs, nullptr);
-                } else {
-                    self.run_batch(configs, 
+                }
+                else {
+                    self.run_batch(configs,
                         [callback](int batch_idx, const std::vector<ObjectState>& results) {
                             py::gil_scoped_acquire acquire;
                             callback(batch_idx, results);
                         });
-                } }, 
-             py::arg("configs"), py::arg("callback") = py::none(),
-             R"pbdoc(
+                }
+            },
+            py::arg("configs"), py::arg("callback") = py::none(),
+            R"pbdoc(
              Run multiple simulations in batch mode.
              
              Args:
@@ -422,9 +519,9 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         // Parameters
-        .def("set_parameter", &SimulationWrapper::set_parameter, 
-             py::arg("name"), py::arg("value"),
-             R"pbdoc(
+        .def("set_parameter", &SimulationWrapper::set_parameter,
+            py::arg("name"), py::arg("value"),
+            R"pbdoc(
              Set global simulation parameter.
              
              Args:
@@ -437,55 +534,59 @@ PYBIND11_MODULE(stellar, m)
              - "stiffness": Default constraint stiffness
              )pbdoc")
 
-        .def("get_parameter", &SimulationWrapper::get_parameter, 
-             py::arg("name"),
-             "Get global parameter value by name")
+        .def("get_parameter", &SimulationWrapper::get_parameter,
+            py::arg("name"),
+            "Get global parameter value by name")
 
         // Simulation control
-        .def("set_paused", &SimulationWrapper::set_paused, 
-             py::arg("paused"),
-             "Pause or resume simulation")
+        .def("set_paused", &SimulationWrapper::set_paused,
+            py::arg("paused"),
+            "Pause or resume simulation")
 
         .def("is_paused", &SimulationWrapper::is_paused,
-             "Check if simulation is paused")
+            "Check if simulation is paused")
 
-        .def("update_shader_loading", [](SimulationWrapper &self)
-             {
+        .def("update_shader_loading", [](SimulationWrapper& self)
+            {
                 py::gil_scoped_release release;
-                self.update_shader_loading(); },
-             "Update shader loading status")
+                self.update_shader_loading();
+            },
+            "Update shader loading status")
 
-        .def("are_all_shaders_ready", [](const SimulationWrapper &self)
-             {
+        .def("are_all_shaders_ready", [](const SimulationWrapper& self)
+            {
                 py::gil_scoped_release release;
-                return self.are_all_shaders_ready(); },
-             "Check if all shaders are loaded")
+                return self.are_all_shaders_ready();
+            },
+            "Check if all shaders are loaded")
 
-        .def("get_shader_load_progress", [](const SimulationWrapper &self)
-             {
+        .def("get_shader_load_progress", [](const SimulationWrapper& self)
+            {
                 py::gil_scoped_release release;
-                return self.get_shader_load_progress(); },
-             "Get shader loading progress (0.0 to 1.0)")
+                return self.get_shader_load_progress();
+            },
+            "Get shader loading progress (0.0 to 1.0)")
 
-        .def("get_shader_load_status", [](const SimulationWrapper &self)
-             {
+        .def("get_shader_load_status", [](const SimulationWrapper& self)
+            {
                 py::gil_scoped_release release;
-                return self.get_shader_load_status(); },
-             "Get current shader loading status message")
+                return self.get_shader_load_status();
+            },
+            "Get current shader loading status message")
 
         .def("reset", &SimulationWrapper::reset,
-             "Reset simulation to initial state (keeps objects)")
+            "Reset simulation to initial state (keeps objects)")
 
         .def("cleanup", &SimulationWrapper::cleanup,
-             "Explicitly cleanup resources")
+            "Explicitly cleanup resources")
 
         // File I/O
-        .def("save_to_file", &SimulationWrapper::save_to_file, 
-             py::arg("filename"), 
-             py::arg("title") = "", 
-             py::arg("author") = "", 
-             py::arg("description") = "",
-             R"pbdoc(
+        .def("save_to_file", &SimulationWrapper::save_to_file,
+            py::arg("filename"),
+            py::arg("title") = "",
+            py::arg("author") = "",
+            py::arg("description") = "",
+            R"pbdoc(
              Save simulation state to .stellar file.
              
              Args:
@@ -495,9 +596,9 @@ PYBIND11_MODULE(stellar, m)
                  description (str): Simulation description
              )pbdoc")
 
-        .def("load_from_file", &SimulationWrapper::load_from_file, 
-             py::arg("filename"),
-             R"pbdoc(
+        .def("load_from_file", &SimulationWrapper::load_from_file,
+            py::arg("filename"),
+            R"pbdoc(
              Load simulation state from .stellar file.
              
              Args:
@@ -506,7 +607,7 @@ PYBIND11_MODULE(stellar, m)
 
         // Properties
         .def_property_readonly("is_headless", &SimulationWrapper::is_headless,
-                               "Check if simulation is running in headless mode")
+            "Check if simulation is running in headless mode")
         .def_property_readonly("is_initialized", &SimulationWrapper::is_initialized,
-                               "Check if simulation is fully initialized");
+            "Check if simulation is fully initialized");
 }

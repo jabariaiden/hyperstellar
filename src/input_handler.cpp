@@ -4,14 +4,11 @@
 #include "camera.h"
 #include "physics_system.h"
 #include "common_definitions.h"
+#include "renderer.h"
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <iostream>
 #include <vector>
-
-namespace Renderer {
-    int GetCurrentObjectBuffer();  // Forward declaration
-}
 
 void InputHandler::Initialize() {
     g_mouseIsDown = false;

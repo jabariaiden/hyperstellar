@@ -36,7 +36,7 @@ add_subdirectory(pybind11)
 # ============================================================================
 # Define paths to GLFW
 set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
-set(GLFW_LIBRARY "${GLFW_ROOT}/lib/glfw/glfw3.lib")  # Using static library now
+set(GLFW_LIBRARY "${GLFW_ROOT}/lib/glfw/glfw3.lib")
 set(GLFW_INCLUDE_DIR "${GLFW_ROOT}/lib/glfw/include")
 
 # Check if GLFW files exist
@@ -62,7 +62,6 @@ if(MSVC)
         /DNOMINMAX
         /DWIN32_LEAN_AND_MEAN
         /DNO_TEXT_RENDERING=1
-        # NO GLFW_DLL - We're using static linking!
     )
 else()
     add_compile_options(-Wall -Wextra -Wno-unused-parameter)
@@ -111,20 +110,17 @@ target_compile_definitions(stellar PRIVATE
     NO_TEXT_RENDERING
     _WINDLL
     PYTHON_MODULE=1
-    # NO GLFW_DLL - Static linking!
 )
 
 # ============================================================================
 # INCLUDE DIRECTORIES
 # ============================================================================
-# First, try to find GLFW includes
 if(EXISTS "${GLFW_ROOT}/lib/glfw/include/GLFW")
     target_include_directories(stellar PRIVATE
         "${GLFW_ROOT}/lib/glfw/include"
     )
     message(STATUS "Using GLFW includes from: ${GLFW_ROOT}/lib/glfw/include")
 else()
-    # Fallback: use the include directory from the downloaded GLFW
     target_include_directories(stellar PRIVATE
         "C:/Users/user/jabariaiden-ProjStellar-main/glfw-3.4.bin.WIN64/include"
     )
@@ -147,7 +143,7 @@ target_link_libraries(stellar PRIVATE
     ${Python3_LIBRARIES}
     opengl32.lib
     gdi32.lib
-    "${GLFW_LIBRARY}"  # Static GLFW library
+    "${GLFW_LIBRARY}"
     user32.lib
     shell32.lib
     advapi32.lib
@@ -168,8 +164,41 @@ add_custom_command(TARGET stellar POST_BUILD
 )
 
 # ============================================================================
+# COPY ALL SHADERS TO PACKAGE DIRECTORY - FIXED VERSION
+# ============================================================================
+add_custom_command(TARGET stellar POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders"
+    # Copy ALL shader files individually
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/math.comp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.vert"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.geom"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.geom"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.frag"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.frag"
+    # Add more shaders if you have them
+    COMMENT "Copying shaders to Python package"
+)
+
+# ============================================================================
 # SHOW BUILD INFO
 # ============================================================================
 message(STATUS "Building Python module: stellar")
 message(STATUS "Output: $<TARGET_FILE:stellar>")
 message(STATUS "Will copy to: ${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd")
+
+
+
+
+
+
+
+
+
+

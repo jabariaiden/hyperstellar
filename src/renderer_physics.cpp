@@ -29,7 +29,6 @@ void Renderer::UpdatePhysics(float deltaTime, float fakeDeltaTime) {
 
         // Now call Objects::Update - it will use the same compute program
         Objects::Update(inputIndex, outputIndex);
-        Objects::DebugCheckComputeExecution();
         
         glUseProgram(0);
     }
