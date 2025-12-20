@@ -2,7 +2,7 @@
 
 /*
  * ============================================================================
- * PHYSICS ENGINE COMPUTE SHADER - EXTENDED COMPLEX SUPPORT
+ * PHYSICS ENGINE COMPUTE SHADER - EXTENDED COMPLEX SUPPORT + STABLE INTEGRATOR
  * ============================================================================
  */
 
@@ -160,7 +160,6 @@ const float SAFE_MIN_VALUE = 1e-6;
 const float SAFE_MAX_EXP = 50.0;
 const float DERIVATIVE_H = 1e-4;
 const int MAX_DERIV_EXPR_SIZE = 500;
-
 const int CONSTRAINT_DISTANCE = 0;
 const int CONSTRAINT_BOUNDARY = 1;
 const int CONSTRAINT_ANGLE = 2;
@@ -175,7 +174,7 @@ float safeDivide(float numerator, float denominator) {
     return (abs(denominator) < EPSILON) ? 0.0 : (numerator / denominator);
 }
 float safePow(float base, float exponent) { 
-    return pow(max(0.0, base), exponent); 
+    return pow(max(0.0, base), exponent);
 }
 float safeLog(float value) { 
     return log(max(SAFE_MIN_VALUE, value));
@@ -189,20 +188,22 @@ bool isInvalidFloat(float value) {
 vec2 sanitizeVec2(vec2 v) { 
     if (isInvalidFloat(v.x)) v.x = 0.0;
     if (isInvalidFloat(v.y)) v.y = 0.0; 
-    return v; 
+    return v;
 }
 vec4 sanitizeVec4(vec4 v) { 
     if (isInvalidFloat(v.x)) v.x = 0.0;
-    if (isInvalidFloat(v.y)) v.y = 0.0; 
+    if (isInvalidFloat(v.y)) v.y = 0.0;
     if (isInvalidFloat(v.z)) v.z = 0.0; 
     if (isInvalidFloat(v.w)) v.w = 0.0; 
     return v;
 }
-float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }
-float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0; }
+float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0);
+}
+float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0;
+}
 
 // ============================================================================
-// COMPLEX MATH UTILITIES (NEW)
+// COMPLEX MATH UTILITIES
 // ============================================================================
 
 // Complex Addition
@@ -252,7 +253,6 @@ float getObjectProperty(int targetIndex, int propertyHash, int currentObject) {
     if (targetIndex == currentObject) return 0.0; 
     
     Object p = objectsIn[targetIndex];
-    
     switch (propertyHash) {
         case VAR_HASH_X: return p.position.x;
         case VAR_HASH_Y: return p.position.y;
@@ -277,9 +277,6 @@ float getObjectProperty(int targetIndex, int propertyHash, int currentObject) {
 // ============================================================================
 // INLINE RPN EVALUATOR (For Numerical Derivatives)
 // ============================================================================
-// UPGRADED: Now returns vec2 (Real, Imag) and supports full complex math
-// to allow derivatives of complex expressions like D(i*x, x).
-
 vec2 evaluateDerivativeExpression(
     float x, float y, float vx, float vy, float ax_prev, float ay_prev,
     float rotation, float angular_vel, vec4 color,
@@ -287,20 +284,17 @@ vec2 evaluateDerivativeExpression(
     int componentType, int exprOffset, int exprCount, int constantOffset
 ) {
     if (exprCount <= 0 || exprCount > MAX_DERIV_EXPR_SIZE) return vec2(0.0);
-
     // Local stack: Size 128 to hold 64 complex numbers (2 floats each)
     float dstack[128]; 
     bool dIsComplex[64];
     int dstackPtr = 0;
     int dComplexPtr = 0;
     int dtokenIdx = exprOffset;
-    
     for (int di = 0; di < exprCount; ++di) {
         if (dtokenIdx >= MAX_TOKEN_BUFFER_SIZE) break;
         if (dstackPtr >= 126) return vec2(0.0); // Safety margin
 
         int dtoken = allTokens[dtokenIdx++];
-        
         // --- LITERALS AND VARIABLES ---
         if (dtoken == TOKEN_NUMBER) {
             int dconstIdx = allTokens[dtokenIdx++];
@@ -314,7 +308,6 @@ vec2 evaluateDerivativeExpression(
         }
         else if (dtoken == TOKEN_VARIABLE) {
             int dvarHash = allTokens[dtokenIdx++];
-            
             // Handle 'i' inside derivative
             if (dvarHash == VAR_HASH_I) {
                 dstack[dstackPtr++] = 0.0; // real
@@ -373,24 +366,21 @@ vec2 evaluateDerivativeExpression(
             
             vec2 res = vec2(0.0);
             bool res_c = (a_c || b_c);
-
             if (dtoken == TOKEN_ADD) res = cAdd(a_val, b_val);
             else if (dtoken == TOKEN_SUB) res = cSub(a_val, b_val);
             else if (dtoken == TOKEN_MUL) {
                 res = cMul(a_val, b_val);
-                res_c = true; // Multiply usually produces complex unless R*R
+                res_c = true;
             }
             else if (dtoken == TOKEN_DIV) {
                 res = cDiv(a_val, b_val);
                 res_c = true;
             }
             else if (dtoken == TOKEN_POW) {
-                // Complex Power Support
                 if (a_c || b_c) {
                     res = cPow(a_val, b_val);
                     res_c = true;
                 } else {
-                    // Check for negative base in Real^Real case
                     if (a_val.x < 0.0) {
                         res = cPow(a_val, b_val);
                         res_c = true;
@@ -410,14 +400,12 @@ vec2 evaluateDerivativeExpression(
                 dIsComplex[dComplexPtr-1] = false;
             }
         }
-        // --- UNARY OPERATORS (Basic support needed for derivatives) ---
+        // --- UNARY OPERATORS ---
         else if (dtoken == TOKEN_SIN || dtoken == TOKEN_COS || dtoken == TOKEN_EXP || dtoken == TOKEN_NEG) {
             if (dComplexPtr < 1) { dstack[0]=0.0; dstackPtr=1; dComplexPtr=1; continue; }
             bool a_c = dIsComplex[dComplexPtr-1];
-            
             vec2 a_val = a_c ? vec2(dstack[dstackPtr-2], dstack[dstackPtr-1]) : vec2(dstack[dstackPtr-1], 0.0);
             dstackPtr -= (a_c ? 2 : 1);
-            
             vec2 res = vec2(0.0);
             bool res_c = a_c;
 
@@ -438,7 +426,7 @@ vec2 evaluateDerivativeExpression(
         else if (dtoken == TOKEN_DERIVATIVE) {
             // Nested derivatives skipped
             if (dtokenIdx + 3 < MAX_TOKEN_BUFFER_SIZE) {
-                dtokenIdx += 3; 
+                dtokenIdx += 3;
                 int nested_count = allTokens[dtokenIdx++];
                 dtokenIdx += nested_count;
                 di += nested_count + 3;
@@ -446,12 +434,8 @@ vec2 evaluateDerivativeExpression(
             dstack[dstackPtr++] = 0.0;
             dIsComplex[dComplexPtr++] = false;
         }
-        // ... (Skipping less relevant tokens for brevity in derivative, 
-        // but basics like min/max/abs work on reals if encountered)
         else {
-             // Fallback for real-only ops (min, max, etc) in derivative context
-             // This keeps the function valid even if these tokens appear.
-             // (Implementation omitted for brevity, logic identical to original)
+             // Fallback for real-only ops
         }
     }
     
@@ -483,13 +467,11 @@ float evaluateRPNComponent(
     int complexStackPtr = 0;
     
     int tokenIdx = tokenOffset;
-    
     for (int i = 0; i < tokenCount; ++i) {
         if (tokenIdx >= MAX_TOKEN_BUFFER_SIZE) return 0.0;
         if (stackPtr >= 126) return 0.0; // Stack overflow guard
         
         int tokenType = allTokens[tokenIdx++];
-        
         // ====================================================================
         // LITERALS AND VARIABLES
         // ====================================================================
@@ -570,7 +552,6 @@ float evaluateRPNComponent(
                 float ax_orig = ax_prev, ay_orig = ay_prev;
                 float rotation_orig = rotation, angular_vel_orig = angular_vel;
                 vec4 color_orig = color;
-
                 // Function to perturb variable
                 #define PERTURB(var, delta) \
                 if (wrtVarHash == VAR_HASH_X) x = x_orig + delta; \
@@ -585,25 +566,24 @@ float evaluateRPNComponent(
                 else if (wrtVarHash == VAR_HASH_G) color.g = color_orig.g + delta; \
                 else if (wrtVarHash == VAR_HASH_B) color.b = color_orig.b + delta; \
                 else if (wrtVarHash == VAR_HASH_A) color.a = color_orig.a + delta;
-
                 // f(x+h)
                 PERTURB(wrtVarHash, h);
                 vec2 val_plus = evaluateDerivativeExpression(
                     x, y, vx, vy, ax_prev, ay_prev, rotation, angular_vel, color,
                     mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset
                 );
-
                 // f(x-h)
                 PERTURB(wrtVarHash, -h);
                 vec2 val_minus = evaluateDerivativeExpression(
                     x, y, vx, vy, ax_prev, ay_prev, rotation, angular_vel, color,
                     mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset
                 );
-
                 // Restore
-                x = x_orig; y = y_orig; vx = vx_orig; vy = vy_orig;
+                x = x_orig;
+                y = y_orig; vx = vx_orig; vy = vy_orig;
                 ax_prev = ax_orig; ay_prev = ay_orig;
-                rotation = rotation_orig; angular_vel = angular_vel_orig;
+                rotation = rotation_orig;
+                angular_vel = angular_vel_orig;
                 color = color_orig;
 
                 // (f(x+h) - f(x-h)) / 2h
@@ -634,7 +614,7 @@ float evaluateRPNComponent(
             stackPtr -= (a_c ? 2 : 1);
             
             vec2 res = vec2(0.0);
-            bool res_c = (a_c || b_c); // Default result is complex if either input is
+            bool res_c = (a_c || b_c); 
 
             if (tokenType == TOKEN_ADD) res = cAdd(a_val, b_val);
             else if (tokenType == TOKEN_SUB) res = cSub(a_val, b_val);
@@ -691,10 +671,8 @@ float evaluateRPNComponent(
             
             if (complexStackPtr < 1) { stack[0] = 0.0; stackPtr = 1; complexStackPtr = 1; continue; }
             bool a_c = isComplex[complexStackPtr-1];
-            
             vec2 a_val = a_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (a_c ? 2 : 1);
-            
             vec2 res = vec2(0.0);
             bool res_c = a_c; // Inherit complexity by default
 
@@ -705,7 +683,6 @@ float evaluateRPNComponent(
             else if (tokenType == TOKEN_LOG) { res = cLog(a_val); res_c = true; }
             else if (tokenType == TOKEN_SQRT) { res = cPow(a_val, vec2(0.5, 0.0)); res_c = true; }
             else if (tokenType == TOKEN_TAN) { 
-                 // tan(z) = sin(z)/cos(z)
                  vec2 s = cSin(a_val);
                  vec2 c = cCos(a_val);
                  res = cDiv(s, c);
@@ -725,8 +702,6 @@ float evaluateRPNComponent(
                 isComplex[complexStackPtr-1] = false;
             }
         }
-        // ... (Remaining Real-Only Ops like FLOOR, CEIL, MOD, CLAMP) ...
-        // Keeping original logic for these as they don't have standard complex definitions
         else if (tokenType == TOKEN_FLOOR) {
             if (!isComplex[complexStackPtr-1]) stack[stackPtr-1] = floor(stack[stackPtr-1]);
         }
@@ -778,7 +753,8 @@ float evaluateRPNComponent(
         else if (tokenType == TOKEN_REAL) {
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
-                stackPtr--; // Pop imag
+                stackPtr--;
+                // Pop imag
                 isComplex[--complexStackPtr] = false;
             }
         }
@@ -790,13 +766,15 @@ float evaluateRPNComponent(
                 stack[stackPtr-1] = imag; // Real part becomes imag
                 isComplex[--complexStackPtr] = false;
             } else {
-                stack[stackPtr-1] = 0.0; // Real numbers have 0 imaginary part
+                stack[stackPtr-1] = 0.0;
+                // Real numbers have 0 imaginary part
             }
         }
         else if (tokenType == TOKEN_CONJ) {
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
-                stack[stackPtr-1] = -stack[stackPtr-1]; // Negate imag
+                stack[stackPtr-1] = -stack[stackPtr-1];
+                // Negate imag
             }
         }
         else if (tokenType == TOKEN_ARG) {
@@ -851,9 +829,11 @@ void solveDistanceConstraint(inout vec2 pos, inout vec2 vel, Constraint c, int o
 }
 
 void solveBoundaryConstraint(inout vec2 pos, inout vec2 vel, Constraint c) {
-    float x1 = c.param1; float x2 = c.param2;
+    float x1 = c.param1;
+    float x2 = c.param2;
     float y1 = c.param3; float y2 = c.param4;
-    float minX = min(x1, x2); float maxX = max(x1, x2);
+    float minX = min(x1, x2);
+    float maxX = max(x1, x2);
     float minY = min(y1, y2); float maxY = max(y1, y2);
     const float elasticity = 0.7;
     const float friction = 0.95;
@@ -961,7 +941,6 @@ void main() {
                                         1, mapping.tokenOffset_ay, mapping.tokenCount_ay, mapping.constantOffset_ay);
             }
             acceleration = sanitizeVec2(vec2(ax, ay));
-
             if (mapping.tokenCount_angular > 0) {
                 angular_accel = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
                                                    rotation, angular_vel, color, mass, charge, objectIndex,
@@ -995,20 +974,31 @@ void main() {
     }
     
     acceleration = sanitizeVec2(acceleration);
-    vec2 new_pos = pos + vel * uDt + 0.5 * acceleration * uDt * uDt;
+
+    // ============================================================================
+    // STABLE INTEGRATION FIX (SYMPLECTIC EULER)
+    // ============================================================================
+    // 1. Update VELOCITY first
     vec2 new_vel = vel + acceleration * uDt;
     new_vel = sanitizeVec2(new_vel);
+
+    // 2. Use NEW VELOCITY to update POSITION (Energy Conserving)
+    vec2 new_pos = pos + new_vel * uDt;
     new_pos = sanitizeVec2(new_pos);
-    
-    float new_rotation = rotation + angular_vel * uDt + 0.5 * angular_accel * uDt * uDt;
+
+    // 3. Same for Angular
     float new_angular_vel = angular_vel + angular_accel * uDt;
+    float new_rotation = rotation + new_angular_vel * uDt; // Use new_angular_vel
     new_rotation = mod(new_rotation, 2.0 * PI);
     
+    // World Bounds
     const vec2 world_min = vec2(-100.0, -100.0);
     const vec2 world_max = vec2(100.0, 100.0);
     const float friction = 0.95;
+
     if (new_pos.x < world_min.x) { new_pos.x = world_min.x; new_vel.x = abs(new_vel.x) * uRestitution; new_vel.y *= friction; } 
     else if (new_pos.x > world_max.x) { new_pos.x = world_max.x; new_vel.x = -abs(new_vel.x) * uRestitution; new_vel.y *= friction; }
+    
     if (new_pos.y < world_min.y) { new_pos.y = world_min.y; new_vel.y = abs(new_vel.y) * uRestitution; new_vel.x *= friction; } 
     else if (new_pos.y > world_max.y) { new_pos.y = world_max.y; new_vel.y = -abs(new_vel.y) * uRestitution; new_vel.x *= friction; }
     

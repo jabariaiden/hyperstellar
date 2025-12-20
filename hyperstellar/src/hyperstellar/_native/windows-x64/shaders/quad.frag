@@ -13,12 +13,11 @@ void main() {
     if (isCircle) {
         float dist = length(fragTexCoord);
 
-        // Mask outside circle
+        // HARD EDGE: Discard everything outside the exact circle boundary
         if (dist > 1.0) discard;
 
-        // Smooth edge with anti-aliasing
-        float alpha = 1.0 - smoothstep(0.8, 1.0, dist);
-        FragColor = vec4(fragColor.rgb, fragColor.a * alpha);
+        // No smoothstep - just use the original color with full opacity
+        FragColor = fragColor;
 
     } else {
         // Rectangle & polygon (texcoord = 0) - use color as-is

@@ -339,59 +339,76 @@ void SimulationWrapper::update(float dt)
     ensure_initialized();
     if (m_paused) return;
 
-    m_simulationTime += dt;
-
-    while (glGetError() != GL_NO_ERROR);
-
     if (m_window)
         glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
 
-    GLuint computeProgram = Objects::GetComputeProgram();
-    if (computeProgram && Objects::IsComputeShaderReady())
+    // 1. Define physics resolution (1ms is ideal for high-stiffness systems)
+    const float FIXED_STEP = 0.001f;
+
+    // 2. Accumulate real-world time elapsed since last frame
+    static float accumulator = 0.0f;
+    accumulator += dt;
+
+    // 3. Sub-stepping Loop: Run the math in small chunks to "catch up"
+    int stepCount = 0;
+    const int MAX_STEPS_PER_FRAME = 20; // Prevent "Spiral of Death" on slow hardware
+
+    while (accumulator >= FIXED_STEP && stepCount < MAX_STEPS_PER_FRAME)
     {
-        glUseProgram(computeProgram);
+        m_simulationTime += FIXED_STEP;
 
-        GLint dtLoc = glGetUniformLocation(computeProgram, "uDt");
-        GLint timeLoc = glGetUniformLocation(computeProgram, "uTime");
-        GLint kLoc = glGetUniformLocation(computeProgram, "k");
-        GLint bLoc = glGetUniformLocation(computeProgram, "b");
-        GLint gLoc = glGetUniformLocation(computeProgram, "g");
-        GLint gravityDirLoc = glGetUniformLocation(computeProgram, "uGravityDir");
-        GLint restitutionLoc = glGetUniformLocation(computeProgram, "uRestitution");
-        GLint couplingLoc = glGetUniformLocation(computeProgram, "uCoupling");
-        GLint externalForceLoc = glGetUniformLocation(computeProgram, "uExternalForce");
-        GLint driveFreqLoc = glGetUniformLocation(computeProgram, "uDriveFreq");
-        GLint driveAmpLoc = glGetUniformLocation(computeProgram, "uDriveAmp");
-        GLint equationModeLoc = glGetUniformLocation(computeProgram, "uEquationMode");
-        GLint numObjectsLoc = glGetUniformLocation(computeProgram, "uNumObjects");
+        while (glGetError() != GL_NO_ERROR); // Clear previous errors
 
-        if (dtLoc != -1) glUniform1f(dtLoc, dt);
-        if (timeLoc != -1) glUniform1f(timeLoc, m_simulationTime);
-        if (kLoc != -1) glUniform1f(kLoc, 1.0f);
-        if (bLoc != -1) glUniform1f(bLoc, 0.1f);
-        if (gLoc != -1) glUniform1f(gLoc, 9.81f);
-        if (gravityDirLoc != -1) glUniform2f(gravityDirLoc, 0.0f, -1.0f);
-        if (restitutionLoc != -1) glUniform1f(restitutionLoc, 0.7f);
-        if (couplingLoc != -1) glUniform1f(couplingLoc, 1.0f);
-        if (externalForceLoc != -1) glUniform2f(externalForceLoc, 0.0f, 0.0f);
-        if (driveFreqLoc != -1) glUniform1f(driveFreqLoc, 1.0f);
-        if (driveAmpLoc != -1) glUniform1f(driveAmpLoc, 0.0f);
-        if (equationModeLoc != -1) glUniform1i(equationModeLoc, 0);
-        if (numObjectsLoc != -1) glUniform1i(numObjectsLoc, Objects::GetNumObjects());
+        GLuint computeProgram = Objects::GetComputeProgram();
+        if (computeProgram && Objects::IsComputeShaderReady())
+        {
+            glUseProgram(computeProgram);
 
-        glUseProgram(0);
+            // Fetch uniform locations (Original Logic)
+            GLint dtLoc = glGetUniformLocation(computeProgram, "uDt");
+            GLint timeLoc = glGetUniformLocation(computeProgram, "uTime");
+            GLint kLoc = glGetUniformLocation(computeProgram, "k");
+            GLint bLoc = glGetUniformLocation(computeProgram, "b");
+            GLint gLoc = glGetUniformLocation(computeProgram, "g");
+            GLint gravityDirLoc = glGetUniformLocation(computeProgram, "uGravityDir");
+            GLint restitutionLoc = glGetUniformLocation(computeProgram, "uRestitution");
+            GLint couplingLoc = glGetUniformLocation(computeProgram, "uCoupling");
+            GLint externalForceLoc = glGetUniformLocation(computeProgram, "uExternalForce");
+            GLint driveFreqLoc = glGetUniformLocation(computeProgram, "uDriveFreq");
+            GLint driveAmpLoc = glGetUniformLocation(computeProgram, "uDriveAmp");
+            GLint equationModeLoc = glGetUniformLocation(computeProgram, "uEquationMode");
+            GLint numObjectsLoc = glGetUniformLocation(computeProgram, "uNumObjects");
 
-        GLenum err = glGetError();
-        if (err != GL_NO_ERROR)
-            std::cerr << "OpenGL error after uniforms: " << err << std::endl;
+            // Apply Uniforms - CRITICAL: Use FIXED_STEP for math consistency
+            if (dtLoc != -1) glUniform1f(dtLoc, FIXED_STEP);
+            if (timeLoc != -1) glUniform1f(timeLoc, m_simulationTime);
+            if (kLoc != -1) glUniform1f(kLoc, 1.0f); // Default or class member
+            if (bLoc != -1) glUniform1f(bLoc, 0.1f);
+            if (gLoc != -1) glUniform1f(gLoc, 9.81f);
+            if (gravityDirLoc != -1) glUniform2f(gravityDirLoc, 0.0f, -1.0f);
+            if (restitutionLoc != -1) glUniform1f(restitutionLoc, 0.7f);
+            if (couplingLoc != -1) glUniform1f(couplingLoc, 1.0f);
+            if (externalForceLoc != -1) glUniform2f(externalForceLoc, 0.0f, 0.0f);
+            if (driveFreqLoc != -1) glUniform1f(driveFreqLoc, 1.0f);
+            if (driveAmpLoc != -1) glUniform1f(driveAmpLoc, 0.0f);
+            if (equationModeLoc != -1) glUniform1i(equationModeLoc, 0);
+            if (numObjectsLoc != -1) glUniform1i(numObjectsLoc, Objects::GetNumObjects());
+
+            // 4. Run Compute Shader for this sub-step
+            Objects::Update(m_currentBuffer, 1 - m_currentBuffer);
+            m_currentBuffer = 1 - m_currentBuffer; // Swap buffers for next step
+
+            glUseProgram(0);
+        }
+
+        accumulator -= FIXED_STEP;
+        stepCount++;
     }
 
-    Objects::Update(m_currentBuffer, 1 - m_currentBuffer);
-    m_currentBuffer = 1 - m_currentBuffer;
-
+    // Optional error checking after the loop
     GLenum err = glGetError();
     if (err != GL_NO_ERROR)
-        std::cerr << "OpenGL error after Objects::Update: " << err << std::endl;
+        std::cerr << "OpenGL error in sub-stepping loop: " << err << std::endl;
 }
 
 void SimulationWrapper::render()
