@@ -4,7 +4,7 @@ import sys
 import platform
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.1.24"
 
 # Platform detection
 system = platform.system().lower()
