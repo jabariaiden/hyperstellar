@@ -81,14 +81,13 @@ struct BatchGetData {
 };
 
 // Constraint types for Python
-struct DistanceConstraint
-{
+struct DistanceConstraint {
     int target_object;
-    float rest_length;
-    float stiffness;
+    float rest_length;   // Desired distance between objects
 
-    DistanceConstraint(int target = 0, float length = 5.0f, float stiff = 100.0f)
-        : target_object(target), rest_length(length), stiffness(stiff) {}
+    DistanceConstraint(int target = 0, float length = 5.0f)
+        : target_object(target), rest_length(length) {
+    }
 };
 
 struct BoundaryConstraint
@@ -107,6 +106,21 @@ struct ConstraintConfig
     int type;
     int target;
     float param1, param2, param3, param4;
+};
+
+enum class PyCollisionShape {
+    NONE = 0,
+    CIRCLE = 1,
+    AABB = 2,
+    POLYGON = 3
+};
+
+// collision property struct
+struct CollisionConfig {
+    bool enabled = true;
+    PyCollisionShape shape = PyCollisionShape::NONE;
+    float restitution = 0.7f;
+    float friction = 0.3f;
 };
 
 struct ObjectConfig
@@ -212,6 +226,16 @@ public:
     void add_boundary_constraint(int object_index, const BoundaryConstraint &constraint);
     void clear_constraints(int object_index);
     void clear_all_constraints();
+
+	//collision
+    void set_collision_enabled(int index, bool enabled);
+    void set_collision_shape(int index, PyCollisionShape shape);
+    void set_collision_properties(int index, float restitution, float friction);
+    CollisionConfig get_collision_config(int index);
+    void enable_collision_between(int obj1, int obj2, bool enable);
+    bool is_collision_enabled(int index);
+    void set_collision_parameters(bool enable_warm_start, int max_contact_iterations);
+    std::pair<bool, int> get_collision_parameters() const;
 
     // System parameters
     void set_parameter(const std::string &name, float value);

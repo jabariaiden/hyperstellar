@@ -1,0 +1,23 @@
+Hyperstellar Speed Benchmark Summary
+==================================================
+
+Test Date: 2025-12-21 19:39:21
+Baseline: 1.48 ms
+
+Performance Scaling:
+----------------------------------------
+64 objects: 1.80 ms (556 FPS)
+128 objects: 2.14 ms (467 FPS)
+256 objects: 1.51 ms (663 FPS)
+512 objects: 1.26 ms (794 FPS)
+1024 objects: 1.44 ms (695 FPS)
+2048 objects: 1.18 ms (848 FPS)
+4096 objects: 1.35 ms (741 FPS)
+
+Batch Speedup: 81.0x
+
+Memory Efficiency:
+----------------------------------------
+256 objects: 0.001 MB/object
+1024 objects: 0.001 MB/object
+4096 objects: 0.001 MB/object

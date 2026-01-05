@@ -9,13 +9,4 @@ enum visualSkinType
     SKIN_POLYGON = 2      
 };
 
-// Collision Types (for future)
-enum CollisionShapeType
-{
-    COLLISION_NONE = 0,
-    COLLISION_CIRCLE = 1,
-    COLLISION_RECTANGLE = 2,
-    COLLISION_POLYGON = 3
-};
-
 #endif // COMMON_DEFINITIONS_H

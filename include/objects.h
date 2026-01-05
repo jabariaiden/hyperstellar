@@ -75,6 +75,27 @@ struct EquationMapping
     int constantOffset_a;
     int _pad7;
 };
+
+enum CollisionShape
+{
+    COLLISION_NONE = 0,
+    COLLISION_CIRCLE = 1,
+    COLLISION_AABB = 2,
+    COLLISION_POLYGON = 3
+};
+const int MAX_CONTACTS_PER_OBJECT = 4;
+
+// Collision properties per object
+struct CollisionProperties
+{
+    int enabled;           // 0 = disabled, 1 = enabled
+    int shapeType;         // CollisionShape enum
+    float restitution;     // Bounciness (0-1)
+    float friction;        // Surface friction (0-1)
+    float mass_factor;     // Mass multiplier for collision response
+    int _pad1, _pad2, _pad3;
+};
+
 static_assert(sizeof(EquationMapping) == 112, "EquationMapping must be 112 bytes!");
 
 namespace Objects
@@ -109,6 +130,15 @@ namespace Objects
     void ClearConstraints(int objectIndex);
     void ClearAllConstraints();
     std::vector<Constraint> GetConstraints(int objectIndex);
+
+    void SetCollisionEnabled(int objectIndex, bool enabled);
+    void SetCollisionShape(int objectIndex, CollisionShape shape);
+    void SetCollisionProperties(int objectIndex, float restitution, float friction);
+    CollisionProperties GetCollisionProperties(int objectIndex);
+    void EnableCollisionBetween(int obj1, int obj2, bool enable);
+    bool IsCollisionEnabled(int objectIndex);
+    void SetCollisionParameters(bool enableWarmStart, int maxContactIterations);
+    void GetCollisionParameters(bool& enableWarmStart, int& maxContactIterations);
 
     // Object management
     void AddObject();

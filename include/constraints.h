@@ -13,8 +13,8 @@ enum ConstraintType {
 struct Constraint {
     int type;              // ConstraintType
     int targetObjectID;  // For distance constraints (-1 if none)
-    float param1;          // Distance: dx, Boundary: x1, Angle: min_angle
-    float param2;          // Distance: dy, Boundary: x2, Angle: max_angle
+    float param1;          // Distance: radius, Boundary: x1, Angle: min_angle
+    float param2;          // Distance: unused, Boundary: x2, Angle: max_angle
     float param3;          // Distance: unused, Boundary: y1, Angle: unused
     float param4;          // Distance: unused, Boundary: y2, Angle: unused
     int _pad1;

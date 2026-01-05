@@ -1,4 +1,4 @@
-// async_shader_loader.h - FIXED FOR MINGW THREADING AND RELATIVE PATHS
+// async_shader_loader.h - FIXED FOR MINGW THREADING, RELATIVE PATHS, AND BOM REMOVAL
 #ifndef ASYNC_SHADER_LOADER_H
 #define ASYNC_SHADER_LOADER_H
 
@@ -56,19 +56,19 @@ struct ShaderSources
 // Helper function to get shader path relative to module location
 static std::string GetShaderPath(const std::string& shaderName) {
     static std::string shaderBasePath;
-    
+
     if (shaderBasePath.empty()) {
-        #ifdef _WIN32
+#ifdef _WIN32
         // Get path to this DLL/.pyd
         char modulePath[1024];
         HMODULE hm = NULL;
-        
+
         // Get the address of this function to locate our module
-        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | 
-                              GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                              (LPCSTR)&GetShaderPath, &hm)) {
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCSTR)&GetShaderPath, &hm)) {
             GetModuleFileNameA(hm, modulePath, sizeof(modulePath));
-            
+
             // Extract directory and add "shaders/"
             std::string fullPath(modulePath);
             size_t lastSlash = fullPath.find_last_of("\\/");
@@ -76,25 +76,28 @@ static std::string GetShaderPath(const std::string& shaderName) {
                 shaderBasePath = fullPath.substr(0, lastSlash + 1) + "shaders\\";
                 std::cout << "[ShaderLoader] Module located at: " << fullPath << std::endl;
                 std::cout << "[ShaderLoader] Shader directory: " << shaderBasePath << std::endl;
-                
+
                 // Debug: Check if directory exists
-                #ifdef _WIN32
+#ifdef _WIN32
                 DWORD attrib = GetFileAttributesA(shaderBasePath.c_str());
                 if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
                     std::cerr << "[ShaderLoader] WARNING: Shader directory not found: " << shaderBasePath << std::endl;
-                } else {
+                }
+                else {
                     std::cout << "[ShaderLoader] ✓ Shader directory exists" << std::endl;
                 }
-                #endif
-            } else {
+#endif
+            }
+            else {
                 std::cerr << "[ShaderLoader] WARNING: Could not extract directory from: " << fullPath << std::endl;
                 shaderBasePath = "./shaders/";
             }
-        } else {
+        }
+        else {
             std::cerr << "[ShaderLoader] WARNING: Could not get module handle, using default path" << std::endl;
             shaderBasePath = "./shaders/";
         }
-        #else
+#else
         // Linux/macOS: use dladdr to get module path
         Dl_info info;
         if (dladdr((void*)&GetShaderPath, &info)) {
@@ -102,18 +105,50 @@ static std::string GetShaderPath(const std::string& shaderName) {
             size_t lastSlash = fullPath.find_last_of("/");
             if (lastSlash != std::string::npos) {
                 shaderBasePath = fullPath.substr(0, lastSlash + 1) + "shaders/";
-            } else {
+            }
+            else {
                 shaderBasePath = "./shaders/";
             }
-        } else {
+        }
+        else {
             shaderBasePath = "./shaders/";
         }
-        #endif
-        
+#endif
+
         std::cout << "[ShaderLoader] Using shader base path: " << shaderBasePath << std::endl;
     }
-    
+
     return shaderBasePath + shaderName;
+}
+
+// Helper function to strip UTF-8 BOM from string
+static std::string StripUTF8BOM(const std::string& content) {
+    if (content.size() >= 3) {
+        // Check for UTF-8 BOM: EF BB BF
+        unsigned char bom[3] = {
+            (unsigned char)content[0],
+            (unsigned char)content[1],
+            (unsigned char)content[2]
+        };
+
+        if (bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF) {
+            std::cout << "[AsyncLoader] ✓ Stripped UTF-8 BOM (3 bytes)" << std::endl;
+            return content.substr(3);
+        }
+
+        // Also check for UTF-16 BOM patterns (though less likely for GLSL)
+        if (bom[0] == 0xFF && bom[1] == 0xFE) {
+            std::cout << "[AsyncLoader] ✓ Stripped UTF-16 LE BOM (2 bytes)" << std::endl;
+            return content.substr(2);
+        }
+
+        if (bom[0] == 0xFE && bom[1] == 0xFF) {
+            std::cout << "[AsyncLoader] ✓ Stripped UTF-16 BE BOM (2 bytes)" << std::endl;
+            return content.substr(2);
+        }
+    }
+
+    return content;
 }
 
 class AsyncShaderLoader
@@ -135,9 +170,9 @@ public:
     }
 
     // Load compute shader
-    void LoadComputeShaderAsync(const std::string &computePath,
-                                std::function<void(GLuint)> onComplete,
-                                std::function<void(const std::string &)> onError)
+    void LoadComputeShaderAsync(const std::string& computePath,
+        std::function<void(GLuint)> onComplete,
+        std::function<void(const std::string&)> onError)
     {
         ShaderPaths paths;
         paths.compute = computePath;  // Just filename, GetShaderPath will add directory
@@ -145,11 +180,11 @@ public:
     }
 
     // Load graphics pipeline (vert + frag + optional geom)
-    void LoadGraphicsShaderAsync(const std::string &vertPath,
-                                 const std::string &fragPath,
-                                 const std::string &geomPath,
-                                 std::function<void(GLuint)> onComplete,
-                                 std::function<void(const std::string &)> onError)
+    void LoadGraphicsShaderAsync(const std::string& vertPath,
+        const std::string& fragPath,
+        const std::string& geomPath,
+        std::function<void(GLuint)> onComplete,
+        std::function<void(const std::string&)> onError)
     {
         ShaderPaths paths;
         paths.vertex = vertPath;      // Just filename
@@ -165,7 +200,7 @@ public:
         if (debugCounter++ % 100 == 0)
         {
             std::cout << "[AsyncLoader::Update] State=" << (int)m_state.load()
-                      << ", Progress=" << m_progress.load() << std::endl;
+                << ", Progress=" << m_progress.load() << std::endl;
             std::flush(std::cout);
         }
 
@@ -174,10 +209,10 @@ public:
         {
             std::cout << "[AsyncLoader::Update] FILES_READY detected, starting compilation..." << std::endl;
             std::flush(std::cout);
-            
+
             CompileShadersOnMainThread();
         }
-        
+
         // Check if we just completed AND haven't called callback yet
         if (m_state == ShaderLoadState::COMPLETE && m_onComplete)
         {
@@ -246,14 +281,14 @@ public:
     bool IsLoading() const
     {
         return m_state != ShaderLoadState::IDLE &&
-               m_state != ShaderLoadState::COMPLETE &&
-               m_state != ShaderLoadState::FAILED;
+            m_state != ShaderLoadState::COMPLETE &&
+            m_state != ShaderLoadState::FAILED;
     }
 
 private:
-    void LoadShaderAsync(const ShaderPaths &paths,
-                         std::function<void(GLuint)> onComplete,
-                         std::function<void(const std::string &)> onError)
+    void LoadShaderAsync(const ShaderPaths& paths,
+        std::function<void(GLuint)> onComplete,
+        std::function<void(const std::string&)> onError)
     {
         if (m_state != ShaderLoadState::IDLE && m_state != ShaderLoadState::COMPLETE)
         {
@@ -279,8 +314,8 @@ private:
         sources.isCompute = paths.IsComputeShader();
         sources.hasGeometry = paths.HasGeometry();
 
-        std::cout << "[AsyncLoader] IsCompute=" << sources.isCompute 
-                  << ", HasGeometry=" << sources.hasGeometry << std::endl;
+        std::cout << "[AsyncLoader] IsCompute=" << sources.isCompute
+            << ", HasGeometry=" << sources.hasGeometry << std::endl;
         std::flush(std::cout);
 
         try {
@@ -290,8 +325,9 @@ private:
                 std::string fullPath = GetShaderPath(paths.vertex);
                 std::cout << "[AsyncLoader] Reading vertex: " << fullPath << std::endl;
                 std::flush(std::cout);
-                sources.vertex = ReadTextFile(fullPath);
-                
+                std::string rawContent = ReadTextFile(fullPath);
+                sources.vertex = StripUTF8BOM(rawContent);
+
                 if (sources.vertex.empty())
                 {
                     SetError("Failed to read vertex shader: " + fullPath);
@@ -307,8 +343,9 @@ private:
                 std::string fullPath = GetShaderPath(paths.geometry);
                 std::cout << "[AsyncLoader] Reading geometry: " << fullPath << std::endl;
                 std::flush(std::cout);
-                sources.geometry = ReadTextFile(fullPath);
-                
+                std::string rawContent = ReadTextFile(fullPath);
+                sources.geometry = StripUTF8BOM(rawContent);
+
                 if (!sources.geometry.empty())
                 {
                     std::cout << "[AsyncLoader] ✓ Geometry shader loaded (" << sources.geometry.length() << " bytes)" << std::endl;
@@ -326,8 +363,9 @@ private:
                 std::string fullPath = GetShaderPath(paths.fragment);
                 std::cout << "[AsyncLoader] Reading fragment: " << fullPath << std::endl;
                 std::flush(std::cout);
-                sources.fragment = ReadTextFile(fullPath);
-                
+                std::string rawContent = ReadTextFile(fullPath);
+                sources.fragment = StripUTF8BOM(rawContent);
+
                 if (sources.fragment.empty())
                 {
                     SetError("Failed to read fragment shader: " + fullPath);
@@ -343,8 +381,9 @@ private:
                 std::string fullPath = GetShaderPath(paths.compute);
                 std::cout << "[AsyncLoader] Reading compute: " << fullPath << std::endl;
                 std::flush(std::cout);
-                sources.compute = ReadTextFile(fullPath);
-                
+                std::string rawContent = ReadTextFile(fullPath);
+                sources.compute = StripUTF8BOM(rawContent);
+
                 if (sources.compute.empty())
                 {
                     SetError("Failed to read compute shader: " + fullPath);
@@ -357,7 +396,7 @@ private:
             // Store sources
             m_sources = sources;
             m_progress = 0.1f;
-            
+
             std::cout << "[AsyncLoader] All files loaded, setting FILES_READY" << std::endl;
             std::flush(std::cout);
 
@@ -522,10 +561,10 @@ private:
         std::flush(std::cout);
     }
 
-    GLuint CompileShader(GLenum type, const std::string &source, const char *typeName)
+    GLuint CompileShader(GLenum type, const std::string& source, const char* typeName)
     {
         GLuint shader = glCreateShader(type);
-        const char *src = source.c_str();
+        const char* src = source.c_str();
         glShaderSource(shader, 1, &src, nullptr);
         glCompileShader(shader);
 
@@ -545,7 +584,7 @@ private:
         return shader;
     }
 
-    void SetError(const std::string &error)
+    void SetError(const std::string& error)
     {
         m_errorMessage = error;
         m_state = ShaderLoadState::FAILED;
@@ -554,30 +593,30 @@ private:
         std::flush(std::cerr);
     }
 
-    std::string ReadTextFile(const std::string &fullPath)
+    std::string ReadTextFile(const std::string& fullPath)
     {
         std::cout << "[AsyncLoader] Opening file with C API: " << fullPath << std::endl;
         std::flush(std::cout);
-        
+
         // Use C file I/O to avoid MinGW std::ifstream issues
         FILE* file = fopen(fullPath.c_str(), "rb");
-        
+
         if (!file)
         {
             std::cerr << "[AsyncLoader] fopen failed for: " << fullPath << std::endl;
-            #ifdef _WIN32
+#ifdef _WIN32
             DWORD error = GetLastError();
             std::cerr << "[AsyncLoader] Windows error code: " << error << std::endl;
-            #endif
+#endif
             std::flush(std::cerr);
             return "";
         }
-        
+
         // Get file size
         fseek(file, 0, SEEK_END);
         long size = ftell(file);
         fseek(file, 0, SEEK_SET);
-        
+
         if (size <= 0)
         {
             std::cerr << "[AsyncLoader] Invalid file size: " << fullPath << std::endl;
@@ -585,25 +624,25 @@ private:
             fclose(file);
             return "";
         }
-        
+
         // Read content
         std::string content;
         content.resize(size);
-        
+
         size_t bytesRead = fread(&content[0], 1, size, file);
         fclose(file);
-        
+
         if (bytesRead != (size_t)size)
         {
-            std::cerr << "[AsyncLoader] Read size mismatch for: " << fullPath 
-                      << " (expected " << size << ", got " << bytesRead << ")" << std::endl;
+            std::cerr << "[AsyncLoader] Read size mismatch for: " << fullPath
+                << " (expected " << size << ", got " << bytesRead << ")" << std::endl;
             std::flush(std::cerr);
             return "";
         }
-        
+
         std::cout << "[AsyncLoader] ✓ File read successfully: " << bytesRead << " bytes" << std::endl;
         std::flush(std::cout);
-        
+
         return content;
     }
 
@@ -613,7 +652,7 @@ private:
     std::atomic<bool> m_shouldStop;
     std::string m_errorMessage;
     std::function<void(GLuint)> m_onComplete;
-    std::function<void(const std::string &)> m_onError;
+    std::function<void(const std::string&)> m_onError;
 
     // Shader sources (no longer needs mutex since no threading)
     ShaderSources m_sources;

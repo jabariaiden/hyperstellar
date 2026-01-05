@@ -19,6 +19,7 @@ PYBIND11_MODULE(stellar, m)
         - Batch processing for headless simulations
         - Multiple constraint types
         - Object rotation and angular dynamics
+        - Complete collision system (Circle, AABB, SAT)
         
         Example:
             >>> import stellar
@@ -53,6 +54,21 @@ PYBIND11_MODULE(stellar, m)
         )pbdoc")
         .value("DISTANCE", PyConstraintType::PY_CONSTRAINT_DISTANCE, "Distance constraint")
         .value("BOUNDARY", PyConstraintType::PY_CONSTRAINT_BOUNDARY, "Boundary constraint")
+        .export_values();
+
+    py::enum_<PyCollisionShape>(m, "CollisionShape", R"pbdoc(
+        Collision shape type for physics interactions.
+        
+        Attributes:
+            NONE: No collision detection
+            CIRCLE: Circular collision boundary
+            AABB: Axis-aligned bounding box (rectangle)
+            POLYGON: Convex polygon collision (uses SAT)
+        )pbdoc")
+        .value("NONE", PyCollisionShape::NONE, "No collision")
+        .value("CIRCLE", PyCollisionShape::CIRCLE, "Circle collision")
+        .value("AABB", PyCollisionShape::AABB, "Rectangle AABB collision")
+        .value("POLYGON", PyCollisionShape::POLYGON, "Polygon SAT collision")
         .export_values();
 
     // =========================================================================
@@ -140,14 +156,24 @@ PYBIND11_MODULE(stellar, m)
             std::to_string(p.y) + ") mass=" + std::to_string(p.mass) + ">";
             });
 
-    py::class_<ConstraintConfig>(m, "ConstraintConfig", "Constraint configuration for batch mode")
+    py::class_<ConstraintConfig>(m, "ConstraintConfig", R"pbdoc(
+        Constraint configuration for batch mode.
+        
+        Attributes:
+            type (int): Constraint type (0=DISTANCE, 1=BOUNDARY)
+            target (int): Target object ID
+            param1 (float): Distance: rest_length, Boundary: min_x, Angle: min_angle
+            param2 (float): Boundary: max_x, Angle: max_angle
+            param3 (float): Boundary: min_y
+            param4 (float): Boundary: max_y
+        )pbdoc")
         .def(py::init<>(), "Create default constraint config")
         .def_readwrite("type", &ConstraintConfig::type, "Constraint type")
         .def_readwrite("target", &ConstraintConfig::target, "Target object ID")
-        .def_readwrite("param1", &ConstraintConfig::param1, "Parameter 1")
-        .def_readwrite("param2", &ConstraintConfig::param2, "Parameter 2")
-        .def_readwrite("param3", &ConstraintConfig::param3, "Parameter 3")
-        .def_readwrite("param4", &ConstraintConfig::param4, "Parameter 4");
+        .def_readwrite("param1", &ConstraintConfig::param1, "Distance: rest_length, Boundary: min_x, Angle: min_angle")
+        .def_readwrite("param2", &ConstraintConfig::param2, "Boundary: max_x, Angle: max_angle")
+        .def_readwrite("param3", &ConstraintConfig::param3, "Boundary: min_y")
+        .def_readwrite("param4", &ConstraintConfig::param4, "Boundary: max_y");
 
     py::class_<BatchConfig>(m, "BatchConfig", R"pbdoc(
         Configuration for batch simulations.
@@ -214,16 +240,13 @@ PYBIND11_MODULE(stellar, m)
         Args:
             target_object (int): ID of target object to maintain distance with
             rest_length (float): Desired distance between objects
-            stiffness (float): Constraint stiffness (higher = stronger)
         )pbdoc")
-        .def(py::init<int, float, float>(),
+        .def(py::init<int, float>(),
             py::arg("target_object") = 0,
             py::arg("rest_length") = 5.0f,
-            py::arg("stiffness") = 100.0f,
             "Create distance constraint")
         .def_readwrite("target_object", &DistanceConstraint::target_object, "Target object ID")
         .def_readwrite("rest_length", &DistanceConstraint::rest_length, "Desired distance")
-        .def_readwrite("stiffness", &DistanceConstraint::stiffness, "Constraint stiffness")
         .def("__repr__", [](const DistanceConstraint& c) {
         return "<DistanceConstraint target=" + std::to_string(c.target_object) +
             " length=" + std::to_string(c.rest_length) + ">";
@@ -255,6 +278,36 @@ PYBIND11_MODULE(stellar, m)
             });
 
     // =========================================================================
+    // COLLISION CONFIG
+    // =========================================================================
+    py::class_<CollisionConfig>(m, "CollisionConfig", R"pbdoc(
+        Collision configuration for an object.
+        
+        Attributes:
+            enabled (bool): Whether collision detection is enabled
+            shape (CollisionShape): Collision shape type
+            restitution (float): Bounciness (0.0 = no bounce, 1.0 = perfect bounce)
+            friction (float): Surface friction (0.0 = frictionless, 1.0 = maximum friction)
+        )pbdoc")
+        .def(py::init<>(), "Create default collision config")
+        .def_readwrite("enabled", &CollisionConfig::enabled, "Collision enabled")
+        .def_readwrite("shape", &CollisionConfig::shape, "Collision shape type")
+        .def_readwrite("restitution", &CollisionConfig::restitution, "Bounciness (0.0-1.0)")
+        .def_readwrite("friction", &CollisionConfig::friction, "Surface friction (0.0-1.0)")
+        .def("__repr__", [](const CollisionConfig& c) {
+        std::string shapeStr;
+        switch (c.shape) {
+        case PyCollisionShape::NONE: shapeStr = "NONE"; break;
+        case PyCollisionShape::CIRCLE: shapeStr = "CIRCLE"; break;
+        case PyCollisionShape::AABB: shapeStr = "AABB"; break;
+        case PyCollisionShape::POLYGON: shapeStr = "POLYGON"; break;
+        }
+        return "<CollisionConfig shape=" + shapeStr +
+            " restitution=" + std::to_string(c.restitution) +
+            " friction=" + std::to_string(c.friction) + ">";
+            });
+
+    // =========================================================================
     // MAIN SIMULATION CLASS
     // =========================================================================
     py::class_<SimulationWrapper>(m, "Simulation", R"pbdoc(
@@ -268,7 +321,7 @@ PYBIND11_MODULE(stellar, m)
             py::arg("width") = 1280,
             py::arg("height") = 720,
             py::arg("title") = "Physics Simulation",
-            py::arg("enable_grid") = true,  // New parameter
+            py::arg("enable_grid") = true,
             R"pbdoc(
              Create a new simulation instance.
              
@@ -489,6 +542,119 @@ PYBIND11_MODULE(stellar, m)
 
         .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints,
             "Clear all constraints from all objects")
+
+        // Collision management
+        .def("set_collision_enabled", &SimulationWrapper::set_collision_enabled,
+            py::arg("index"), py::arg("enabled"),
+            R"pbdoc(
+             Enable or disable collision detection for an object.
+             
+             Args:
+                 index (int): Object ID
+                 enabled (bool): True to enable collisions, False to disable
+                 
+             Example:
+                 >>> sim.set_collision_enabled(0, False)  # Disable collisions for object 0
+             )pbdoc")
+
+        .def("set_collision_shape", &SimulationWrapper::set_collision_shape,
+            py::arg("index"), py::arg("shape"),
+            R"pbdoc(
+             Set collision shape for an object.
+             
+             Args:
+                 index (int): Object ID
+                 shape (CollisionShape): Collision shape type
+                 
+             Note: Shape is automatically set based on visual skin when adding objects.
+             
+             Example:
+                 >>> sim.set_collision_shape(0, CollisionShape.CIRCLE)
+             )pbdoc")
+
+        .def("set_collision_properties", &SimulationWrapper::set_collision_properties,
+            py::arg("index"), py::arg("restitution"), py::arg("friction"),
+            R"pbdoc(
+             Set collision physical properties.
+             
+             Args:
+                 index (int): Object ID
+                 restitution (float): Bounciness (0.0-1.0)
+                     0.0 = no bounce (inelastic collision)
+                     1.0 = perfect bounce (elastic collision)
+                 friction (float): Surface friction (0.0-1.0)
+                     0.0 = frictionless (ice)
+                     1.0 = maximum friction (rubber)
+                 
+             Example:
+                 >>> sim.set_collision_properties(0, restitution=0.9, friction=0.1)
+                 >>> # Makes object 0 very bouncy with low friction
+             )pbdoc")
+
+        .def("get_collision_config", &SimulationWrapper::get_collision_config,
+            py::arg("index"),
+            R"pbdoc(
+             Get collision configuration for an object.
+             
+             Args:
+                 index (int): Object ID
+                 
+             Returns:
+                 CollisionConfig: Current collision settings
+                 
+             Example:
+                 >>> config = sim.get_collision_config(0)
+                 >>> print(f"Restitution: {config.restitution}")
+             )pbdoc")
+
+        .def("enable_collision_between", &SimulationWrapper::enable_collision_between,
+            py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
+            R"pbdoc(
+             Enable or disable collision detection between two specific objects.
+             
+             Args:
+                 obj1 (int): First object ID
+                 obj2 (int): Second object ID
+                 enable (bool): True to enable, False to disable
+                 
+             Useful for creating collision layers or groups.
+             
+             Example:
+                 >>> sim.enable_collision_between(0, 1, False)
+                 >>> # Objects 0 and 1 will pass through each other
+             )pbdoc")
+
+        .def("is_collision_enabled", &SimulationWrapper::is_collision_enabled,
+            py::arg("index"),
+            R"pbdoc(
+             Check if collision detection is enabled for an object.
+             
+             Args:
+                 index (int): Object ID
+                 
+             Returns:
+                 bool: True if collisions are enabled
+             )pbdoc")
+
+            // For set_collision_parameters (void return)
+            .def("set_collision_parameters", &SimulationWrapper::set_collision_parameters,
+                py::arg("enable_warm_start"), py::arg("max_contact_iterations"),
+                R"pbdoc(
+     Set global collision parameters.
+     
+     Args:
+         enable_warm_start (bool): Enable warm starting for contacts
+         max_contact_iterations (int): Maximum iterations for contact resolution (1-20)
+     )pbdoc")
+
+            // For get_collision_parameters
+            .def("get_collision_parameters", &SimulationWrapper::get_collision_parameters,
+                R"pbdoc(
+     Get global collision parameters.
+     
+     Returns:
+         tuple: (enable_warm_start, max_contact_iterations)
+     )pbdoc")
 
         // Batch processing
         .def("run_batch", [](SimulationWrapper& self, const std::vector<BatchConfig>& configs, py::object callback)

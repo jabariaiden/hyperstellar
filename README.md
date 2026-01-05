@@ -1,4 +1,4 @@
-# Hyperstellar
+﻿# Hyperstellar
 ### Write math Equations in python
 
 Buckle up, coz this isn't just another preset physics engine. Hyperstellar gives you the mathematical language to define *any* dynamical system, then GPU accelerates it to thousands of frames per second. From orbital mechanics to fluid dynamics, if you can write the equation, you can simulate it.
@@ -55,7 +55,7 @@ See the full version in [examples/orbit.py](examples/orbit.py)
 ### What you can actually do with this
 
 - Write your own equations (real or complex) and run them directly on the GPU.
-- Reference other objects inside equations � positions, velocities, even colors. ```p[i].value```
+- Reference other objects inside equations — positions, velocities, even colors. ```p[i].value```
 - Define derivatives and run them in the GPU.  ```D(expression, variable, order)```
 - Most Math functions are available in DSL. Full support for trig, exponentials, powers, statistics, and complex numbers
 - Run the engine with a window, or completely headless if you just want numbers.
