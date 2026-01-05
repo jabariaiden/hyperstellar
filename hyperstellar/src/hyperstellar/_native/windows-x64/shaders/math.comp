@@ -1900,93 +1900,108 @@ void main() {
     // CONSTRAINT RESOLUTION (UNCHANGED)
     // ========================================================================
     applyConstraints(new_pos, new_vel, objectIndex, originalPos);
+
+// ========================================================================
+// NEW: COLLISION SYSTEM - FIXED FOR PARALLEL EXECUTION
+// ========================================================================
+
+// Strategy:
+// 1. Each thread only modifies its OWN object's velocity
+// 2. Use impulses that conserve momentum without modifying other objects
+// 3. Position correction happens AFTER all velocity updates
+
+vec2 collision_vel = new_vel;
+bool had_collision = false;
+
+// Check collisions with ALL other objects (not just higher indices)
+for (int i = 0; i < uNumObjects; i++) {
+    if (i == objectIndex) continue;  // Skip self
     
-    // ========================================================================
-    // COLLISION SYSTEM - FIXED TO PREVENT DOUBLE-RESOLUTION
-    // ========================================================================
+    Object other = objectsIn[i];
+    
+    // Detect collision
+    CollisionInfo collision = detectCollision(p, other, i);
+    
+    if (collision.hasCollision) {
+        had_collision = true;
+        
+        // Get collision properties
+        CollisionProperties propsA = collisionProps[objectIndex];
+        CollisionProperties propsB = collisionProps[i];
+        
+        // Calculate effective properties
+        float restitution = min(propsA.restitution, propsB.restitution);
+        float friction = sqrt(propsA.friction * propsB.friction);
+        
+        // Get masses
+        float massA = mass;
+        float massB = max(EPSILON, other.mass);
+        
+        // Relative velocity
+        vec2 relativeVel = other.velocity - collision_vel;
+        float velocityAlongNormal = dot(relativeVel, collision.normal);
+        
+        // Only resolve if moving toward each other
+        if (velocityAlongNormal < 0.0) {
+            // Calculate impulse (standard rigid body physics)
+            float e = clamp(restitution, 0.0, 1.0);
+            float j = -(1.0 + e) * velocityAlongNormal;
+            j /= (1.0 / massA + 1.0 / massB);
+            
+            // Apply impulse to THIS object only
+            vec2 impulse = j * collision.normal;
+            collision_vel -= impulse / massA;
+            
+            // Friction
+            if (friction > 0.0) {
+                vec2 tangent = relativeVel - collision.normal * dot(relativeVel, collision.normal);
+                float tangentLength = length(tangent);
+                
+                if (tangentLength > EPSILON) {
+                    tangent = normalize(tangent);
+                    float vt = dot(relativeVel, tangent);
+                    
+                    float jt = -vt * friction;
+                    jt /= (1.0 / massA + 1.0 / massB);
+                    
+                    // Coulomb friction limit
+                    float maxFriction = abs(j) * friction;
+                    jt = clamp(jt, -maxFriction, maxFriction);
+                    
+                    vec2 frictionImpulse = jt * tangent;
+                    collision_vel -= frictionImpulse / massA;
+                }
+            }
+        }
+        
+        // POSITION CORRECTION - only for deep penetrations
+        // Move THIS object away from penetration
+        const float slop = 0.01;
+        const float percent = 0.4;  // Less aggressive than before
+        
+        if (collision.penetration > slop) {
+            float totalMass = massA + massB;
+            vec2 correction = collision.normal * (collision.penetration - slop) * percent;
+            
+            // Only correct THIS object's position
+            // The correction is weighted by the inverse mass ratio
+            new_pos -= correction * (massB / totalMass);
+        }
+    }
+}
+
+// Apply collision-modified velocity
+if (had_collision) {
+    new_vel = sanitizeVec2(collision_vel);
+}
+
+// ========================================================================
+// REST OF CODE(boundaries, final write, etc.)
+// ========================================================================
     
     // Age out old contacts for this object
     if (uEnableWarmStart == 1) {
         ageContacts(objectIndex);
-    }
-    
-    vec2 collision_pos = new_pos;
-    vec2 collision_vel = new_vel;
-    
-    // CRITICAL FIX: Only check objects with HIGHER indices
-    // This ensures each collision pair is processed exactly once
-    for (int i = objectIndex + 1; i < uNumObjects; i++) {
-        Object other = objectsIn[i];
-        
-        // Detect collision
-        CollisionInfo collision = detectCollision(p, other, i);
-        
-        if (collision.hasCollision) {
-            // Get collision properties
-            CollisionProperties propsA = collisionProps[objectIndex];
-            CollisionProperties propsB = collisionProps[i];
-            
-            // Get other object's state
-            vec2 other_pos = other.position;
-            vec2 other_vel = other.velocity;
-            float other_mass = max(EPSILON, other.mass);
-            
-            // Choose resolution method
-            float restitution = min(propsA.restitution, propsB.restitution);
-            float friction = sqrt(propsA.friction * propsB.friction);
-            
-            // Make local copies for collision resolution
-            vec2 temp_pos_a = collision_pos;
-            vec2 temp_vel_a = collision_vel;
-            vec2 temp_pos_b = other_pos;
-            vec2 temp_vel_b = other_vel;
-            
-            // Apply collision response to both objects
-            applyCollisionResponse(
-                temp_pos_a, temp_vel_a, mass,
-                temp_pos_b, temp_vel_b, other_mass,
-                collision.normal, collision.penetration,
-                restitution, friction
-            );
-            
-            // Update THIS object's state
-            collision_pos = temp_pos_a;
-            collision_vel = temp_vel_a;
-            
-            // ATOMIC UPDATE: Store the impulse to be applied
-            // Instead of directly writing, we'll accumulate the velocity change
-            vec2 delta_vel_b = temp_vel_b - other_vel;
-            vec2 delta_pos_b = temp_pos_b - other_pos;
-            
-            // Use atomic operations or shared memory to accumulate changes
-            // For now, we'll use a conservative approach:
-            // Only the lower-index thread writes, which we guarantee by our loop structure
-            
-            // Since we're in thread objectIndex and i > objectIndex,
-            // thread i hasn't processed its collisions yet, so this is safe
-            objectsOut[i].position = temp_pos_b;
-            objectsOut[i].velocity = temp_vel_b;
-            
-            // Preserve other object's properties
-            objectsOut[i].mass = other_mass;
-            objectsOut[i].charge = other.charge;
-            objectsOut[i].visualSkinType = other.visualSkinType;
-            objectsOut[i].collisionShapeType = other.collisionShapeType;
-            objectsOut[i].visualData = other.visualData;
-            objectsOut[i].collisionData = other.collisionData;
-            objectsOut[i].color = other.color;
-            objectsOut[i].equationID = other.equationID;
-            objectsOut[i]._pad1 = 0;
-            objectsOut[i]._padEnd[0] = 0;
-            objectsOut[i]._padEnd[1] = 0;
-            
-            // Update contact persistence if enabled
-            if (uEnableWarmStart == 1) {
-                vec2 contact_position = 0.5 * (collision_pos + other_pos);
-                updateContactPoint(objectIndex, i, collision.normal, 
-                                  contact_position, collision.penetration);
-            }
-        }
     }
     
     // REMOVED: The second collision loop that was causing double-resolution
@@ -1994,8 +2009,8 @@ void main() {
     // processed exactly once in the loop above
     
     // Apply the collision-corrected state
-    new_pos = sanitizeVec2(collision_pos);
-    new_vel = sanitizeVec2(collision_vel);
+    new_pos = sanitizeVec2(new_pos);
+    new_vel = sanitizeVec2(new_vel);
     
     // ========================================================================
     // FINAL SANITY CHECKS
