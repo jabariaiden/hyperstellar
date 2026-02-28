@@ -56,11 +56,8 @@ See the full version in [examples/orbit.py](examples/orbit.py)
 ### What you can actually do with this
 
 - Write your own equations (real or complex) and run them directly on the GPU.
-<<<<<<< HEAD
 - Reference other objects inside equations — positions, velocities, even colors. ```p[i].value```
-=======
 - Reference other objects inside equations — positions, velocities, even colors. "```p[i].x```, ```p[i].y```, ```p[i].vx```, etc."
->>>>>>> b325bb0bccc24c98bd8827322c31e467fb14614a
 - Define derivatives and run them in the GPU.  ```D(expression, variable, order)```
 - Most Math functions are available in DSL. Full support for trig, exponentials, powers, statistics, and complex numbers
 - Run the engine with a window, or completely headless if you just want numbers.
