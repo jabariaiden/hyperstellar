@@ -61,13 +61,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "message-v1"
@@ -85,7 +78,7 @@ events:
       The output was:
       0
       MSBuild version 18.0.5+e22287bf1 for .NET Framework
-      Build started 1/6/2026 1:02:48 AM.
+      Build started 3/1/2026 7:34:13 PM.
       
       Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\4.2.0\\CompilerIdC\\CompilerIdC.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -114,7 +107,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:02.34
+      Time Elapsed 00:00:01.33
       
       
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CompilerIdC.exe"
@@ -199,13 +192,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -347,13 +333,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -428,13 +407,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -574,13 +546,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -655,13 +620,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -716,13 +674,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "message-v1"
@@ -740,7 +691,7 @@ events:
       The output was:
       0
       MSBuild version 18.0.5+e22287bf1 for .NET Framework
-      Build started 1/6/2026 1:02:51 AM.
+      Build started 3/1/2026 7:34:15 PM.
       
       Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\4.2.0\\CompilerIdCXX\\CompilerIdCXX.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -769,7 +720,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:02.44
+      Time Elapsed 00:00:01.30
       
       
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
@@ -919,13 +870,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
   -
     kind: "find-v1"
@@ -1112,13 +1056,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1135,8 +1072,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-6fho3x"
-      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-6fho3x"
+      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-46psn0"
+      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-46psn0"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -1145,39 +1082,39 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-6fho3x'
+        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-46psn0'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_0b5e8.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_ad35a.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
         MSBuild version 18.0.5+e22287bf1 for .NET Framework
-        Build started 1/6/2026 1:02:55 AM.
+        Build started 3/1/2026 7:34:19 PM.
         
-        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-6fho3x\\cmTC_0b5e8.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-46psn0\\cmTC_ad35a.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-6fho3x\\Debug\\".
-          Creating directory "cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.tlog\\".
+          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-46psn0\\Debug\\".
+          Creating directory "cmTC_ad35a.dir\\Debug\\cmTC_ad35a.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.tlog\\unsuccessfulbuild".
+          Creating "cmTC_ad35a.dir\\Debug\\cmTC_ad35a.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_ad35a.dir\\Debug\\cmTC_ad35a.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_0b5e8.dir\\Debug\\\\" /Fd"cmTC_0b5e8.dir\\Debug\\vc145.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_ad35a.dir\\Debug\\\\" /Fd"cmTC_ad35a.dir\\Debug\\vc145.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35720 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_0b5e8.dir\\Debug\\\\" /Fd"cmTC_0b5e8.dir\\Debug\\vc145.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_ad35a.dir\\Debug\\\\" /Fd"cmTC_ad35a.dir\\Debug\\vc145.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
           CMakeCCompilerABI.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-6fho3x\\Debug\\cmTC_0b5e8.exe" /INCREMENTAL /ILK:"cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-6fho3x/Debug/cmTC_0b5e8.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-6fho3x/Debug/cmTC_0b5e8.lib" /MACHINE:X64  /machine:x64 cmTC_0b5e8.dir\\Debug\\CMakeCCompilerABI.obj
-          cmTC_0b5e8.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-6fho3x\\Debug\\cmTC_0b5e8.exe
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-46psn0\\Debug\\cmTC_ad35a.exe" /INCREMENTAL /ILK:"cmTC_ad35a.dir\\Debug\\cmTC_ad35a.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-46psn0/Debug/cmTC_ad35a.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-46psn0/Debug/cmTC_ad35a.lib" /MACHINE:X64  /machine:x64 cmTC_ad35a.dir\\Debug\\CMakeCCompilerABI.obj
+          cmTC_ad35a.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-46psn0\\Debug\\cmTC_ad35a.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.tlog\\unsuccessfulbuild".
-          Touching "cmTC_0b5e8.dir\\Debug\\cmTC_0b5e8.tlog\\cmTC_0b5e8.lastbuildstate".
-        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-6fho3x\\cmTC_0b5e8.vcxproj" (default targets).
+          Deleting file "cmTC_ad35a.dir\\Debug\\cmTC_ad35a.tlog\\unsuccessfulbuild".
+          Touching "cmTC_ad35a.dir\\Debug\\cmTC_ad35a.tlog\\cmTC_ad35a.lastbuildstate".
+        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-46psn0\\cmTC_ad35a.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:01.27
+        Time Elapsed 00:00:00.96
         
       exitCode: 0
   -
@@ -1217,8 +1154,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-4q3cx4"
-      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-4q3cx4"
+      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-3qj2sm"
+      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-3qj2sm"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DNO_TEXT_RENDERING /DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -1228,39 +1165,39 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-4q3cx4'
+        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-3qj2sm'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_808ab.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_cd70c.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
         MSBuild version 18.0.5+e22287bf1 for .NET Framework
-        Build started 1/6/2026 1:02:59 AM.
+        Build started 3/1/2026 7:34:21 PM.
         
-        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-4q3cx4\\cmTC_808ab.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-3qj2sm\\cmTC_cd70c.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-4q3cx4\\Debug\\".
-          Creating directory "cmTC_808ab.dir\\Debug\\cmTC_808ab.tlog\\".
+          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-3qj2sm\\Debug\\".
+          Creating directory "cmTC_cd70c.dir\\Debug\\cmTC_cd70c.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_808ab.dir\\Debug\\cmTC_808ab.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_808ab.dir\\Debug\\cmTC_808ab.tlog\\unsuccessfulbuild".
+          Creating "cmTC_cd70c.dir\\Debug\\cmTC_cd70c.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_cd70c.dir\\Debug\\cmTC_cd70c.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_808ab.dir\\Debug\\\\" /Fd"cmTC_808ab.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_cd70c.dir\\Debug\\\\" /Fd"cmTC_cd70c.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35720 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_808ab.dir\\Debug\\\\" /Fd"cmTC_808ab.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_cd70c.dir\\Debug\\\\" /Fd"cmTC_cd70c.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
           CMakeCXXCompilerABI.cpp
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-4q3cx4\\Debug\\cmTC_808ab.exe" /INCREMENTAL /ILK:"cmTC_808ab.dir\\Debug\\cmTC_808ab.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-4q3cx4/Debug/cmTC_808ab.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-4q3cx4/Debug/cmTC_808ab.lib" /MACHINE:X64  /machine:x64 cmTC_808ab.dir\\Debug\\CMakeCXXCompilerABI.obj
-          cmTC_808ab.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-4q3cx4\\Debug\\cmTC_808ab.exe
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-3qj2sm\\Debug\\cmTC_cd70c.exe" /INCREMENTAL /ILK:"cmTC_cd70c.dir\\Debug\\cmTC_cd70c.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-3qj2sm/Debug/cmTC_cd70c.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-3qj2sm/Debug/cmTC_cd70c.lib" /MACHINE:X64  /machine:x64 cmTC_cd70c.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_cd70c.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-3qj2sm\\Debug\\cmTC_cd70c.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_808ab.dir\\Debug\\cmTC_808ab.tlog\\unsuccessfulbuild".
-          Touching "cmTC_808ab.dir\\Debug\\cmTC_808ab.tlog\\cmTC_808ab.lastbuildstate".
-        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-4q3cx4\\cmTC_808ab.vcxproj" (default targets).
+          Deleting file "cmTC_cd70c.dir\\Debug\\cmTC_cd70c.tlog\\unsuccessfulbuild".
+          Touching "cmTC_cd70c.dir\\Debug\\cmTC_cd70c.tlog\\cmTC_cd70c.lastbuildstate".
+        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-3qj2sm\\cmTC_cd70c.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:01.01
+        Time Elapsed 00:00:00.82
         
       exitCode: 0
   -
@@ -1412,13 +1349,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1488,13 +1418,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1571,13 +1494,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1641,13 +1557,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1781,13 +1690,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1849,13 +1751,6 @@ events:
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files\\CMake\\bin"
         - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
-        - "C:\\Users\\user\\.dotnet\\tools"
-        - "C:\\msys64\\ucrt64\\bin"
-        - "C:\\VulkanSDK\\1.4.321.1\\Bin"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\"
-        - "C:\\Users\\user\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
-        - "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps"
         - "C:\\Users\\user\\AppData\\Local\\Python\\bin"
       CMAKE_INSTALL_PREFIX: "C:/Program Files (x86)/stellar_python"
       CMAKE_SYSTEM_PREFIX_PATH:
@@ -1876,8 +1771,8 @@ events:
     checks:
       - "Performing Test HAS_MSVC_GL_LTCG"
     directories:
-      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-5zie8q"
-      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-5zie8q"
+      source: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-w342wd"
+      binary: "C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-w342wd"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DNO_TEXT_RENDERING /DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -1886,47 +1781,47 @@ events:
       variable: "HAS_MSVC_GL_LTCG"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-5zie8q'
+        Change Dir: 'C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-w342wd'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_3f262.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_246db.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
         MSBuild version 18.0.5+e22287bf1 for .NET Framework
-        Build started 1/6/2026 1:03:04 AM.
+        Build started 3/1/2026 7:34:24 PM.
         
-        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\cmTC_3f262.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\cmTC_246db.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\Debug\\".
-          Creating directory "cmTC_3f262.dir\\Debug\\cmTC_3f262.tlog\\".
+          Creating directory "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\Debug\\".
+          Creating directory "cmTC_246db.dir\\Debug\\cmTC_246db.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_3f262.dir\\Debug\\cmTC_3f262.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_3f262.dir\\Debug\\cmTC_3f262.tlog\\unsuccessfulbuild".
+          Creating "cmTC_246db.dir\\Debug\\cmTC_246db.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_246db.dir\\Debug\\cmTC_246db.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /GL /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D HAS_MSVC_GL_LTCG /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_3f262.dir\\Debug\\\\" /Fd"cmTC_3f262.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\src.cxx"
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /GL /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D HAS_MSVC_GL_LTCG /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_246db.dir\\Debug\\\\" /Fd"cmTC_246db.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\src.cxx"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35720 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /GL /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D HAS_MSVC_GL_LTCG /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_3f262.dir\\Debug\\\\" /Fd"cmTC_3f262.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\src.cxx"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /GL /D _MBCS /D NO_TEXT_RENDERING /D PYTHON_MODULE=1 /D HAS_MSVC_GL_LTCG /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_246db.dir\\Debug\\\\" /Fd"cmTC_246db.dir\\Debug\\vc145.pdb" /external:W1 /TP /errorReport:queue "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\src.cxx"
           src.cxx
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\Debug\\cmTC_3f262.exe" /INCREMENTAL /ILK:"cmTC_3f262.dir\\Debug\\cmTC_3f262.ilk" /NOLOGO "-LTCG" kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-5zie8q/Debug/cmTC_3f262.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-5zie8q/Debug/cmTC_3f262.lib" /MACHINE:X64  /machine:x64 cmTC_3f262.dir\\Debug\\src.obj
-        LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/LTCG' specification [C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\cmTC_3f262.vcxproj]
+          C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\Debug\\cmTC_246db.exe" /INCREMENTAL /ILK:"cmTC_246db.dir\\Debug\\cmTC_246db.ilk" /NOLOGO "-LTCG" kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-w342wd/Debug/cmTC_246db.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/user/hyperstellar-public/_build/CMakeFiles/CMakeScratch/TryCompile-w342wd/Debug/cmTC_246db.lib" /MACHINE:X64  /machine:x64 cmTC_246db.dir\\Debug\\src.obj
+        LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/LTCG' specification [C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\cmTC_246db.vcxproj]
           Generating code
           Finished generating code
-          cmTC_3f262.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\Debug\\cmTC_3f262.exe
+          cmTC_246db.vcxproj -> C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\Debug\\cmTC_246db.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_3f262.dir\\Debug\\cmTC_3f262.tlog\\unsuccessfulbuild".
-          Touching "cmTC_3f262.dir\\Debug\\cmTC_3f262.tlog\\cmTC_3f262.lastbuildstate".
-        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\cmTC_3f262.vcxproj" (default targets).
+          Deleting file "cmTC_246db.dir\\Debug\\cmTC_246db.tlog\\unsuccessfulbuild".
+          Touching "cmTC_246db.dir\\Debug\\cmTC_246db.tlog\\cmTC_246db.lastbuildstate".
+        Done Building Project "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\cmTC_246db.vcxproj" (default targets).
         
         Build succeeded.
         
-        "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\cmTC_3f262.vcxproj" (default target) (1) ->
+        "C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\cmTC_246db.vcxproj" (default target) (1) ->
         (Link target) -> 
-          LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/LTCG' specification [C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-5zie8q\\cmTC_3f262.vcxproj]
+          LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/LTCG' specification [C:\\Users\\user\\hyperstellar-public\\_build\\CMakeFiles\\CMakeScratch\\TryCompile-w342wd\\cmTC_246db.vcxproj]
         
             1 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:01.09
+        Time Elapsed 00:00:00.84
         
       exitCode: 0
 ...

@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 // ============================================================================
 // DATA STRUCTURES (std430 layout)
@@ -1275,7 +1275,7 @@ CollisionInfo detectCircleAABB(vec2 circlePos, float radius,
         if (dist > EPSILON)
         {
             // Circle center outside AABB
-            info.normal = delta / dist;
+            info.normal = -(delta / dist);
             info.penetration = radius - dist;
         }
         else

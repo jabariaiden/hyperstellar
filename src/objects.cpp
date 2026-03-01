@@ -800,7 +800,6 @@ void Objects::Update(int inputIndex, int outputIndex)
     int workGroupSize = 64;
     int numWorkGroups = (g_numObjects + workGroupSize - 1) / workGroupSize;
     if (numWorkGroups < 1) numWorkGroups = 1;
-    if (numWorkGroups > 16) numWorkGroups = 16;
 
     glDispatchCompute(numWorkGroups, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
