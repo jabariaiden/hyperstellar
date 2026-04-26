@@ -53,6 +53,41 @@ class CollisionConfig:
     def __init__(self) -> None: ...
     def __repr__(self) -> str: ...
 
+class KeyState:
+    """Represents the state of a single keyboard key for the current frame."""
+    @property
+    def pressed(self) -> bool:
+        """True if the key is currently held down."""
+        ...
+    @property
+    def released(self) -> bool:
+        """True if the key was just released this frame."""
+        ...
+    @property
+    def held(self) -> bool:
+        """Alias for pressed."""
+        ...
+    def __repr__(self) -> str: ...
+
+class KeyboardMonitor:
+    """
+    Provides access to keyboard states via attributes or indexing.
+    
+    Example:
+        if sim.keyboard.Z.pressed: ...
+        if sim.keyboard["Space"].released: ...
+    
+    Supported key names include: A-Z, 0-9, Space, Shift, Control, Alt,
+    Escape, Enter, Tab, Backspace, Delete, Home, End, PageUp, PageDown,
+    Insert, Up, Down, Left, Right, F1-F12.
+    """
+    def __init__(self, sim: "Simulation") -> None: ...
+    def __getattr__(self, name: str) -> KeyState: ...
+    def __getitem__(self, name: str) -> KeyState: ...
+    def get_key_state(self, key_name: str) -> KeyState:
+        """Get the state of a specific key by name."""
+        ...
+
 class ObjectConfig:
     """Configuration for creating objects in batch mode."""
     x: float                    # Initial X position
@@ -542,7 +577,7 @@ class Simulation:
         ...
     
     # ========================================================================
-    # NEW: COLLISION PARAMETERS
+    #  COLLISION PARAMETERS
     # ========================================================================
     
     def set_collision_parameters(self, enable_warm_start: bool, max_contact_iterations: int) -> None:
@@ -772,6 +807,58 @@ class Simulation:
         
         Args:
             filename: Path to load file
+        """
+        ...
+    
+    # ========================================================================
+    # KEYBOARD AND CAMERA CONTROL
+    # ========================================================================
+    
+    @property
+    def keyboard(self) -> KeyboardMonitor:
+        """
+        Keyboard state monitor.
+        
+        Example:
+            if sim.keyboard.Z.pressed: ...
+            if sim.keyboard["Space"].released: ...
+        """
+        ...
+    
+    def set_camera_position(self, x: float, y: float) -> None:
+        """
+        Set the camera position in world coordinates.
+        
+        Args:
+            x: New camera X coordinate
+            y: New camera Y coordinate
+        """
+        ...
+    
+    def get_camera_position(self) -> Tuple[float, float]:
+        """
+        Return the current camera position as a tuple (x, y).
+        
+        Returns:
+            Tuple of (x, y) camera coordinates
+        """
+        ...
+    
+    def set_camera_zoom(self, zoom: float) -> None:
+        """
+        Set the camera zoom level.
+        
+        Args:
+            zoom: Zoom factor (1.0 = default, >1.0 zooms in, <1.0 zooms out)
+        """
+        ...
+    
+    def get_camera_zoom(self) -> float:
+        """
+        Return the current camera zoom level.
+        
+        Returns:
+            Current zoom factor
         """
         ...
     

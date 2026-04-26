@@ -1,4 +1,4 @@
-// async_shader_loader.h - FIXED FOR MINGW THREADING, RELATIVE PATHS, AND BOM REMOVAL
+// async_shader_loader.h
 #ifndef ASYNC_SHADER_LOADER_H
 #define ASYNC_SHADER_LOADER_H
 
@@ -306,7 +306,7 @@ private:
         m_onError = onError;
         m_program = 0;
 
-        // CRITICAL FIX: Read files on MAIN THREAD to avoid MinGW file I/O issues
+        // Read files on MAIN THREAD to avoid MinGW file I/O issues
         std::cout << "[AsyncLoader] Reading shader files on main thread..." << std::endl;
         std::flush(std::cout);
 

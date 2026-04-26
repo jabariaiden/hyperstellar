@@ -6,11 +6,10 @@
 #include <functional>
 #include <fstream>
 #include <vector>
+#include <array>
 
-// Forward declarations to avoid including all headers
-struct ObjectState;
-struct DistanceConstraint;
-struct BoundaryConstraint;
+// Forward declarations
+class SimulationWrapper;
 
 // Python-friendly enums
 enum class PySkinType
@@ -26,22 +25,22 @@ enum class PyConstraintType
     PY_CONSTRAINT_BOUNDARY = 1
 };
 
-// ENHANCED Object state for Python - NOW INCLUDES ROTATION AND DIMENSIONS
+// Object state for Python
 struct ObjectState
 {
     float x, y;
     float vx, vy;
     float mass, charge;
-    float rotation;         // NEW: rotation angle in radians
-    float angular_velocity; // NEW: angular velocity in radians/sec
-    float width, height;    // NEW: for rectangles
-    float radius;           // NEW: for circles/polygons
-    int polygon_sides;      // NEW: for polygons
-    int skin_type;          // NEW: so users know what shape it is
+    float rotation;         // rotation angle in radians
+    float angular_velocity; // angular velocity in radians/sec
+    float width, height;    // for rectangles
+    float radius;           // for circles/polygons
+    int polygon_sides;      // for polygons
+    int skin_type;          // so users know what shape it is
     float r, g, b, a;
 };
 
-// Add these structs to simulation_wrapper.h
+// Batch update data structure
 struct BatchUpdateData {
     int index;
     float x;
@@ -60,6 +59,7 @@ struct BatchUpdateData {
     float a;
 };
 
+// Batch get data structure
 struct BatchGetData {
     float x;
     float y;
@@ -100,7 +100,7 @@ struct BoundaryConstraint
         : min_x(minx), max_x(maxx), min_y(miny), max_y(maxy) {}
 };
 
-// Batch mode structures - ENHANCED
+// Batch mode structures
 struct ConstraintConfig
 {
     int type;
@@ -115,7 +115,7 @@ enum class PyCollisionShape {
     POLYGON = 3
 };
 
-// collision property struct
+// Collision property struct
 struct CollisionConfig {
     bool enabled = true;
     PyCollisionShape shape = PyCollisionShape::NONE;
@@ -129,12 +129,12 @@ struct ObjectConfig
     float vx = 0.0f, vy = 0.0f;
     float mass = 1.0f;
     float charge = 0.0f;
-    float rotation = 0.0f;         // NEW
-    float angular_velocity = 0.0f; // NEW
+    float rotation = 0.0f;         
+    float angular_velocity = 0.0f; 
     PySkinType skin = PySkinType::PY_SKIN_CIRCLE;
     float size = 0.3f;
-    float width = 0.5f;  // NEW: for rectangles
-    float height = 0.3f; // NEW: for rectangles
+    float width = 0.5f;  // for rectangles
+    float height = 0.3f; // for rectangles
     float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
     int polygon_sides = 6;
     std::string equation = "";
@@ -149,6 +149,24 @@ struct BatchConfig
     std::string output_file = "";
 };
 
+// Helper class for key state
+class KeyState {
+    bool m_pressed;
+    bool m_released;
+public:
+    KeyState(bool pressed, bool released) : m_pressed(pressed), m_released(released) {}
+    bool pressed() const { return m_pressed; }
+    bool released() const { return m_released; }
+};
+
+// Helper class for keyboard monitoring
+class KeyboardMonitor {
+    SimulationWrapper* m_sim;
+public:
+    KeyboardMonitor(SimulationWrapper* sim) : m_sim(sim) {}
+    KeyState get_key_state(const std::string& name) const;
+};
+
 class SimulationWrapper
 {
 private:
@@ -161,6 +179,13 @@ private:
     int m_width, m_height;
     float m_simulationTime = 0.0f;
     bool m_enable_grid;
+
+    // Keyboard state tracking
+    static constexpr int MAX_KEYS = 512;
+    std::array<bool, MAX_KEYS> m_currentKeys{};
+    std::array<bool, MAX_KEYS> m_previousKeys{};
+    
+    void update_keyboard_state();
 
     bool init_headless();
     bool init_windowed(int width, int height, const std::string &title);
@@ -177,10 +202,20 @@ public:
     void set_grid_enabled(bool enabled) { m_enable_grid = enabled; }
     bool get_grid_enabled() const { return m_enable_grid; }
 
+    // Keyboard queries
+    bool is_key_pressed(int key) const;
+    bool is_key_just_pressed(int key) const;
+    bool is_key_just_released(int key) const;
+    
+    // Camera control
+    void set_camera_position(float x, float y);
+    std::pair<float, float> get_camera_position() const;
+    void set_camera_zoom(float zoom);
+    float get_camera_zoom() const;
+
     // Core simulation
     void update(float dt);
 
-    // ENHANCED object creation with FULL property control including rotation and dimensions
     int add_object(
         float x = 0.0f, float y = 0.0f,
         float vx = 0.0f, float vy = 0.0f,
@@ -196,7 +231,6 @@ public:
     int object_count() const;
     ObjectState get_object(int index) const;
 
-    // ENHANCED update with rotation and dimensions
     void update_object(
         int index,
         float x, float y,
@@ -206,11 +240,11 @@ public:
         float width, float height,
         float r, float g, float b, float a);
 
-    //batch get and update
+    // Batch get and update
     std::vector<BatchGetData> batch_get(const std::vector<int>& indices) const;
     void batch_update(const std::vector<BatchUpdateData>& updates);
 
-    // NEW: Convenience methods for specific properties
+    // Convenience methods for specific properties
     void set_rotation(int index, float rotation);
     void set_angular_velocity(int index, float angular_velocity);
     void set_dimensions(int index, float width, float height);
@@ -227,7 +261,7 @@ public:
     void clear_constraints(int object_index);
     void clear_all_constraints();
 
-	//collision
+    // Collision
     void set_collision_enabled(int index, bool enabled);
     void set_collision_shape(int index, PyCollisionShape shape);
     void set_collision_properties(int index, float restitution, float friction);

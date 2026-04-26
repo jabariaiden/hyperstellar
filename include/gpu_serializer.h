@@ -96,7 +96,7 @@ namespace PropertyHashes {
     const int PROP_HASH_DATA_Y = 10;     // angular_vel
     const int PROP_HASH_DATA_Z = 11;
     const int PROP_HASH_DATA_W = 12;
-    // NEW: Color properties (matches shader lines 118-121)
+    //  Color properties (matches shader lines 118-121)
     const int PROP_HASH_COLOR_R = 13;
     const int PROP_HASH_COLOR_G = 14;
     const int PROP_HASH_COLOR_B = 15;
@@ -158,7 +158,7 @@ static const std::unordered_map<std::string, int> s_propertyHashMap = {
     {"data.y", PropertyHashes::PROP_HASH_DATA_Y},     // angular_vel
     {"data.z", PropertyHashes::PROP_HASH_DATA_Z},
     {"data.w", PropertyHashes::PROP_HASH_DATA_W},
-    // NEW: Color properties
+    //  Color properties
     {"color.r", PropertyHashes::PROP_HASH_COLOR_R},
     {"color.g", PropertyHashes::PROP_HASH_COLOR_G},
     {"color.b", PropertyHashes::PROP_HASH_COLOR_B},
@@ -448,7 +448,7 @@ inline GPUSerializedEquation serializeEquationForGPU(const ParsedEquation& equat
 // ============================================================================
 
 struct GPUEquationBatch {
-    // CRITICAL: Each component needs its own global buffer
+    // Each component needs its own global buffer
     // This matches the shader's separate binding points (2 & 3 for ax, etc.)
     std::vector<int> globalTokenBuffer_ax;
     std::vector<float> globalConstantBuffer_ax;

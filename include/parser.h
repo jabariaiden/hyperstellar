@@ -135,11 +135,11 @@ private:
 struct ParsedEquation {
     std::vector<Token> tokens_ax;        // Acceleration X in RPN
     std::vector<Token> tokens_ay;        // Acceleration Y in RPN
-    std::vector<Token> tokens_angular;   // NEW: Angular acceleration in RPN
-    std::vector<Token> tokens_r;         // NEW: Red color component in RPN
-    std::vector<Token> tokens_g;         // NEW: Green color component in RPN
-    std::vector<Token> tokens_b;         // NEW: Blue color component in RPN
-    std::vector<Token> tokens_a;         // NEW: Alpha color component in RPN
+    std::vector<Token> tokens_angular;   //  Angular acceleration in RPN
+    std::vector<Token> tokens_r;         //  Red color component in RPN
+    std::vector<Token> tokens_g;         //  Green color component in RPN
+    std::vector<Token> tokens_b;         //  Blue color component in RPN
+    std::vector<Token> tokens_a;         //  Alpha color component in RPN
     std::vector<float> constants;        // Numeric constants from all components
     
     // Helper methods to check what's present

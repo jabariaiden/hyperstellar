@@ -63,7 +63,7 @@ ParserContext::ParserContext()
     registerObjectType("p", {
         "x", "y", "vx", "vy", "ax", "ay", "mass", "charge",
         "data.x", "data.y", "data.z", "data.w",
-        "color.r", "color.g", "color.b", "color.a"  // NEW: Color properties
+        "color.r", "color.g", "color.b", "color.a"  //  Color properties
     });
 }
 void ParserContext::registerVariable(const std::string &name, VariableDomain domain, bool differentiable)

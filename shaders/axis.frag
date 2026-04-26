@@ -4,5 +4,5 @@ in vec3 color;
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(color, 1.0); // Use the vertex color directly
+    FragColor = vec4(color, 1.0); // Using the vertex color directly, smart
 }

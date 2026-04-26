@@ -1,4 +1,3 @@
-// Add this to a new header file: buffer_helpers.h
 // Safe buffer upload utilities for Intel integrated graphics
 
 #ifndef BUFFER_HELPERS_H

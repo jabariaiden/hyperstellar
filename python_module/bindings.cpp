@@ -308,6 +308,47 @@ PYBIND11_MODULE(stellar, m)
             });
 
     // =========================================================================
+    // KEYBOARD STATE
+    // =========================================================================
+    py::class_<KeyState>(m, "KeyState", R"pbdoc(
+        Represents the state of a single keyboard key for the current frame.
+        
+        Attributes:
+            pressed (bool): True if the key is currently held down.
+            released (bool): True if the key was just released this frame.
+            held (bool): Alias for pressed.
+    )pbdoc")
+        .def_property_readonly("pressed", &KeyState::pressed)
+        .def_property_readonly("released", &KeyState::released)
+        .def_property_readonly("held", &KeyState::pressed)
+        .def("__repr__", [](const KeyState& ks) {
+            return "<KeyState pressed=" + std::to_string(ks.pressed()) +
+                   " released=" + std::to_string(ks.released()) + ">";
+        });
+
+    py::class_<KeyboardMonitor>(m, "KeyboardMonitor", R"pbdoc(
+        Provides access to keyboard states via attributes or indexing.
+        
+        Example:
+            if sim.keyboard.Z.pressed: ...
+            if sim.keyboard["Space"].released: ...
+        
+        Supported key names include: A-Z, 0-9, Space, Shift, Control, Alt,
+        Escape, Enter, Tab, Backspace, Delete, Home, End, PageUp, PageDown,
+        Insert, Up, Down, Left, Right, F1-F12.
+    )pbdoc")
+        .def(py::init<SimulationWrapper*>())
+        .def("__getattr__", [](KeyboardMonitor& km, const std::string& name) {
+            return km.get_key_state(name);
+        })
+        .def("__getitem__", [](KeyboardMonitor& km, const std::string& name) {
+            return km.get_key_state(name);
+        })
+        .def("get_key_state", &KeyboardMonitor::get_key_state,
+             py::arg("key_name"),
+             "Get the state of a specific key by name.");
+
+    // =========================================================================
     // MAIN SIMULATION CLASS
     // =========================================================================
     py::class_<SimulationWrapper>(m, "Simulation", R"pbdoc(
@@ -770,6 +811,22 @@ PYBIND11_MODULE(stellar, m)
              Args:
                  filename (str): Input file path
              )pbdoc")
+
+        // Keyboard property (added)
+        .def_property_readonly("keyboard", [](SimulationWrapper& self) {
+            return KeyboardMonitor(&self);
+        }, "Keyboard state monitor (e.g., sim.keyboard.Z.pressed, sim.keyboard.Space.released)")
+
+        // Camera controls (added)
+        .def("set_camera_position", &SimulationWrapper::set_camera_position,
+             py::arg("x"), py::arg("y"),
+             "Set the camera position in world coordinates.")
+        .def("get_camera_position", &SimulationWrapper::get_camera_position,
+             "Return the current camera position as a tuple (x, y).")
+        .def("set_camera_zoom", &SimulationWrapper::set_camera_zoom,
+             py::arg("zoom"), "Set the camera zoom level (1.0 = default).")
+        .def("get_camera_zoom", &SimulationWrapper::get_camera_zoom,
+             "Return the current camera zoom level.")
 
         // Properties
         .def_property_readonly("is_headless", &SimulationWrapper::is_headless,

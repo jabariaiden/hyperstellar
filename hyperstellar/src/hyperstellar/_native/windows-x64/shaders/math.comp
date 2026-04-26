@@ -2,7 +2,7 @@
 
 /*
  * ============================================================================
- * PHYSICS ENGINE COMPUTE SHADER - RESEARCH GRADE
+ * PHYSICS ENGINE COMPUTE SHADER
  * Extended complex math support + stable integrator + momentum-conserving collision system
  * ============================================================================
  */
@@ -76,10 +76,11 @@ struct CollisionInfo {
     vec2 normal;             // Collision normal (direction from A to B)
     float penetration;       // Penetration depth
     int otherObjectID;       // ID of the other object
+    vec2 contactPoint;       // World space contact point
 };
 
 // ============================================================================
-// NEW: CONTACT POINT STRUCTURE FOR WARM STARTING
+// CONTACT POINT STRUCTURE FOR WARM STARTING
 // ============================================================================
 
 struct ContactPoint {
@@ -103,7 +104,6 @@ layout(std430, binding = 4) readonly buffer EquationMappings { EquationMapping m
 layout(std430, binding = 5) readonly buffer Constraints { Constraint constraints[]; };
 layout(std430, binding = 6) readonly buffer ObjectConstraintMappings { ObjectConstraints objectConstraints[]; };
 layout(std430, binding = 7) readonly buffer CollisionProps { CollisionProperties collisionProps[]; };
-// NEW: Contact persistence buffer for warm starting
 layout(std430, binding = 8) buffer ContactBuffer { ContactPoint contacts[]; };
 
 // ============================================================================
@@ -123,7 +123,6 @@ uniform float uDriveFreq;    // Driving force frequency
 uniform float uDriveAmp;     // Driving force amplitude
 uniform int uEquationMode;   // Equation mode (0=custom, 1=default)
 uniform int uNumObjects;     // Current number of active objects
-// NEW: Collision system parameters
 uniform int uEnableWarmStart;// Enable contact warm starting (0/1)
 uniform int uMaxContactIterations; // Max iterations for contact resolution
 
@@ -219,48 +218,41 @@ const int COLLISION_CIRCLE = 1;
 const int COLLISION_AABB = 2;
 const int COLLISION_POLYGON = 3;
 
-// NEW: Contact system constants
+// Contact system constants
 const int MAX_CONTACTS_PER_OBJECT = 4;
-const float CONTACT_PERSISTENCE_THRESHOLD = 0.1; // Distance threshold for contact persistence
-const int MAX_CONTACT_FRAMES = 5; // How many frames to keep a contact alive
+const float CONTACT_PERSISTENCE_THRESHOLD = 0.1;
+const int MAX_CONTACT_FRAMES = 5;
 
 // ============================================================================
 // UTILITY FUNCTIONS (Numerical Safety)
 // ============================================================================
 
-// Safe division with zero check
 float safeDivide(float numerator, float denominator) { 
     return (abs(denominator) < EPSILON) ? 0.0 : (numerator / denominator);
 }
 
-// Safe power with non-negative base
 float safePow(float base, float exponent) { 
     return pow(max(0.0, base), exponent);
 }
 
-// Safe logarithm with minimum value
 float safeLog(float value) { 
     return log(max(SAFE_MIN_VALUE, value));
 }
 
-// Safe exponential with range clamping
 float safeExp(float value) { 
     return exp(clamp(value, -SAFE_MAX_EXP, SAFE_MAX_EXP));
 }
 
-// Check for invalid floating point values
 bool isInvalidFloat(float value) { 
     return isinf(value) || isnan(value);
 }
 
-// Sanitize 2D vector by replacing invalid components with zero
 vec2 sanitizeVec2(vec2 v) { 
     if (isInvalidFloat(v.x)) v.x = 0.0;
     if (isInvalidFloat(v.y)) v.y = 0.0; 
     return v;
 }
 
-// Sanitize 4D vector by replacing invalid components with zero
 vec4 sanitizeVec4(vec4 v) { 
     if (isInvalidFloat(v.x)) v.x = 0.0;
     if (isInvalidFloat(v.y)) v.y = 0.0;
@@ -269,59 +261,46 @@ vec4 sanitizeVec4(vec4 v) {
     return v;
 }
 
-// Sign function with proper zero handling
 float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }
-
-// Step function (Heaviside)
 float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0; }
 
 // ============================================================================
 // COMPLEX MATH UTILITIES
 // ============================================================================
 
-// Complex addition
 vec2 cAdd(vec2 a, vec2 b) { return a + b; }
-
-// Complex subtraction
 vec2 cSub(vec2 a, vec2 b) { return a - b; }
 
-// Complex multiplication: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
 vec2 cMul(vec2 a, vec2 b) {
     return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
-// Complex division
 vec2 cDiv(vec2 a, vec2 b) {
     float denom = b.x * b.x + b.y * b.y;
     if (abs(denom) < EPSILON) return vec2(0.0);
     return vec2((a.x * b.x + a.y * b.y) / denom, (a.y * b.x - a.x * b.y) / denom);
 }
 
-// Complex logarithm: ln(z) = ln|z| + i*arg(z)
 vec2 cLog(vec2 z) {
     float r = length(z);
     float theta = atan(z.y, z.x);
     return vec2(safeLog(r), theta);
 }
 
-// Complex exponential: e^(a+bi) = e^a * (cos(b) + i*sin(b))
 vec2 cExp(vec2 z) {
     float ea = safeExp(z.x);
     return vec2(ea * cos(z.y), ea * sin(z.y));
 }
 
-// Complex power: a^b = exp(b * ln(a))
 vec2 cPow(vec2 base, vec2 exponent) {
     if (length(base) < EPSILON) return vec2(0.0);
     return cExp(cMul(exponent, cLog(base)));
 }
 
-// Complex sine: sin(a+bi) = sin(a)cosh(b) + i*cos(a)sinh(b)
 vec2 cSin(vec2 z) {
     return vec2(sin(z.x) * cosh(z.y), cos(z.x) * sinh(z.y));
 }
 
-// Complex cosine: cos(a+bi) = cos(a)cosh(b) - i*sin(a)sinh(b)
 vec2 cCos(vec2 z) {
     return vec2(cos(z.x) * cosh(z.y), -sin(z.x) * sinh(z.y));
 }
@@ -330,15 +309,12 @@ vec2 cCos(vec2 z) {
 // OBJECT PROPERTY ACCESSOR
 // ============================================================================
 
-// Get property value from another object
 float getObjectProperty(int targetIndex, int propertyHash, int currentObject) {
-    // Validate object index
     if (targetIndex < 0 || targetIndex >= uNumObjects) return 0.0;
-    if (targetIndex == currentObject) return 0.0; // Don't reference self
+    if (targetIndex == currentObject) return 0.0;
     
     Object p = objectsIn[targetIndex];
     
-    // Return property based on hash code
     switch (propertyHash) {
         case VAR_HASH_X: return p.position.x;
         case VAR_HASH_Y: return p.position.y;
@@ -364,34 +340,27 @@ float getObjectProperty(int targetIndex, int propertyHash, int currentObject) {
 // INLINE RPN EVALUATOR (For Numerical Derivatives)
 // ============================================================================
 
-// Evaluate derivative expression for numerical differentiation
 vec2 evaluateDerivativeExpression(
     float x, float y, float vx, float vy, float ax_prev, float ay_prev,
     float rotation, float angular_vel, vec4 color,
     float mass, float charge, int objectIndex,
     int componentType, int exprOffset, int exprCount, int constantOffset
 ) {
-    // Validate expression parameters
     if (exprCount <= 0 || exprCount > MAX_DERIV_EXPR_SIZE) return vec2(0.0);
     
-    // Local evaluation stack (2 floats per complex number)
     float dstack[128]; 
     bool dIsComplex[64];
     int dstackPtr = 0;
     int dComplexPtr = 0;
     int dtokenIdx = exprOffset;
     
-    // Process each token in the expression
     for (int di = 0; di < exprCount; ++di) {
-        // Safety checks
         if (dtokenIdx >= MAX_TOKEN_BUFFER_SIZE) break;
         if (dstackPtr >= 126) return vec2(0.0);
         
         int dtoken = allTokens[dtokenIdx++];
         
-        // --- LITERALS AND VARIABLES ---
         if (dtoken == TOKEN_NUMBER) {
-            // Push constant value
             int dconstIdx = allTokens[dtokenIdx++];
             int dglobalConstIdx = constantOffset + dconstIdx;
             float val = 0.0;
@@ -402,18 +371,13 @@ vec2 evaluateDerivativeExpression(
             dIsComplex[dComplexPtr++] = false;
         }
         else if (dtoken == TOKEN_VARIABLE) {
-            // Push variable value
             int dvarHash = allTokens[dtokenIdx++];
-            
-            // Handle imaginary unit 'i'
             if (dvarHash == VAR_HASH_I) {
-                dstack[dstackPtr++] = 0.0; // real
-                dstack[dstackPtr++] = 1.0; // imag
+                dstack[dstackPtr++] = 0.0;
+                dstack[dstackPtr++] = 1.0;
                 dIsComplex[dComplexPtr++] = true;
                 continue;
             }
-            
-            // Get variable value based on hash
             float dvalue = 0.0;
             switch(dvarHash) {
                 case VAR_HASH_X: dvalue = x; break;
@@ -444,55 +408,30 @@ vec2 evaluateDerivativeExpression(
             dIsComplex[dComplexPtr++] = false;
         }
         else if (dtoken == TOKEN_OBJECT_REF) {
-            // Push referenced object property
             int dobjIndex = allTokens[dtokenIdx++];
             int dpropHash = allTokens[dtokenIdx++];
             float dvalue = getObjectProperty(dobjIndex, dpropHash, objectIndex);
             dstack[dstackPtr++] = isInvalidFloat(dvalue) ? 0.0 : dvalue;
             dIsComplex[dComplexPtr++] = false;
         }
-        
-        // --- BINARY OPERATORS ---
         else if (dtoken == TOKEN_ADD || dtoken == TOKEN_SUB || dtoken == TOKEN_MUL || dtoken == TOKEN_DIV || dtoken == TOKEN_POW) {
-            // Need at least two operands
             if (dComplexPtr < 2) { dstack[0]=0.0; dstackPtr=1; dComplexPtr=1; continue; }
-            
-            // Extract operands (may be complex)
             bool b_c = dIsComplex[--dComplexPtr];
             bool a_c = dIsComplex[dComplexPtr-1];
-            
             vec2 b_val = b_c ? vec2(dstack[dstackPtr-2], dstack[dstackPtr-1]) : vec2(dstack[dstackPtr-1], 0.0);
             dstackPtr -= (b_c ? 2 : 1);
             vec2 a_val = a_c ? vec2(dstack[dstackPtr-2], dstack[dstackPtr-1]) : vec2(dstack[dstackPtr-1], 0.0);
             dstackPtr -= (a_c ? 2 : 1);
-            
             vec2 res = vec2(0.0);
             bool res_c = (a_c || b_c);
-            
-            // Apply operation
             if (dtoken == TOKEN_ADD) res = cAdd(a_val, b_val);
             else if (dtoken == TOKEN_SUB) res = cSub(a_val, b_val);
-            else if (dtoken == TOKEN_MUL) {
-                res = cMul(a_val, b_val);
-                res_c = true; // Multiplication always produces complex
-            }
-            else if (dtoken == TOKEN_DIV) {
-                res = cDiv(a_val, b_val);
-                res_c = true; // Division always produces complex
-            }
+            else if (dtoken == TOKEN_MUL) { res = cMul(a_val, b_val); res_c = true; }
+            else if (dtoken == TOKEN_DIV) { res = cDiv(a_val, b_val); res_c = true; }
             else if (dtoken == TOKEN_POW) {
-                // Use complex power if either operand is complex or base is negative
-                if (a_c || b_c || a_val.x < 0.0) {
-                    res = cPow(a_val, b_val);
-                    res_c = true;
-                } else {
-                    // Real power for positive base
-                    res = vec2(safePow(a_val.x, b_val.x), 0.0);
-                    res_c = false;
-                }
+                if (a_c || b_c || a_val.x < 0.0) { res = cPow(a_val, b_val); res_c = true; }
+                else { res = vec2(safePow(a_val.x, b_val.x), 0.0); res_c = false; }
             }
-
-            // Push result back to stack
             if (res_c) {
                 dstack[dstackPtr++] = res.x;
                 dstack[dstackPtr++] = res.y;
@@ -502,25 +441,17 @@ vec2 evaluateDerivativeExpression(
                 dIsComplex[dComplexPtr-1] = false;
             }
         }
-        
-        // --- UNARY OPERATORS ---
         else if (dtoken == TOKEN_SIN || dtoken == TOKEN_COS || dtoken == TOKEN_EXP || dtoken == TOKEN_NEG) {
-            // Need at least one operand
             if (dComplexPtr < 1) { dstack[0]=0.0; dstackPtr=1; dComplexPtr=1; continue; }
-            
             bool a_c = dIsComplex[dComplexPtr-1];
             vec2 a_val = a_c ? vec2(dstack[dstackPtr-2], dstack[dstackPtr-1]) : vec2(dstack[dstackPtr-1], 0.0);
             dstackPtr -= (a_c ? 2 : 1);
             vec2 res = vec2(0.0);
             bool res_c = a_c;
-
-            // Apply unary operation
             if (dtoken == TOKEN_NEG) { res = vec2(-a_val.x, -a_val.y); }
             else if (dtoken == TOKEN_SIN) { res = cSin(a_val); res_c = true; }
             else if (dtoken == TOKEN_COS) { res = cCos(a_val); res_c = true; }
             else if (dtoken == TOKEN_EXP) { res = cExp(a_val); res_c = true; }
-
-            // Push result back to stack
             if (res_c) {
                 dstack[dstackPtr++] = res.x;
                 dstack[dstackPtr++] = res.y;
@@ -530,10 +461,7 @@ vec2 evaluateDerivativeExpression(
                 dIsComplex[dComplexPtr-1] = false;
             }
         }
-        
-        // --- DERIVATIVE OPERATOR (skip nested derivatives) ---
         else if (dtoken == TOKEN_DERIVATIVE) {
-            // Skip nested derivative evaluation for simplicity
             if (dtokenIdx + 3 < MAX_TOKEN_BUFFER_SIZE) {
                 dtokenIdx += 3;
                 int nested_count = allTokens[dtokenIdx++];
@@ -545,7 +473,6 @@ vec2 evaluateDerivativeExpression(
         }
     }
     
-    // Return final result
     if (dstackPtr <= 0) return vec2(0.0);
     if (dIsComplex[0]) return vec2(dstack[0], dstack[1]);
     return vec2(dstack[0], 0.0);
@@ -555,7 +482,6 @@ vec2 evaluateDerivativeExpression(
 // MAIN RPN EVALUATOR (Full Feature Set)
 // ============================================================================
 
-// Evaluate RPN expression for a specific physics component (ax, ay, angular, color)
 float evaluateRPNComponent(
     float x, float y, float vx, float vy, float ax_prev, float ay_prev,
     float rotation, float angular_vel, vec4 color,
@@ -563,35 +489,25 @@ float evaluateRPNComponent(
     int componentType,
     int tokenOffset, int tokenCount, int constantOffset
 ) {
-    // Validate expression parameters
     if (tokenCount <= 0 || tokenCount > 1000) {
-        // Return defaults for invalid expressions
-        if (componentType == 2) return 0.0; // angular
-        if (componentType >= 3 && componentType <= 6) return 1.0; // color channels
+        if (componentType == 2) return 0.0;
+        if (componentType >= 3 && componentType <= 6) return 1.0;
         return 0.0;
     }
     
-    // Evaluation stack (128 floats = 64 complex numbers max)
     float stack[128];
     int stackPtr = 0;
     bool isComplex[64];
     int complexStackPtr = 0;
-    
     int tokenIdx = tokenOffset;
     
-    // Process each token in RPN order
     for (int i = 0; i < tokenCount; ++i) {
-        // Safety checks
         if (tokenIdx >= MAX_TOKEN_BUFFER_SIZE) return 0.0;
-        if (stackPtr >= 126) return 0.0; // Stack overflow guard
+        if (stackPtr >= 126) return 0.0;
         
         int tokenType = allTokens[tokenIdx++];
         
-        // ====================================================================
-        // LITERALS AND VARIABLES
-        // ====================================================================
         if (tokenType == TOKEN_NUMBER) {
-            // Push constant value
             int constIdx = allTokens[tokenIdx++];
             int globalConstIdx = constantOffset + constIdx;
             float value = 0.0;
@@ -603,19 +519,14 @@ float evaluateRPNComponent(
             isComplex[complexStackPtr++] = false;
         }
         else if (tokenType == TOKEN_VARIABLE) {
-            // Push variable value
             int varHash = allTokens[tokenIdx++];
             float value = 0.0;
-            
-            // Handle imaginary unit 'i'
             if (varHash == VAR_HASH_I) {
-                stack[stackPtr++] = 0.0; // real
-                stack[stackPtr++] = 1.0; // imag
+                stack[stackPtr++] = 0.0;
+                stack[stackPtr++] = 1.0;
                 isComplex[complexStackPtr++] = true;
-                continue; 
+                continue;
             }
-            
-            // Get variable value based on hash
             switch(varHash) {
                 case VAR_HASH_X: value = x; break;
                 case VAR_HASH_Y: value = y; break;
@@ -645,7 +556,6 @@ float evaluateRPNComponent(
             isComplex[complexStackPtr++] = false;
         }
         else if (tokenType == TOKEN_OBJECT_REF) {
-            // Push referenced object property
             int objIndex = allTokens[tokenIdx++];
             int propHash = allTokens[tokenIdx++];
             float value = getObjectProperty(objIndex, propHash, objectIndex);
@@ -653,29 +563,20 @@ float evaluateRPNComponent(
             stack[stackPtr++] = value;
             isComplex[complexStackPtr++] = false;
         }
-        
-        // ====================================================================
-        // NUMERICAL DERIVATIVE (Complex-Aware)
-        // ====================================================================
         else if (tokenType == TOKEN_DERIVATIVE) {
-            int wrtVarHash = allTokens[tokenIdx++];  // Variable to differentiate with respect to
-            int order = allTokens[tokenIdx++];       // Derivative order (1st, 2nd, etc.)
-            int method = allTokens[tokenIdx++];      // Numerical method (center diff, forward, etc.)
-            int exprCount = allTokens[tokenIdx++];   // Number of tokens in expression
-            int exprOffset = tokenIdx;               // Expression start offset
-            
+            int wrtVarHash = allTokens[tokenIdx++];
+            int order = allTokens[tokenIdx++];
+            int method = allTokens[tokenIdx++];
+            int exprCount = allTokens[tokenIdx++];
+            int exprOffset = tokenIdx;
             float h = DERIVATIVE_H;
             vec2 derivValue = vec2(0.0);
-            
-            // Currently only support first-order central difference
             if (order == 1 && exprCount > 0 && exprCount <= MAX_DERIV_EXPR_SIZE) {
-                // Save original values
                 float x_orig = x, y_orig = y, vx_orig = vx, vy_orig = vy;
                 float ax_orig = ax_prev, ay_orig = ay_prev;
                 float rotation_orig = rotation, angular_vel_orig = angular_vel;
                 vec4 color_orig = color;
                 
-                // Macro to perturb the target variable
                 #define PERTURB(var, delta) \
                 if (wrtVarHash == VAR_HASH_X) x = x_orig + delta; \
                 else if (wrtVarHash == VAR_HASH_Y) y = y_orig + delta; \
@@ -690,72 +591,40 @@ float evaluateRPNComponent(
                 else if (wrtVarHash == VAR_HASH_B) color.b = color_orig.b + delta; \
                 else if (wrtVarHash == VAR_HASH_A) color.a = color_orig.a + delta;
                 
-                // f(x+h)
                 PERTURB(wrtVarHash, h);
                 vec2 val_plus = evaluateDerivativeExpression(
                     x, y, vx, vy, ax_prev, ay_prev, rotation, angular_vel, color,
-                    mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset
-                );
-                
-                // f(x-h)
+                    mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset);
                 PERTURB(wrtVarHash, -h);
                 vec2 val_minus = evaluateDerivativeExpression(
                     x, y, vx, vy, ax_prev, ay_prev, rotation, angular_vel, color,
-                    mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset
-                );
-                
-                // Restore original values
+                    mass, charge, objectIndex, componentType, exprOffset, exprCount, constantOffset);
                 x = x_orig; y = y_orig; vx = vx_orig; vy = vy_orig;
                 ax_prev = ax_orig; ay_prev = ay_orig;
                 rotation = rotation_orig; angular_vel = angular_vel_orig;
                 color = color_orig;
-
-                // Central difference: (f(x+h) - f(x-h)) / (2h)
                 derivValue = (val_plus - val_minus) / (2.0 * h);
             }
-            
-            // Push derivative result (always complex to be safe)
             stack[stackPtr++] = derivValue.x;
             stack[stackPtr++] = derivValue.y;
             isComplex[complexStackPtr++] = true;
-            
-            // Skip the expression tokens we just processed
             tokenIdx += exprCount;
             i += exprCount + 3;
         }
-        
-        // ====================================================================
-        // BINARY OPERATORS
-        // ====================================================================
         else if (tokenType == TOKEN_ADD || tokenType == TOKEN_SUB || tokenType == TOKEN_MUL || tokenType == TOKEN_DIV) {
-            // Need at least two operands
             if (complexStackPtr < 2) { stack[0] = 0.0; stackPtr = 1; complexStackPtr = 1; continue; }
-            
             bool b_c = isComplex[--complexStackPtr];
             bool a_c = isComplex[complexStackPtr-1];
-            
-            // Extract operands
             vec2 b_val = b_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (b_c ? 2 : 1);
             vec2 a_val = a_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (a_c ? 2 : 1);
-            
             vec2 res = vec2(0.0);
-            bool res_c = (a_c || b_c); 
-
-            // Apply operation
+            bool res_c = (a_c || b_c);
             if (tokenType == TOKEN_ADD) res = cAdd(a_val, b_val);
             else if (tokenType == TOKEN_SUB) res = cSub(a_val, b_val);
-            else if (tokenType == TOKEN_MUL) {
-                res = cMul(a_val, b_val);
-                res_c = true; // Multiplication always produces complex
-            }
-            else if (tokenType == TOKEN_DIV) {
-                res = cDiv(a_val, b_val);
-                res_c = true; // Division always produces complex
-            }
-
-            // Push result
+            else if (tokenType == TOKEN_MUL) { res = cMul(a_val, b_val); res_c = true; }
+            else if (tokenType == TOKEN_DIV) { res = cDiv(a_val, b_val); res_c = true; }
             if (res_c) {
                 stack[stackPtr++] = res.x;
                 stack[stackPtr++] = res.y;
@@ -765,52 +634,33 @@ float evaluateRPNComponent(
                 isComplex[complexStackPtr-1] = false;
             }
         }
-        
-        // ====================================================================
-        // POWER OPERATOR (Complex-Aware)
-        // ====================================================================
         else if (tokenType == TOKEN_POW) {
-            // Need at least two operands
             if (complexStackPtr < 2) { stack[0] = 0.0; stackPtr = 1; complexStackPtr = 1; continue; }
-            
             bool b_c = isComplex[--complexStackPtr];
             bool a_c = isComplex[complexStackPtr-1];
-            
             vec2 b_val = b_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (b_c ? 2 : 1);
             vec2 a_val = a_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (a_c ? 2 : 1);
-            
-            // Use complex power if any operand is complex OR base is negative
             if (a_c || b_c || a_val.x < 0.0) {
                 vec2 res = cPow(a_val, b_val);
                 stack[stackPtr++] = res.x;
                 stack[stackPtr++] = res.y;
                 isComplex[complexStackPtr-1] = true;
             } else {
-                // Real power for positive base
                 stack[stackPtr++] = safePow(a_val.x, b_val.x);
                 isComplex[complexStackPtr-1] = false;
             }
         }
-        
-        // ====================================================================
-        // UNARY OPERATORS (Complex-Aware)
-        // ====================================================================
         else if (tokenType == TOKEN_NEG || tokenType == TOKEN_SIN || tokenType == TOKEN_COS || 
                  tokenType == TOKEN_TAN || tokenType == TOKEN_EXP || tokenType == TOKEN_LOG ||
                  tokenType == TOKEN_SQRT || tokenType == TOKEN_ABS) {
-            
-            // Need at least one operand
             if (complexStackPtr < 1) { stack[0] = 0.0; stackPtr = 1; complexStackPtr = 1; continue; }
-            
             bool a_c = isComplex[complexStackPtr-1];
             vec2 a_val = a_c ? vec2(stack[stackPtr-2], stack[stackPtr-1]) : vec2(stack[stackPtr-1], 0.0);
             stackPtr -= (a_c ? 2 : 1);
             vec2 res = vec2(0.0);
-            bool res_c = a_c; // Inherit complexity by default
-
-            // Apply unary operation
+            bool res_c = a_c;
             if (tokenType == TOKEN_NEG) { res = vec2(-a_val.x, -a_val.y); }
             else if (tokenType == TOKEN_SIN) { res = cSin(a_val); res_c = true; }
             else if (tokenType == TOKEN_COS) { res = cCos(a_val); res_c = true; }
@@ -818,19 +668,15 @@ float evaluateRPNComponent(
             else if (tokenType == TOKEN_LOG) { res = cLog(a_val); res_c = true; }
             else if (tokenType == TOKEN_SQRT) { res = cPow(a_val, vec2(0.5, 0.0)); res_c = true; }
             else if (tokenType == TOKEN_TAN) { 
-                 // tan(z) = sin(z)/cos(z)
-                 vec2 s = cSin(a_val);
-                 vec2 c = cCos(a_val);
-                 res = cDiv(s, c);
-                 res_c = true;
+                vec2 s = cSin(a_val);
+                vec2 c = cCos(a_val);
+                res = cDiv(s, c);
+                res_c = true;
             }
             else if (tokenType == TOKEN_ABS) {
-                // Absolute value/magnitude of complex number
                 res.x = length(a_val);
-                res_c = false; // Magnitude is always real
+                res_c = false;
             }
-
-            // Push result
             if (res_c) {
                 stack[stackPtr++] = res.x;
                 stack[stackPtr++] = res.y;
@@ -840,10 +686,6 @@ float evaluateRPNComponent(
                 isComplex[complexStackPtr-1] = false;
             }
         }
-        
-        // ====================================================================
-        // REAL-VALUED UNARY OPERATORS
-        // ====================================================================
         else if (tokenType == TOKEN_FLOOR) {
             if (!isComplex[complexStackPtr-1]) stack[stackPtr-1] = floor(stack[stackPtr-1]);
         }
@@ -859,10 +701,6 @@ float evaluateRPNComponent(
         else if (tokenType == TOKEN_STEP) {
             if (!isComplex[complexStackPtr-1]) stack[stackPtr-1] = stepFunc(stack[stackPtr-1]);
         }
-        
-        // ====================================================================
-        // REAL-VALUED BINARY OPERATORS
-        // ====================================================================
         else if (tokenType == TOKEN_MOD) {
             if (complexStackPtr < 2) continue;
             complexStackPtr--;
@@ -878,11 +716,11 @@ float evaluateRPNComponent(
             isComplex[complexStackPtr-1] = false;
         }
         else if (tokenType == TOKEN_ATAN2) {
-             if (complexStackPtr < 2) continue;
-             complexStackPtr--;
-             float x_val = stack[--stackPtr], y_val = stack[--stackPtr];
-             stack[stackPtr++] = atan(y_val, x_val);
-             isComplex[complexStackPtr-1] = false;
+            if (complexStackPtr < 2) continue;
+            complexStackPtr--;
+            float x_val = stack[--stackPtr], y_val = stack[--stackPtr];
+            stack[stackPtr++] = atan(y_val, x_val);
+            isComplex[complexStackPtr-1] = false;
         }
         else if (tokenType == TOKEN_CLAMP) {
             if (complexStackPtr < 3) continue;
@@ -893,74 +731,57 @@ float evaluateRPNComponent(
             stack[stackPtr++] = clamp(val, min_val, max_val);
             isComplex[complexStackPtr-1] = false;
         }
-        
-        // ====================================================================
-        // COMPLEX-SPECIFIC OPERATORS
-        // ====================================================================
         else if (tokenType == TOKEN_REAL) {
-            // Extract real part of complex number
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
-                stackPtr--; // Remove imaginary part
-                isComplex[--complexStackPtr] = false; // Mark as real
+                stackPtr--;
+                isComplex[--complexStackPtr] = false;
             }
         }
         else if (tokenType == TOKEN_IMAG) {
-            // Extract imaginary part of complex number
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
                 float imag = stack[stackPtr-1];
-                stackPtr--; 
-                stack[stackPtr-1] = imag; // Replace real with imaginary part
+                stackPtr--;
+                stack[stackPtr-1] = imag;
                 isComplex[--complexStackPtr] = false;
             } else {
-                stack[stackPtr-1] = 0.0; // Real numbers have 0 imaginary part
+                stack[stackPtr-1] = 0.0;
             }
         }
         else if (tokenType == TOKEN_CONJ) {
-            // Complex conjugate
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
-                stack[stackPtr-1] = -stack[stackPtr-1]; // Negate imaginary part
+                stack[stackPtr-1] = -stack[stackPtr-1];
             }
         }
         else if (tokenType == TOKEN_ARG) {
-            // Argument/phase of complex number
             if (complexStackPtr < 1) continue;
             if (isComplex[complexStackPtr-1]) {
                 float imag = stack[--stackPtr], real = stack[stackPtr-1];
                 stack[stackPtr-1] = atan(imag, real);
                 isComplex[--complexStackPtr] = false;
             } else {
-                // Real numbers: 0 for positive, π for negative
                 stack[stackPtr-1] = (stack[stackPtr-1] >= 0.0) ? 0.0 : PI;
             }
         }
     }
     
-    // Extract final result from stack
     float result = (stackPtr > 0) ? stack[0] : 0.0;
     if (isInvalidFloat(result)) {
-        // Return defaults for invalid results
-        if (componentType >= 3 && componentType <= 6) return 1.0; // color channels
+        if (componentType >= 3 && componentType <= 6) return 1.0;
         return 0.0;
     }
-    
-    // Clamp color channels to [0, 1]
     if (componentType >= 3 && componentType <= 6) result = clamp(result, 0.0, 1.0);
-    
     return result;
 }
 
 // ============================================================================
-// DEFAULT PHYSICS (Simple Spring-Mass-Damper System)
+// DEFAULT PHYSICS (Simple Zero System)
 // ============================================================================
 
-// Calculate default physics (gravity + damping)
-vec2 calculateDefaultPhysics(vec2 pos, vec2 vel, float mass) {
+vec2 calculateDefaultPhysics() {
     vec2 acceleration = vec2(0.0);
-    acceleration += uGravityDir * g;  // Gravity
-    acceleration -= vel * b;           // Damping
     return acceleration;
 }
 
@@ -968,109 +789,55 @@ vec2 calculateDefaultPhysics(vec2 pos, vec2 vel, float mass) {
 // CONSTRAINT SOLVERS
 // ============================================================================
 
-// Solve distance constraint between two objects
 void solveDistanceConstraint(inout vec2 pos, inout vec2 vel, Constraint c, int objectIndex) {
     if (c.targetObjectID < 0 || c.targetObjectID >= uNumObjects) return;
     if (c.targetObjectID == objectIndex) return;
-    
     Object target = objectsIn[c.targetObjectID];
     vec2 targetPos = target.position;
-    
-    // Desired distance (parameter 1)
     float desiredDistance = c.param1;
-    
-    // Calculate current offset and distance
     vec2 currentOffset = targetPos - pos;
     float currentDistance = length(currentOffset);
-    
     if (currentDistance < EPSILON) return;
-    
-    // Calculate desired offset vector
     vec2 desiredOffset = normalize(currentOffset) * desiredDistance;
-    
-    // Position correction (move toward desired distance)
     vec2 error = currentOffset - desiredOffset;
     pos -= error * CONSTRAINT_STIFFNESS;
- 
-    // Velocity damping (reduce relative velocity along constraint axis)
     vec2 targetVel = target.velocity;
     vec2 relativeVel = vel - targetVel;
     float damping = 0.8;
     vel -= dot(relativeVel, normalize(error + vec2(EPSILON))) * normalize(error + vec2(EPSILON)) * damping;
 }
 
-// Solve boundary/box constraint
 void solveBoundaryConstraint(inout vec2 pos, inout vec2 vel, Constraint c) {
-    // Extract boundary coordinates
-    float x1 = c.param1;
-    float x2 = c.param2;
-    float y1 = c.param3;
-    float y2 = c.param4;
-    float minX = min(x1, x2);
-    float maxX = max(x1, x2);
-    float minY = min(y1, y2);
-    float maxY = max(y1, y2);
-    
-    const float elasticity = 0.7;  // Bounce coefficient
-    const float friction = 0.95;   // Wall friction
-    
-    // Check and resolve X boundaries
-    if (pos.x < minX) { 
-        pos.x = minX; 
-        vel.x = abs(vel.x) * elasticity; 
-        vel.y *= friction; 
-    } 
-    else if (pos.x > maxX) { 
-        pos.x = maxX; 
-        vel.x = -abs(vel.x) * elasticity; 
-        vel.y *= friction; 
-    }
-    
-    // Check and resolve Y boundaries
-    if (pos.y < minY) { 
-        pos.y = minY; 
-        vel.y = abs(vel.y) * elasticity; 
-        vel.x *= friction; 
-    } 
-    else if (pos.y > maxY) { 
-        pos.y = maxY; 
-        vel.y = -abs(vel.y) * elasticity; 
-        vel.x *= friction; 
-    }
+    float x1 = c.param1, x2 = c.param2, y1 = c.param3, y2 = c.param4;
+    float minX = min(x1, x2), maxX = max(x1, x2);
+    float minY = min(y1, y2), maxY = max(y1, y2);
+    const float elasticity = 0.7;
+    const float friction = 0.95;
+    if (pos.x < minX) { pos.x = minX; vel.x = abs(vel.x) * elasticity; vel.y *= friction; }
+    else if (pos.x > maxX) { pos.x = maxX; vel.x = -abs(vel.x) * elasticity; vel.y *= friction; }
+    if (pos.y < minY) { pos.y = minY; vel.y = abs(vel.y) * elasticity; vel.x *= friction; }
+    else if (pos.y > maxY) { pos.y = maxY; vel.y = -abs(vel.y) * elasticity; vel.x *= friction; }
 }
 
-// Solve angular constraint (restrict rotation angle)
 void solveAngleConstraint(inout vec2 pos, inout vec2 vel, Constraint c, vec2 originalPos) {
-    float minAngle = c.param1;
-    float maxAngle = c.param2;
-    
-    // Calculate current angle from original position
+    float minAngle = c.param1, maxAngle = c.param2;
     vec2 dir = pos - originalPos;
     float radius = length(dir);
     if (radius < EPSILON) return;
-    
     float currentAngle = atan(dir.y, dir.x);
     currentAngle = mod(currentAngle + 2.0 * PI, 2.0 * PI);
-    
-    // Normalize angle bounds
     float normMinAngle = mod(minAngle + 2.0 * PI, 2.0 * PI);
     float normMaxAngle = mod(maxAngle + 2.0 * PI, 2.0 * PI);
-    
     bool outsideBounds = false;
     float correctedAngle = currentAngle;
-    
-    // Check if angle is outside allowed range
     if (normMinAngle <= normMaxAngle) {
-        // Normal case: min < max
         if (currentAngle < normMinAngle || currentAngle > normMaxAngle) {
             outsideBounds = true;
-            // Choose closest boundary
             float distToMin = abs(currentAngle - normMinAngle);
             float distToMax = abs(currentAngle - normMaxAngle);
             correctedAngle = (distToMin < distToMax) ? normMinAngle : normMaxAngle;
         }
     } else {
-        // Wrap-around case: min > max (crossing 0/2π)
         if (currentAngle < normMinAngle && currentAngle > normMaxAngle) {
             outsideBounds = true;
             float distToMin = abs(currentAngle - normMinAngle);
@@ -1078,30 +845,21 @@ void solveAngleConstraint(inout vec2 pos, inout vec2 vel, Constraint c, vec2 ori
             correctedAngle = (distToMin < distToMax) ? normMinAngle : normMaxAngle;
         }
     }
-    
-    // Apply correction if needed
     if (outsideBounds) {
-        // Move to boundary angle
         pos = originalPos + vec2(cos(correctedAngle), sin(correctedAngle)) * radius;
-        
-        // Apply friction to velocity (only keep tangential component)
         vec2 radialDir = normalize(pos - originalPos);
         vec2 tangentDir = vec2(-radialDir.y, radialDir.x);
         vel = tangentDir * dot(vel, tangentDir) * 0.9;
     }
 }
 
-// Apply all constraints for an object
 void applyConstraints(inout vec2 pos, inout vec2 vel, int objectIndex, vec2 originalPos) {
     ObjectConstraints pc = objectConstraints[objectIndex];
     if (pc.numConstraints <= 0) return;
-    
-    // Multiple iterations for constraint stability
     for (int iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; iter++) {
         for (int i = 0; i < pc.numConstraints; i++) {
             int constraintIdx = pc.constraintOffset + i;
             Constraint c = constraints[constraintIdx];
-            
             if (c.type == CONSTRAINT_DISTANCE) solveDistanceConstraint(pos, vel, c, objectIndex);
             else if (c.type == CONSTRAINT_BOUNDARY) solveBoundaryConstraint(pos, vel, c);
             else if (c.type == CONSTRAINT_ANGLE) solveAngleConstraint(pos, vel, c, originalPos);
@@ -1110,608 +868,447 @@ void applyConstraints(inout vec2 pos, inout vec2 vel, int objectIndex, vec2 orig
 }
 
 // ============================================================================
-// COLLISION DETECTION FUNCTIONS (UNCHANGED - KEEP YOUR EXISTING CODE)
+// ROTATION HELPER FUNCTIONS
 // ============================================================================
 
-// Circle-Circle collision detection
-CollisionInfo detectCircleCircle(vec2 posA, float radiusA, vec2 posB, float radiusB, int objB)
-{
+vec2 rotatePoint(vec2 point, float angle) {
+    float cosA = cos(angle);
+    float sinA = sin(angle);
+    return vec2(point.x * cosA - point.y * sinA, point.x * sinA + point.y * cosA);
+}
+
+vec2 worldToLocal(vec2 worldPos, vec2 objectPos, float rotation) {
+    vec2 localPos = worldPos - objectPos;
+    return rotatePoint(localPos, -rotation);
+}
+
+vec2 localToWorld(vec2 localPos, vec2 objectPos, float rotation) {
+    vec2 rotated = rotatePoint(localPos, rotation);
+    return objectPos + rotated;
+}
+
+vec2 getSupportPoint(vec2 pos, vec2 halfExt, float rot, vec2 dir) {
+    // Transform direction into local coordinates
+    float cosR = cos(rot), sinR = sin(rot);
+    vec2 localDir = vec2( dot(dir, vec2( cosR, sinR)),
+                          dot(dir, vec2(-sinR, cosR)) );
+    // Local support vertex (max projection onto localDir)
+    vec2 localSupport = vec2( sign(localDir.x) * halfExt.x,
+                              sign(localDir.y) * halfExt.y );
+    // Transform back to world
+    return pos + vec2( localSupport.x * cosR - localSupport.y * sinR,
+                       localSupport.x * sinR + localSupport.y * cosR );
+}
+
+float getMomentOfInertia(float mass, int shapeType, float width, float height, float radius) {
+    if (shapeType == COLLISION_CIRCLE) {
+        return 0.5 * mass * radius * radius;
+    }
+    else if (shapeType == COLLISION_AABB) {
+        return (1.0 / 12.0) * mass * (width * width + height * height);
+    }
+    else {
+        return 0.5 * mass * radius * radius;
+    }
+}
+
+// ============================================================================
+// COLLISION DETECTION FUNCTIONS (UPDATED WITH ROTATION SUPPORT)
+// ============================================================================
+
+CollisionInfo detectCircleCircle(vec2 posA, float radiusA, vec2 posB, float radiusB, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = objB;
-    
-    // Calculate distance between centers
     vec2 delta = posB - posA;
     float distSq = dot(delta, delta);
     float radiusSum = radiusA + radiusB;
-    
-    // Check if circles overlap
-    if (distSq < radiusSum * radiusSum && distSq > EPSILON)
-    {
+    if (distSq < radiusSum * radiusSum && distSq > EPSILON) {
         float dist = sqrt(distSq);
         info.hasCollision = true;
-        info.normal = delta / dist;           // Collision normal (A→B)
-        info.penetration = radiusSum - dist;  // Overlap depth
+        info.normal = delta / dist;
+        info.penetration = radiusSum - dist;
+        info.contactPoint = posA + delta * (radiusA / radiusSum);
     }
-    
     return info;
 }
 
-// Axis-Aligned Bounding Box collision detection
-CollisionInfo detectAABBAABB(vec2 posA, vec2 halfExtA, vec2 posB, vec2 halfExtB, int objB)
-{
+CollisionInfo detectAABBAABB(vec2 posA, vec2 halfExtA, float rotA, 
+                              vec2 posB, vec2 halfExtB, float rotB, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = objB;
-    
-    // Calculate separation vector
+    info.penetration = 1e10;
+    vec2 axes[4];
+    axes[0] = vec2(cos(rotA), sin(rotA));
+    axes[1] = vec2(-sin(rotA), cos(rotA));
+    axes[2] = vec2(cos(rotB), sin(rotB));
+    axes[3] = vec2(-sin(rotB), cos(rotB));
     vec2 delta = posB - posA;
-    vec2 overlap = halfExtA + halfExtB - abs(delta);
-    
-    // Check for overlap on both axes
-    if (overlap.x > 0.0 && overlap.y > 0.0)
-    {
-        info.hasCollision = true;
-        
-        // Resolve along minimum penetration axis
-        if (overlap.x < overlap.y)
-        {
-            info.normal = vec2(sign(delta.x), 0.0);
-            info.penetration = overlap.x;
-        }
-        else
-        {
-            info.normal = vec2(0.0, sign(delta.y));
-            info.penetration = overlap.y;
+    for (int i = 0; i < 4; i++) {
+        vec2 axis = axes[i];
+        float projA_radius = abs(dot(axes[0], axis)) * halfExtA.x + abs(dot(axes[1], axis)) * halfExtA.y;
+        float projB_radius = abs(dot(axes[2], axis)) * halfExtB.x + abs(dot(axes[3], axis)) * halfExtB.y;
+        float projA_center = 0.0;
+        float projB_center = dot(delta, axis);
+        float separation = abs(projB_center - projA_center) - (projA_radius + projB_radius);
+        const float COLLISION_EPSILON = 1e-4;
+        if (separation > COLLISION_EPSILON) return info;
+        float overlap = -separation;
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            if (dot(delta, axis) < 0.0) info.normal = -axis;
         }
     }
-    
+    info.hasCollision = true;
+    info.contactPoint = getSupportPoint(posA, halfExtA, rotA, info.normal);
     return info;
 }
 
-// Project polygon onto axis (Separating Axis Theorem helper)
-vec2 projectPolygon(vec2 center, float radius, int sides, float rotation, vec2 axis)
-{
-    float minProj = 1e10;
-    float maxProj = -1e10;
-    
+vec2 projectPolygon(vec2 center, float radius, int sides, float rotation, vec2 axis) {
+    float minProj = 1e10, maxProj = -1e10;
     float angleStep = 2.0 * PI / float(sides);
-    
-    // Project each vertex onto axis
-    for (int i = 0; i < sides; i++)
-    {
+    for (int i = 0; i < sides; i++) {
         float angle = rotation + float(i) * angleStep;
         vec2 vertex = center + radius * vec2(cos(angle), sin(angle));
         float proj = dot(vertex, axis);
         minProj = min(minProj, proj);
         maxProj = max(maxProj, proj);
     }
-    
     return vec2(minProj, maxProj);
 }
 
-// Get polygon edge normal
-vec2 getPolygonNormal(int side, int totalSides, float rotation)
-{
+vec2 getPolygonNormal(int side, int totalSides, float rotation) {
     float angleStep = 2.0 * PI / float(totalSides);
     float angle = rotation + float(side) * angleStep;
-    
-    // Calculate edge vector
-    vec2 edge = vec2(cos(angle + angleStep), sin(angle + angleStep)) - 
-                vec2(cos(angle), sin(angle));
-    
-    // Return perpendicular (normal) to edge
+    vec2 edge = vec2(cos(angle + angleStep), sin(angle + angleStep)) - vec2(cos(angle), sin(angle));
     return normalize(vec2(-edge.y, edge.x));
 }
 
-// Polygon-Polygon SAT collision detection
-CollisionInfo detectPolygonPolygon(
-    vec2 posA, float radiusA, int sidesA, float rotA,
-    vec2 posB, float radiusB, int sidesB, float rotB,
-    int objB)
-{
+CollisionInfo detectPolygonPolygon(vec2 posA, float radiusA, int sidesA, float rotA,
+                                    vec2 posB, float radiusB, int sidesB, float rotB, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = objB;
     info.penetration = 1e10;
-    
-    // Test all edge normals from both polygons
     int totalTests = sidesA + sidesB;
-    
-    for (int i = 0; i < totalTests; i++)
-    {
-        vec2 axis;
-        
-        if (i < sidesA)
-            axis = getPolygonNormal(i, sidesA, rotA);
-        else
-            axis = getPolygonNormal(i - sidesA, sidesB, rotB);
-        
-        // Project both polygons onto axis
+    for (int i = 0; i < totalTests; i++) {
+        vec2 axis = (i < sidesA) ? getPolygonNormal(i, sidesA, rotA) : getPolygonNormal(i - sidesA, sidesB, rotB);
         vec2 projA = projectPolygon(posA, radiusA, sidesA, rotA, axis);
         vec2 projB = projectPolygon(posB, radiusB, sidesB, rotB, axis);
-        
-        // Check for separating axis
-        if (projA.y < projB.x || projB.y < projA.x)
-            return info; // Separating axis found, no collision
-        
-        // Calculate overlap
+        if (projA.y < projB.x || projB.y < projA.x) return info;
         float overlap = min(projA.y, projB.y) - max(projA.x, projB.x);
-        
-        // Track minimum overlap (minimum translation vector)
-        if (overlap < info.penetration)
-        {
+        if (overlap < info.penetration) {
             info.penetration = overlap;
             info.normal = axis;
-            
-            // Ensure normal points from A to B
-            if (dot(posB - posA, axis) < 0.0)
-                info.normal = -axis;
+            if (dot(posB - posA, axis) < 0.0) info.normal = -axis;
         }
     }
-    
     info.hasCollision = true;
     return info;
 }
 
-// Circle-AABB collision detection
-CollisionInfo detectCircleAABB(vec2 circlePos, float radius, 
-                                vec2 boxPos, vec2 halfExt, int objB)
-{
+CollisionInfo detectCircleAABB(vec2 circlePos, float radius, vec2 boxPos, vec2 halfExt, float boxRot, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = objB;
-    
-    // Find closest point on AABB to circle center
-    vec2 closest = clamp(circlePos, boxPos - halfExt, boxPos + halfExt);
-    vec2 delta = circlePos - closest;
+    vec2 localCirclePos = worldToLocal(circlePos, boxPos, boxRot);
+    vec2 localClosest = clamp(localCirclePos, -halfExt, halfExt);
+    vec2 delta = localCirclePos - localClosest;
     float distSq = dot(delta, delta);
-    
-    if (distSq < radius * radius)
-    {
+    if (distSq < radius * radius) {
         float dist = sqrt(distSq);
         info.hasCollision = true;
-        
-        if (dist > EPSILON)
-        {
-            // Circle center outside AABB
-            info.normal = -(delta / dist);
+        if (dist > EPSILON) {
+            vec2 localNormal = -(delta / dist);
+            info.normal = rotatePoint(localNormal, boxRot);
             info.penetration = radius - dist;
-        }
-        else
-        {
-            // Circle center inside AABB - push out nearest edge
-            vec2 toEdge = boxPos - circlePos;
+            info.contactPoint = circlePos - info.normal * (radius - info.penetration * 0.5);
+        } else {
+            vec2 toEdge = -localCirclePos;
             vec2 absToEdge = abs(toEdge);
             vec2 edgeDist = halfExt - absToEdge;
-            
-            if (edgeDist.x < edgeDist.y)
-            {
-                info.normal = vec2(sign(toEdge.x), 0.0);
+            vec2 localNormal;
+            if (edgeDist.x < edgeDist.y) {
+                localNormal = vec2(sign(toEdge.x), 0.0);
                 info.penetration = radius + edgeDist.x;
-            }
-            else
-            {
-                info.normal = vec2(0.0, sign(toEdge.y));
+            } else {
+                localNormal = vec2(0.0, sign(toEdge.y));
                 info.penetration = radius + edgeDist.y;
             }
+            info.normal = rotatePoint(localNormal, boxRot);
+            info.contactPoint = circlePos - info.normal * radius;
         }
     }
-    
     return info;
 }
 
-// Circle-Polygon SAT collision detection
 CollisionInfo detectCirclePolygon(vec2 circlePos, float circleRadius,
-                                  vec2 polyPos, float polyRadius, 
-                                  int polySides, float polyRot, int objB)
-{
+                                   vec2 polyPos, float polyRadius, int polySides, float polyRot, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = objB;
     info.penetration = 1e10;
-    
-    // Test polygon edge normals
     float angleStep = 2.0 * PI / float(polySides);
-    
-    for (int i = 0; i < polySides; i++)
-    {
+    for (int i = 0; i < polySides; i++) {
         vec2 axis = getPolygonNormal(i, polySides, polyRot);
-        
-        // Project circle onto axis (capsule projection)
         float circleProj = dot(circlePos, axis);
-        vec2 circleProjRange = vec2(circleProj - circleRadius, 
-                                     circleProj + circleRadius);
-        
-        // Project polygon onto axis
+        vec2 circleProjRange = vec2(circleProj - circleRadius, circleProj + circleRadius);
         vec2 polyProj = projectPolygon(polyPos, polyRadius, polySides, polyRot, axis);
-        
-        // Check for separation
-        if (circleProjRange.y < polyProj.x || polyProj.y < circleProjRange.x)
-            return info;
-        
-        // Calculate overlap
-        float overlap = min(circleProjRange.y, polyProj.y) - 
-                       max(circleProjRange.x, polyProj.x);
-        
-        // Track minimum overlap
-        if (overlap < info.penetration)
-        {
+        if (circleProjRange.y < polyProj.x || polyProj.y < circleProjRange.x) return info;
+        float overlap = min(circleProjRange.y, polyProj.y) - max(circleProjRange.x, polyProj.x);
+        if (overlap < info.penetration) {
             info.penetration = overlap;
             info.normal = axis;
-            if (dot(polyPos - circlePos, axis) < 0.0)
-                info.normal = -axis;
+            if (dot(polyPos - circlePos, axis) < 0.0) info.normal = -axis;
         }
     }
-    
-    // Test axis from circle center to closest polygon vertex
     vec2 closestVertex = polyPos;
     float closestDistSq = 1e10;
-    
-    // Find closest polygon vertex to circle center
-    for (int i = 0; i < polySides; i++)
-    {
+    for (int i = 0; i < polySides; i++) {
         float angle = polyRot + float(i) * angleStep;
         vec2 vertex = polyPos + polyRadius * vec2(cos(angle), sin(angle));
         float distSq = dot(vertex - circlePos, vertex - circlePos);
-        
-        if (distSq < closestDistSq)
-        {
-            closestDistSq = distSq;
-            closestVertex = vertex;
-        }
+        if (distSq < closestDistSq) { closestDistSq = distSq; closestVertex = vertex; }
     }
-    
-    // Test axis from circle center to closest vertex
     vec2 axis = normalize(circlePos - closestVertex);
     float circleProj = dot(circlePos, axis);
     vec2 circleProjRange = vec2(circleProj - circleRadius, circleProj + circleRadius);
     vec2 polyProj = projectPolygon(polyPos, polyRadius, polySides, polyRot, axis);
-    
-    // Final separation check
-    if (circleProjRange.y < polyProj.x || polyProj.y < circleProjRange.x)
-        return info;
-    
-    float overlap = min(circleProjRange.y, polyProj.y) - 
-                   max(circleProjRange.x, polyProj.x);
-    
-    if (overlap < info.penetration)
-    {
-        info.penetration = overlap;
-        info.normal = axis;
-        if (dot(polyPos - circlePos, axis) < 0.0)
-            info.normal = -axis;
+    if (!(circleProjRange.y < polyProj.x || polyProj.y < circleProjRange.x)) {
+        float overlap = min(circleProjRange.y, polyProj.y) - max(circleProjRange.x, polyProj.x);
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            if (dot(polyPos - circlePos, axis) < 0.0) info.normal = -axis;
+        }
+        info.hasCollision = true;
     }
-    
-    info.hasCollision = true;
+    if (info.hasCollision) info.contactPoint = circlePos - info.normal * circleRadius;
     return info;
 }
 
-// Master collision detection dispatcher
-CollisionInfo detectCollision(Object objA, Object objB, int objIndexB)
-{
+CollisionInfo detectPolygonAABB(vec2 polyPos, float polyRadius, int polySides, float polyRot,
+                                 vec2 boxPos, vec2 boxHalfExt, float boxRot, int objB) {
     CollisionInfo info;
     info.hasCollision = false;
-    
-    // Get collision properties for both objects
+    info.otherObjectID = objB;
+    info.penetration = 1e10;
+    vec2 polyVertices[32];
+    float angleStep = 2.0 * PI / float(polySides);
+    for (int i = 0; i < polySides && i < 32; i++) {
+        float angle = polyRot + float(i) * angleStep;
+        polyVertices[i] = polyPos + polyRadius * vec2(cos(angle), sin(angle));
+    }
+    vec2 boxAxes[2];
+    boxAxes[0] = vec2(cos(boxRot), sin(boxRot));
+    boxAxes[1] = vec2(-sin(boxRot), cos(boxRot));
+    vec2 boxCorners[4] = vec2[](
+        vec2(-boxHalfExt.x, -boxHalfExt.y),
+        vec2( boxHalfExt.x, -boxHalfExt.y),
+        vec2( boxHalfExt.x,  boxHalfExt.y),
+        vec2(-boxHalfExt.x,  boxHalfExt.y)
+    );
+    vec2 boxVertices[4];
+    for (int i = 0; i < 4; i++) {
+        boxVertices[i] = boxPos + boxCorners[i].x * boxAxes[0] + boxCorners[i].y * boxAxes[1];
+    }
+    int axisCount = 0;
+    vec2 axes[34];
+    for (int i = 0; i < polySides; i++) {
+        int next = (i + 1) % polySides;
+        vec2 edge = polyVertices[next] - polyVertices[i];
+        vec2 normal = normalize(vec2(-edge.y, edge.x));
+        axes[axisCount++] = normal;
+    }
+    axes[axisCount++] = boxAxes[0];
+    axes[axisCount++] = boxAxes[1];
+    for (int i = 0; i < axisCount; i++) {
+        vec2 axis = axes[i];
+        float polyMin = dot(polyVertices[0], axis), polyMax = polyMin;
+        for (int j = 1; j < polySides; j++) {
+            float proj = dot(polyVertices[j], axis);
+            polyMin = min(polyMin, proj);
+            polyMax = max(polyMax, proj);
+        }
+        float boxMin = dot(boxVertices[0], axis), boxMax = boxMin;
+        for (int j = 1; j < 4; j++) {
+            float proj = dot(boxVertices[j], axis);
+            boxMin = min(boxMin, proj);
+            boxMax = max(boxMax, proj);
+        }
+        const float COLLISION_EPSILON = 1e-4;
+        if (polyMax < boxMin - COLLISION_EPSILON || boxMax < polyMin - COLLISION_EPSILON) return info;
+        float overlap = min(polyMax, boxMax) - max(polyMin, boxMin);
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            vec2 centerDiff = boxPos - polyPos;
+            if (dot(centerDiff, axis) < 0.0) info.normal = -axis;
+        }
+    }
+    info.hasCollision = true;
+    info.contactPoint = (polyPos + boxPos) * 0.5;
+    return info;
+}
+
+CollisionInfo detectCollision(Object objA, Object objB, int objIndexB) {
+    CollisionInfo info;
+    info.hasCollision = false;
     CollisionProperties propsA = collisionProps[gl_GlobalInvocationID.x];
     CollisionProperties propsB = collisionProps[objIndexB];
-    
-    // Check if collisions are enabled for both objects
-    if (propsA.enabled == 0 || propsB.enabled == 0)
-        return info;
-    
-    int shapeA = propsA.shapeType;
-    int shapeB = propsB.shapeType;
-    
-    // Skip if either object has no collision shape
-    if (shapeA == COLLISION_NONE || shapeB == COLLISION_NONE)
-        return info;
-    
-    // Dispatch to appropriate collision detection function based on shape types
-    if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_CIRCLE)
-    {
-        // Circle vs Circle
-        info = detectCircleCircle(objA.position, objA.visualData.x,
-                                  objB.position, objB.visualData.x, objIndexB);
+    if (propsA.enabled == 0 || propsB.enabled == 0) return info;
+    int shapeA = propsA.shapeType, shapeB = propsB.shapeType;
+    if (shapeA == COLLISION_NONE || shapeB == COLLISION_NONE) return info;
+    if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_CIRCLE) {
+        info = detectCircleCircle(objA.position, objA.visualData.x, objB.position, objB.visualData.x, objIndexB);
     }
-    // AABB vs AABB
-    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_AABB)
-    {
-        vec2 halfExtA = objA.visualData.xy * 0.5;
+    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_AABB) {
+        vec2 halfExtA = objA.visualData.xy * 0.5, halfExtB = objB.visualData.xy * 0.5;
+        info = detectAABBAABB(objA.position, halfExtA, objA.visualData.z,
+                              objB.position, halfExtB, objB.visualData.z, objIndexB);
+    }
+    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_POLYGON) {
+        info = detectPolygonPolygon(objA.position, objA.visualData.x, int(objA.visualData.y), objA.visualData.z,
+                                    objB.position, objB.visualData.x, int(objB.visualData.y), objB.visualData.z, objIndexB);
+    }
+    else if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_AABB) {
         vec2 halfExtB = objB.visualData.xy * 0.5;
-        info = detectAABBAABB(objA.position, halfExtA, 
-                             objB.position, halfExtB, objIndexB);
+        info = detectCircleAABB(objA.position, objA.visualData.x, objB.position, halfExtB, objB.visualData.z, objIndexB);
     }
-    // Polygon vs Polygon
-    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_POLYGON)
-    {
-        info = detectPolygonPolygon(
-            objA.position, objA.visualData.x, int(objA.visualData.y), objA.visualData.z,
-            objB.position, objB.visualData.x, int(objB.visualData.y), objB.visualData.z,
-            objIndexB);
-    }
-    // Circle vs AABB
-    else if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_AABB)
-    {
-        vec2 halfExtB = objB.visualData.xy * 0.5;
-        info = detectCircleAABB(objA.position, objA.visualData.x,
-                               objB.position, halfExtB, objIndexB);
-    }
-    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_CIRCLE)
-    {
-        // Swap roles and flip normal
+    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_CIRCLE) {
         vec2 halfExtA = objA.visualData.xy * 0.5;
-        info = detectCircleAABB(objB.position, objB.visualData.x,
-                               objA.position, halfExtA, objIndexB);
-        info.normal = -info.normal; // Flip normal
+        info = detectCircleAABB(objB.position, objB.visualData.x, objA.position, halfExtA, objA.visualData.z, objIndexB);
+        info.normal = -info.normal;
     }
-    // Circle vs Polygon
-    else if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_POLYGON)
-    {
+    else if (shapeA == COLLISION_CIRCLE && shapeB == COLLISION_POLYGON) {
         info = detectCirclePolygon(objA.position, objA.visualData.x,
-                                   objB.position, objB.visualData.x,
-                                   int(objB.visualData.y), objB.visualData.z,
-                                   objIndexB);
+                                   objB.position, objB.visualData.x, int(objB.visualData.y), objB.visualData.z, objIndexB);
     }
-    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_CIRCLE)
-    {
+    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_CIRCLE) {
         info = detectCirclePolygon(objB.position, objB.visualData.x,
-                                   objA.position, objA.visualData.x,
-                                   int(objA.visualData.y), objA.visualData.z,
-                                   objIndexB);
-        info.normal = -info.normal; // Flip normal
+                                   objA.position, objA.visualData.x, int(objA.visualData.y), objA.visualData.z, objIndexB);
+        info.normal = -info.normal;
     }
-    // AABB vs Polygon (simplified - treat polygon as circle for collision)
-    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_POLYGON)
-    {
-        vec2 halfExtA = objA.visualData.xy * 0.5;
-        info = detectCircleAABB(objB.position, objB.visualData.x,
-                               objA.position, halfExtA, objIndexB);
-        info.normal = -info.normal; // Flip normal
-    }
-    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_AABB)
-    {
+    else if (shapeA == COLLISION_POLYGON && shapeB == COLLISION_AABB) {
         vec2 halfExtB = objB.visualData.xy * 0.5;
-        info = detectCircleAABB(objA.position, objA.visualData.x,
-                               objB.position, halfExtB, objIndexB);
+        info = detectPolygonAABB(objA.position, objA.visualData.x, int(objA.visualData.y), objA.visualData.z,
+                                 objB.position, halfExtB, objB.visualData.z, objIndexB);
     }
-    
+    else if (shapeA == COLLISION_AABB && shapeB == COLLISION_POLYGON) {
+        vec2 halfExtA = objA.visualData.xy * 0.5;
+        info = detectPolygonAABB(objB.position, objB.visualData.x, int(objB.visualData.y), objB.visualData.z,
+                                 objA.position, halfExtA, objA.visualData.z, objIndexB);
+        info.normal = -info.normal;
+    }
     return info;
 }
 
 // ============================================================================
-// NEW: RESEARCH-GRADE COLLISION RESOLUTION SYSTEM
+// COLLISION RESPONSE WITH TORQUE (PARALLEL-SAFE)
 // ============================================================================
 
-// ============================================================================
-// BASIC COLLISION RESPONSE (Momentum-Conserving)
-// ============================================================================
-
-// Apply collision response to two objects (conserves momentum and energy)
-void applyCollisionResponse(
-    inout vec2 posA, inout vec2 velA, float massA,
-    inout vec2 posB, inout vec2 velB, float massB,
-    vec2 normal, float penetration,
+void resolveCollisionWithTorque(
+    inout vec2 posA, inout vec2 velA, inout float angVelA, float massA, float inertiaA,
+    inout vec2 posB, inout vec2 velB, inout float angVelB, float massB, float inertiaB,
+    vec2 normal, vec2 contactPoint, float penetration,
     float restitution, float friction
 ) {
-    // Ensure valid masses
-    if (massA < EPSILON || massB < EPSILON) return;
-    
-    // ========================================================================
-    // 1. POSITION CORRECTION (Separating objects)
-    // ========================================================================
-    const float positionCorrectionFactor = 0.8;  // Baumgarte stabilization
-    const float penetrationSlop = 0.001;         // Allow small penetration
-    
+    const float positionCorrectionFactor = 0.8;
+    const float penetrationSlop = 0.001;
     if (penetration > penetrationSlop) {
         float totalMass = massA + massB;
         float invTotalMass = 1.0 / totalMass;
-        
-        // Calculate correction vector
         vec2 correction = (penetration - penetrationSlop) * positionCorrectionFactor * normal;
-        
-        // Apply position correction based on mass ratio
         posA -= correction * (massB * invTotalMass);
         posB += correction * (massA * invTotalMass);
     }
-    
-    // ========================================================================
-    // 2. VELOCITY CORRECTION (Impulse-based, conserves momentum)
-    // ========================================================================
-    // Relative velocity
-    vec2 relativeVel = velB - velA;
-    float velocityAlongNormal = dot(relativeVel, normal);
-    
-    // Only resolve if objects are moving toward each other
-    if (velocityAlongNormal > 0.0) return;
-    
-    // Calculate impulse scalar (conserves momentum and energy)
-    float e = min(max(restitution, 0.0), 1.0);  // Clamp restitution
-    float impulseScalar = -(1.0 + e) * velocityAlongNormal;
-    impulseScalar /= (1.0 / massA + 1.0 / massB);
-    
-    // Apply impulse to both velocities (equal and opposite)
-    vec2 impulse = impulseScalar * normal;
+    vec2 rA = contactPoint - posA;
+    vec2 rB = contactPoint - posB;
+    vec2 velAContact = velA + vec2(-angVelA * rA.y, angVelA * rA.x);
+    vec2 velBContact = velB + vec2(-angVelB * rB.y, angVelB * rB.x);
+    vec2 relativeVel = velBContact - velAContact;
+    float velAlongNormal = dot(relativeVel, normal);
+    if (velAlongNormal > 0.0) return;
+    float e = clamp(restitution, 0.0, 1.0);
+    float numerator = -(1.0 + e) * velAlongNormal;
+    float rA_perp = dot(rA, normal);
+    float rB_perp = dot(rB, normal);
+    float denominator = (1.0 / massA) + (1.0 / massB) +
+                        (rA_perp * rA_perp) / inertiaA +
+                        (rB_perp * rB_perp) / inertiaB;
+    if (abs(denominator) < EPSILON) return;
+    float j = numerator / denominator;
+    vec2 impulse = j * normal;
     velA -= impulse / massA;
     velB += impulse / massB;
-    
-    // ========================================================================
-    // 3. FRICTION (Coulomb model)
-    // ========================================================================
+    angVelA -= (rA.x * impulse.y - rA.y * impulse.x) / inertiaA;
+    angVelB += (rB.x * impulse.y - rB.y * impulse.x) / inertiaB;
     if (friction > 0.0) {
-        // Recompute relative velocity after normal impulse
-        relativeVel = velB - velA;
-        
-        // Tangent vector (perpendicular to normal)
+        velAContact = velA + vec2(-angVelA * rA.y, angVelA * rA.x);
+        velBContact = velB + vec2(-angVelB * rB.y, angVelB * rB.x);
+        relativeVel = velBContact - velAContact;
         vec2 tangent = relativeVel - normal * dot(relativeVel, normal);
-        float tangentLength = length(tangent);
-        
-        if (tangentLength > EPSILON) {
+        float tangentLen = length(tangent);
+        if (tangentLen > EPSILON) {
             tangent = normalize(tangent);
-            
-            // Relative velocity in tangent direction
-            float relVelTangent = dot(relativeVel, tangent);
-            
-            // Friction impulse scalar
-            float frictionImpulse = -relVelTangent * friction;
-            frictionImpulse /= (1.0 / massA + 1.0 / massB);
-            
-            // Coulomb's law: friction impulse cannot exceed normal impulse
-            float maxFriction = abs(impulseScalar) * friction;
-            frictionImpulse = clamp(frictionImpulse, -maxFriction, maxFriction);
-            
-            // Apply friction impulse
-            vec2 frictionVec = frictionImpulse * tangent;
-            velA -= frictionVec / massA;
-            velB += frictionVec / massB;
+            float velAlongTangent = dot(relativeVel, tangent);
+            float jt = -velAlongTangent * friction;
+            float denominator_t = (1.0 / massA) + (1.0 / massB) +
+                                   (rA_perp * rA_perp) / inertiaA +
+                                   (rB_perp * rB_perp) / inertiaB;
+            if (abs(denominator_t) > EPSILON) {
+                jt = jt / denominator_t;
+                float maxJt = abs(j) * friction;
+                jt = clamp(jt, -maxJt, maxJt);
+                vec2 frictionImpulse = jt * tangent;
+                velA -= frictionImpulse / massA;
+                velB += frictionImpulse / massB;
+                angVelA -= (rA.x * frictionImpulse.y - rA.y * frictionImpulse.x) / inertiaA;
+                angVelB += (rB.x * frictionImpulse.y - rB.y * frictionImpulse.x) / inertiaB;
+            }
         }
     }
 }
 
 // ============================================================================
-// SIMPLIFIED COLLISION RESOLUTION FOR PARALLEL EXECUTION
+// CONTACT PERSISTENCE FUNCTIONS
 // ============================================================================
 
-// This version handles collisions in a thread-safe way by only modifying
-// the current object and letting the other object handle its own updates
-void resolveCollisionSimple(
-    inout vec2 posA, inout vec2 velA, float massA,
-    Object objB, int objBIndex,
-    CollisionInfo collision
-) {
-    if (!collision.hasCollision) return;
-    
-    // Get collision properties
-    CollisionProperties propsA = collisionProps[gl_GlobalInvocationID.x];
-    CollisionProperties propsB = collisionProps[objBIndex];
-    
-    // Effective restitution and friction
-    float restitution = min(propsA.restitution, propsB.restitution);
-    float friction = sqrt(propsA.friction * propsB.friction);
-    
-    // Other object's state
-    vec2 posB = objB.position;
-    vec2 velB = objB.velocity;
-    float massB = max(EPSILON, objB.mass);
-    
-    // Copy state for local processing
-    vec2 tempPosA = posA;
-    vec2 tempVelA = velA;
-    vec2 tempPosB = posB;
-    vec2 tempVelB = velB;
-    
-    // Apply collision response
-    applyCollisionResponse(
-        tempPosA, tempVelA, massA,
-        tempPosB, tempVelB, massB,
-        collision.normal, collision.penetration,
-        restitution, friction
-    );
-    
-    // Update this object's state
-    posA = tempPosA;
-    velA = tempVelA;
-    
-    // Note: The other object (objB) will handle its own update in its thread
-    // This ensures momentum is conserved across the entire system
-}
-
-// ============================================================================
-// ANALYTICAL ELASTIC COLLISION FORMULA (For perfect conservation)
-// ============================================================================
-
-// Perfectly elastic collision for circles (conserves both momentum and energy)
-void resolveElasticCollision(
-    inout vec2 posA, inout vec2 velA, float massA,
-    inout vec2 posB, inout vec2 velB, float massB,
-    vec2 normal, float penetration
-) {
-    // Position correction
-    const float positionPush = 0.5;
-    if (penetration > 0.0) {
-        float totalMass = massA + massB;
-        posA -= normal * penetration * positionPush * (massB / totalMass);
-        posB += normal * penetration * positionPush * (massA / totalMass);
-    }
-    
-    // Relative velocity along collision normal
-    vec2 relativeVel = velB - velA;
-    float velocityAlongNormal = dot(relativeVel, normal);
-    
-    // If objects are separating, no impulse needed
-    if (velocityAlongNormal > 0.0) return;
-    
-    // Perfectly elastic collision formulas (conserves both momentum and energy)
-    float totalMass = massA + massB;
-    float massRatioA = (massA - massB) / totalMass;
-    float massRatioB = (2.0 * massB) / totalMass;
-    float massRatioC = (2.0 * massA) / totalMass;
-    float massRatioD = (massB - massA) / totalMass;
-    
-    // Apply velocity changes
-    vec2 impulseA = normal * velocityAlongNormal;
-    vec2 impulseB = normal * velocityAlongNormal;
-    
-    velA = velA + massRatioB * impulseA;
-    velB = velB - massRatioC * impulseB;
-}
-
-// ============================================================================
-// CONTACT PERSISTENCE SYSTEM (Optional, for stability)
-// ============================================================================
-
-// Find a persistent contact in the contact buffer
 int findPersistentContact(int objectA, int objectB, vec2 normal) {
     int baseIndex = objectA * MAX_CONTACTS_PER_OBJECT;
-    
     for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; i++) {
         int contactIndex = baseIndex + i;
         if (contactIndex >= contacts.length()) break;
-        
         ContactPoint contact = contacts[contactIndex];
-        
-        // Check if this contact is between the same objects
-        // and has a similar normal direction
         if (contact.frameCount > 0 && dot(contact.normal, normal) > 0.9) {
             return contactIndex;
         }
     }
-    
-    return -1; // No persistent contact found
+    return -1;
 }
 
-// Update or create a contact point
 void updateContactPoint(int objectA, int objectB, vec2 normal, vec2 position, float penetration) {
     int baseIndex = objectA * MAX_CONTACTS_PER_OBJECT;
     int oldestIndex = baseIndex;
     int oldestFrameCount = 9999;
-    
-    // Find slot for this contact
     for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; i++) {
         int contactIndex = baseIndex + i;
         if (contactIndex >= contacts.length()) break;
-        
         ContactPoint contact = contacts[contactIndex];
-        
-        // If this slot is empty or matches our contact, use it
         if (contact.frameCount == 0 || dot(contact.normal, normal) > 0.9) {
-            // Update existing contact
             contacts[contactIndex].normal = normal;
             contacts[contactIndex].position = position;
             contacts[contactIndex].penetration = penetration;
             contacts[contactIndex].frameCount = min(contact.frameCount + 1, MAX_CONTACT_FRAMES);
             return;
         }
-        
-        // Track the oldest contact for replacement
         if (contact.frameCount < oldestFrameCount) {
             oldestFrameCount = contact.frameCount;
             oldestIndex = contactIndex;
         }
     }
-    
-    // Replace the oldest contact
     if (oldestIndex >= 0 && oldestIndex < contacts.length()) {
         contacts[oldestIndex].normal = normal;
         contacts[oldestIndex].position = position;
@@ -1722,19 +1319,14 @@ void updateContactPoint(int objectA, int objectB, vec2 normal, vec2 position, fl
     }
 }
 
-// Age out old contacts
 void ageContacts(int objectIndex) {
     int baseIndex = objectIndex * MAX_CONTACTS_PER_OBJECT;
-    
     for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; i++) {
         int contactIndex = baseIndex + i;
         if (contactIndex >= contacts.length()) break;
-        
-        // Decrement frame count, remove if too old
         if (contacts[contactIndex].frameCount > 0) {
             contacts[contactIndex].frameCount--;
             if (contacts[contactIndex].frameCount == 0) {
-                // Reset contact
                 contacts[contactIndex].accumulatedNormalImpulse = 0.0;
                 contacts[contactIndex].accumulatedTangentImpulse = 0.0;
             }
@@ -1743,16 +1335,13 @@ void ageContacts(int objectIndex) {
 }
 
 // ============================================================================
-// MAIN COMPUTE SHADER ENTRY POINT - UPDATED WITH FIXED COLLISION RESOLUTION
+// MAIN COMPUTE SHADER ENTRY POINT
 // ============================================================================
 
 void main() {
     uint gid = gl_GlobalInvocationID.x;
-    
-    // Early exit if beyond active object count
     if (int(gid) >= uNumObjects) return;
     
-    // Read current object state
     Object p = objectsIn[gid];
     vec2 pos = p.position;
     vec2 vel = p.velocity;
@@ -1764,60 +1353,42 @@ void main() {
     int objectIndex = int(gid);
     vec2 originalPos = pos;
     
-    // Initialize physics variables
     vec2 acceleration = vec2(0.0);
     float angular_accel = 0.0;
     vec4 new_color = color;
     
     // ========================================================================
-    // PHYSICS EQUATION EVALUATION (UNCHANGED)
+    // PHYSICS EQUATION EVALUATION
     // ========================================================================
     if (uEquationMode == 0) {
-        // Custom equation mode
         int eqID = p.equationID;
         bool isValidEquation = (eqID >= 0 && eqID < MAX_EQUATION_COUNT) && 
-                              (mappings[eqID].tokenCount_ax > 0 || 
-                               mappings[eqID].tokenCount_ay > 0 ||
-                               mappings[eqID].tokenCount_angular > 0 ||
-                               mappings[eqID].tokenCount_r > 0 ||
-                               mappings[eqID].tokenCount_g > 0 ||
-                               mappings[eqID].tokenCount_b > 0 ||
+                              (mappings[eqID].tokenCount_ax > 0 || mappings[eqID].tokenCount_ay > 0 ||
+                               mappings[eqID].tokenCount_angular > 0 || mappings[eqID].tokenCount_r > 0 ||
+                               mappings[eqID].tokenCount_g > 0 || mappings[eqID].tokenCount_b > 0 ||
                                mappings[eqID].tokenCount_a > 0);
-        
         if (!isValidEquation) {
-            // Use default physics if equation is invalid
-            acceleration = calculateDefaultPhysics(pos, vel, mass);
+            acceleration = calculateDefaultPhysics();
         } else {
-            // Evaluate custom physics equation components
             EquationMapping mapping = mappings[eqID];
-            float ax = 0.0;
-            float ay = 0.0;
-            
-            // Evaluate X acceleration component
+            float ax = 0.0, ay = 0.0;
             if (mapping.tokenCount_ax > 0) {
                 ax = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
                                         rotation, angular_vel, color, mass, charge, objectIndex,
                                         0, mapping.tokenOffset_ax, mapping.tokenCount_ax, mapping.constantOffset_ax);
             }
-            
-            // Evaluate Y acceleration component
             if (mapping.tokenCount_ay > 0) {
                 ay = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
                                         rotation, angular_vel, color, mass, charge, objectIndex,
                                         1, mapping.tokenOffset_ay, mapping.tokenCount_ay, mapping.constantOffset_ay);
             }
-            
             acceleration = sanitizeVec2(vec2(ax, ay));
-            
-            // Evaluate angular acceleration
             if (mapping.tokenCount_angular > 0) {
                 angular_accel = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
                                                    rotation, angular_vel, color, mass, charge, objectIndex,
                                                    2, mapping.tokenOffset_angular, mapping.tokenCount_angular, mapping.constantOffset_angular);
                 angular_accel = isInvalidFloat(angular_accel) ? 0.0 : angular_accel;
             }
-            
-            // Evaluate color components (dynamic coloring)
             if (mapping.tokenCount_r > 0) {
                 new_color.r = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
                                                  rotation, angular_vel, color, mass, charge, objectIndex,
@@ -1838,185 +1409,83 @@ void main() {
                                                  rotation, angular_vel, color, mass, charge, objectIndex,
                                                  6, mapping.tokenOffset_a, mapping.tokenCount_a, mapping.constantOffset_a);
             }
-            
             new_color = sanitizeVec4(new_color);
         }
     } else {
-        // Default physics mode (simple spring-mass-damper)
-        acceleration = calculateDefaultPhysics(pos, vel, mass);
+        acceleration = calculateDefaultPhysics();
     }
-    
     acceleration = sanitizeVec2(acceleration);
     
     // ========================================================================
-    // STABLE INTEGRATION (Symplectic Euler - Energy Conserving)
+    // STABLE INTEGRATION (Symplectic Euler)
     // ========================================================================
-    
-    // 1. Update VELOCITY first using current acceleration
     vec2 new_vel = vel + acceleration * uDt;
     new_vel = sanitizeVec2(new_vel);
-    
-    // 2. Use NEW VELOCITY to update POSITION (energy-conserving)
     vec2 new_pos = pos + new_vel * uDt;
     new_pos = sanitizeVec2(new_pos);
-    
-    // 3. Same for angular motion
     float new_angular_vel = angular_vel + angular_accel * uDt;
     float new_rotation = rotation + new_angular_vel * uDt;
-    new_rotation = mod(new_rotation, 2.0 * PI);  // Wrap rotation
+    new_rotation = mod(new_rotation, 2.0 * PI);
+    if (new_rotation < 0.0) new_rotation += 2.0 * PI;
     
     // ========================================================================
-    // WORLD BOUNDARIES
-    // ========================================================================
-    const vec2 world_min = vec2(-1000000.0, -1000000.0);
-    const vec2 world_max = vec2(1000000.0, 1000000.0);
-    const float boundary_friction = 0.95;
-    
-    // X boundaries
-    if (new_pos.x < world_min.x) { 
-        new_pos.x = world_min.x; 
-        new_vel.x = abs(new_vel.x) * uRestitution; 
-        new_vel.y *= boundary_friction; 
-    } 
-    else if (new_pos.x > world_max.x) { 
-        new_pos.x = world_max.x; 
-        new_vel.x = -abs(new_vel.x) * uRestitution; 
-        new_vel.y *= boundary_friction; 
-    }
-    
-    // Y boundaries
-    if (new_pos.y < world_min.y) { 
-        new_pos.y = world_min.y; 
-        new_vel.y = abs(new_vel.y) * uRestitution; 
-        new_vel.x *= boundary_friction; 
-    } 
-    else if (new_pos.y > world_max.y) { 
-        new_pos.y = world_max.y; 
-        new_vel.y = -abs(new_vel.y) * uRestitution; 
-        new_vel.x *= boundary_friction; 
-    }
-    
-    // ========================================================================
-    // CONSTRAINT RESOLUTION (UNCHANGED)
+    // CONSTRAINT RESOLUTION
     // ========================================================================
     applyConstraints(new_pos, new_vel, objectIndex, originalPos);
-
-// ========================================================================
-// NEW: COLLISION SYSTEM - FIXED FOR PARALLEL EXECUTION
-// ========================================================================
-
-// Strategy:
-// 1. Each thread only modifies its OWN object's velocity
-// 2. Use impulses that conserve momentum without modifying other objects
-// 3. Position correction happens AFTER all velocity updates
-
-vec2 collision_vel = new_vel;
-bool had_collision = false;
-
-// Check collisions with ALL other objects (not just higher indices)
-for (int i = 0; i < uNumObjects; i++) {
-    if (i == objectIndex) continue;  // Skip self
     
-    Object other = objectsIn[i];
+    // ========================================================================
+    // COLLISION SYSTEM - PARALLEL WITH IMPULSE ACCUMULATION
+    // ========================================================================
+    bool had_collision = false;
+    vec2 totalLinearImpulse = vec2(0.0);
+    float totalAngularImpulse = 0.0;
     
-    // Detect collision
-    CollisionInfo collision = detectCollision(p, other, i);
-    
-    if (collision.hasCollision) {
-        had_collision = true;
-        
-        // Get collision properties
-        CollisionProperties propsA = collisionProps[objectIndex];
-        CollisionProperties propsB = collisionProps[i];
-        
-        // Calculate effective properties
-        float restitution = min(propsA.restitution, propsB.restitution);
-        float friction = sqrt(propsA.friction * propsB.friction);
-        
-        // Get masses
-        float massA = mass;
-        float massB = max(EPSILON, other.mass);
-        
-        // Relative velocity
-        vec2 relativeVel = other.velocity - collision_vel;
-        float velocityAlongNormal = dot(relativeVel, collision.normal);
-        
-        // Only resolve if moving toward each other
-        if (velocityAlongNormal < 0.0) {
-            // Calculate impulse (standard rigid body physics)
-            float e = clamp(restitution, 0.0, 1.0);
-            float j = -(1.0 + e) * velocityAlongNormal;
-            j /= (1.0 / massA + 1.0 / massB);
+    for (int i = 0; i < uNumObjects; i++) {
+        if (i == objectIndex) continue;
+        Object other = objectsIn[i];
+        CollisionInfo collision = detectCollision(p, other, i);
+        if (collision.hasCollision) {
+            had_collision = true;
+            CollisionProperties propsA = collisionProps[objectIndex];
+            CollisionProperties propsB = collisionProps[i];
+            float restitution = min(propsA.restitution, propsB.restitution);
+            float friction = sqrt(propsA.friction * propsB.friction);
+            float massA = mass;
+            float massB = max(EPSILON, other.mass);
+            float angVelA = new_angular_vel;
+            float angVelB = other.visualData.w;
+            float inertiaA = getMomentOfInertia(massA, propsA.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);
+            float inertiaB = getMomentOfInertia(massB, propsB.shapeType, other.visualData.x, other.visualData.y, other.visualData.x * 0.5);
+            vec2 tempPosB = other.position;
+            vec2 tempVelB = other.velocity;
+            float tempAngVelB = angVelB;
             
-            // Apply impulse to THIS object only
-            vec2 impulse = j * collision.normal;
-            collision_vel -= impulse / massA;
-            
-            // Friction
-            if (friction > 0.0) {
-                vec2 tangent = relativeVel - collision.normal * dot(relativeVel, collision.normal);
-                float tangentLength = length(tangent);
-                
-                if (tangentLength > EPSILON) {
-                    tangent = normalize(tangent);
-                    float vt = dot(relativeVel, tangent);
-                    
-                    float jt = -vt * friction;
-                    jt /= (1.0 / massA + 1.0 / massB);
-                    
-                    // Coulomb friction limit
-                    float maxFriction = abs(j) * friction;
-                    jt = clamp(jt, -maxFriction, maxFriction);
-                    
-                    vec2 frictionImpulse = jt * tangent;
-                    collision_vel -= frictionImpulse / massA;
-                }
-            }
-        }
-        
-        // POSITION CORRECTION - only for deep penetrations
-        // Move THIS object away from penetration
-        const float slop = 0.01;
-        const float percent = 0.4;  // Less aggressive than before
-        
-        if (collision.penetration > slop) {
-            float totalMass = massA + massB;
-            vec2 correction = collision.normal * (collision.penetration - slop) * percent;
-            
-            // Only correct THIS object's position
-            // The correction is weighted by the inverse mass ratio
-            new_pos -= correction * (massB / totalMass);
+            // Apply torque response (modifies new_vel, new_angular_vel, tempVelB, etc.)
+            resolveCollisionWithTorque(
+                new_pos, new_vel, new_angular_vel, massA, inertiaA,
+                tempPosB, tempVelB, tempAngVelB, massB, inertiaB,
+                collision.normal, collision.contactPoint, collision.penetration,
+                restitution, friction
+            );
         }
     }
-}
-
-// Apply collision-modified velocity
-if (had_collision) {
-    new_vel = sanitizeVec2(collision_vel);
-}
-
-// ========================================================================
-// REST OF CODE(boundaries, final write, etc.)
-// ========================================================================
     
-    // Age out old contacts for this object
+    if (had_collision) {
+        new_vel = sanitizeVec2(new_vel);
+        new_angular_vel = clamp(new_angular_vel, -100.0, 100.0);
+    }
+    
+    // ========================================================================
+    // AGE OUT CONTACTS
+    // ========================================================================
     if (uEnableWarmStart == 1) {
         ageContacts(objectIndex);
     }
     
-    // REMOVED: The second collision loop that was causing double-resolution
-    // We no longer need to check i < objectIndex because all pairs are
-    // processed exactly once in the loop above
-    
-    // Apply the collision-corrected state
     new_pos = sanitizeVec2(new_pos);
     new_vel = sanitizeVec2(new_vel);
     
-    // ========================================================================
-    // FINAL SANITY CHECKS
-    // ========================================================================
-    
-    // Ensure velocities aren't excessive
+    // Velocity limit
     float maxSpeed = 1000.0;
     float currentSpeed = length(new_vel);
     if (currentSpeed > maxSpeed) {
@@ -2024,7 +1493,7 @@ if (had_collision) {
     }
     
     // ========================================================================
-    // WRITE UPDATED OBJECT STATE 
+    // WRITE UPDATED OBJECT STATE
     // ========================================================================
     objectsOut[gid].position = new_pos;
     objectsOut[gid].velocity = new_vel;
@@ -2046,7 +1515,3 @@ if (had_collision) {
     objectsOut[gid]._padEnd[0] = 0;
     objectsOut[gid]._padEnd[1] = 0;
 }
-
-// ============================================================================
-// END OF RESEARCH-GRADE COLLISION SYSTEM
-// ============================================================================

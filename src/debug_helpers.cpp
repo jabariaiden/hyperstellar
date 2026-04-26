@@ -50,7 +50,7 @@ const char* GetTokenName(int token) {
     }
 }
 
-// NEW: Get token type name for new parser
+//  Get token type name for new parser
 const char* GetTokenTypeName(TokenType type) {
     switch(type) {
         case TOKEN_NUMBER: return "NUMBER";

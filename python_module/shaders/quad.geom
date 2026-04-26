@@ -124,7 +124,7 @@ void main() {
     float speed = length(vel);
     int skinType = vVisualSkinType[0];
     
-    // NEW LAYOUT: width/height in x/y, rotation/angular_vel in z/w
+    //LAYOUT: width/height in x/y, rotation/angular_vel in z/w
     float param_x = vVisualData[0].x;       // width or radius
     float param_y = vVisualData[0].y;       // height or numSides
     float rotation = vVisualData[0].z;      // ROTATION NOW IN Z

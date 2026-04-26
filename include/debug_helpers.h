@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <glad/glad.h>
-#include "parser.h"  // ADD THIS for Token and ParsedEquation
+#include "parser.h"  
 
 inline const char* GetSkinTypeName(int skinType) {
     switch(skinType) {
@@ -18,7 +18,7 @@ inline const char* GetSkinTypeName(int skinType) {
 // Token type names for debugging (must match parser.h)
 const char* GetTokenName(int token);
 
-// NEW: Get token type name for new parser
+//  Get token type name for new parser
 const char* GetTokenTypeName(TokenType type);
 
 // UPDATED: Debug print parsed equation for new parser

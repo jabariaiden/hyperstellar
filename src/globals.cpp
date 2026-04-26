@@ -24,7 +24,7 @@ float g_dragForceStrength = 100.0f;
 glm::vec2 g_simulationViewportPos = glm::vec2(0.0f);
 glm::vec2 g_simulationViewportSize = glm::vec2(640.0f, 480.0f);
 
-// NEW: Visual skin type names
+//  Visual skin type names
 const char* visualSkinTypeNames[] = {
     "Circle", 
     "Rectangle", 

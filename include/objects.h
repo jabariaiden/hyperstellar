@@ -9,7 +9,6 @@
 #include "parser.h"
 #include "constraints.h"
 
-// CRITICAL FIX: Ensure struct packing matches GPU (std430 layout)
 // Use explicit padding to avoid alignment issues
 struct Object
 {
@@ -18,13 +17,13 @@ struct Object
     float mass;         // offset 16, size 4
     float charge;       // offset 20, size 4
 
-    // NEW: Separated visual and physics
+    //  Separated visual and physics
     int visualSkinType;     // offset 24, size 4 - How it looks
     int collisionShapeType; // offset 28, size 4 - Collision geometry (0 = none for now)
 
     glm::vec4 visualData;    // offset 32, size 16 - Skin parameters (x=rotation, y=angular_vel, z=unused, w=unused)
     glm::vec4 collisionData; // offset 48, size 16 - Collision parameters (unused for now)
-    glm::vec4 color;         // NEW: offset 64, size 16 - (r, g, b, a)
+    glm::vec4 color;         //  offset 64, size 16 - (r, g, b, a)
 
     int equationID; // offset 80, size 4
     int _pad1;      // offset 84, size 4
@@ -48,13 +47,13 @@ struct EquationMapping
     int constantOffset_ay;
     int _pad2;
 
-    // NEW: Angular acceleration
+    //  Angular acceleration
     int tokenOffset_angular;
     int tokenCount_angular;
     int constantOffset_angular;
     int _pad3;
 
-    // NEW: Color components
+    //  Color components
     int tokenOffset_r;
     int tokenCount_r;
     int constantOffset_r;

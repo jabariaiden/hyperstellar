@@ -1,6 +1,6 @@
 #version 430 core
 
-// These should match your VAO setup from objects.cpp
+// These should match  VAO setup from objects.cpp
 layout(location = 0) in vec2 aPosition;
 layout(location = 1) in vec2 aVelocity;
 layout(location = 2) in float aMass;
@@ -17,7 +17,7 @@ out float vCharge;
 out int vVisualSkinType;    
 out vec4 vVisualData;       
 out vec4 vColor;            
-// NEW: Add rotation and angular velocity as separate outputs if needed
+//Add rotation and angular velocity as separate outputs if needed
 out float vRotation;
 out float vAngularVelocity;
 

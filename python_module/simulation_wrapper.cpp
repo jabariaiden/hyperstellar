@@ -14,18 +14,18 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <sstream>
-#include <utility> 
+#include <utility>
 
 namespace
 {
-    bool g_axisInitialized = false;   // Tracks axis system initialization
-    GLuint g_axisShaderProgram = 0;   // Shader program for rendering axes/grid
+    bool g_axisInitialized = false; // Tracks axis system initialization
+    GLuint g_axisShaderProgram = 0; // Shader program for rendering axes/grid
 }
 
 // Create shader program for rendering coordinate axes and grid
 GLuint CreateAxisShader()
 {
-    const char* vertexShaderSource = R"(
+    const char *vertexShaderSource = R"(
         #version 330 core
         layout (location = 0) in vec2 aPos;
         layout (location = 1) in vec3 aColor;
@@ -41,7 +41,7 @@ GLuint CreateAxisShader()
         }
     )";
 
-    const char* fragmentShaderSource = R"(
+    const char *fragmentShaderSource = R"(
         #version 330 core
         in vec3 Color;
         out vec4 FragColor;
@@ -105,12 +105,75 @@ GLuint CreateAxisShader()
     return shaderProgram;
 }
 
+static int key_name_to_code(const std::string &name)
+{
+    // Single letters A-Z
+    if (name.size() == 1 && isalpha(name[0]))
+    {
+        char c = toupper(name[0]);
+        if (c >= 'A' && c <= 'Z')
+            return GLFW_KEY_A + (c - 'A');
+    }
+    // Numbers 0-9
+    if (name.size() == 1 && isdigit(name[0]))
+    {
+        return GLFW_KEY_0 + (name[0] - '0');
+    }
+    // Special keys
+    if (name == "Space")
+        return GLFW_KEY_SPACE;
+    if (name == "Shift")
+        return GLFW_KEY_LEFT_SHIFT;
+    if (name == "Control")
+        return GLFW_KEY_LEFT_CONTROL;
+    if (name == "Alt")
+        return GLFW_KEY_LEFT_ALT;
+    if (name == "Escape")
+        return GLFW_KEY_ESCAPE;
+    if (name == "Enter")
+        return GLFW_KEY_ENTER;
+    if (name == "Tab")
+        return GLFW_KEY_TAB;
+    if (name == "Backspace")
+        return GLFW_KEY_BACKSPACE;
+    if (name == "Delete")
+        return GLFW_KEY_DELETE;
+    if (name == "Home")
+        return GLFW_KEY_HOME;
+    if (name == "End")
+        return GLFW_KEY_END;
+    if (name == "PageUp")
+        return GLFW_KEY_PAGE_UP;
+    if (name == "PageDown")
+        return GLFW_KEY_PAGE_DOWN;
+    if (name == "Insert")
+        return GLFW_KEY_INSERT;
+    if (name == "Up")
+        return GLFW_KEY_UP;
+    if (name == "Down")
+        return GLFW_KEY_DOWN;
+    if (name == "Left")
+        return GLFW_KEY_LEFT;
+    if (name == "Right")
+        return GLFW_KEY_RIGHT;
+    // F1-F12
+    if (name.size() >= 2 && name[0] == 'F')
+    {
+        int num = std::stoi(name.substr(1));
+        if (num >= 1 && num <= 12)
+            return GLFW_KEY_F1 + (num - 1);
+    }
+    return -1; // unknown
+}
+
 // Constructor: Initialize simulation with optional graphics
 SimulationWrapper::SimulationWrapper(bool headless, int width, int height, std::string title, bool enable_grid)
     : m_headless(headless), m_initialized(false), m_paused(false),
-    m_window(nullptr), m_currentBuffer(0), m_title(title),
-    m_width(width), m_height(height), m_simulationTime(0.0f),
-    m_enable_grid(enable_grid)
+      m_window(nullptr), m_currentBuffer(0), m_title(title),
+      m_width(width), m_height(height), m_simulationTime(0.0f),
+      m_enable_grid(enable_grid),
+      m_currentKeys{}, m_previousKeys{}
+
 {
     try
     {
@@ -131,7 +194,7 @@ SimulationWrapper::SimulationWrapper(bool headless, int width, int height, std::
                 throw std::runtime_error("Failed to initialize windowed context");
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         // Clean up on failure
         cleanup();
@@ -170,7 +233,7 @@ bool SimulationWrapper::init_headless()
         return false;
     }
 
-    glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
+    glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     // Load OpenGL functions
     if (!gladLoaderLoadGL())
@@ -183,7 +246,8 @@ bool SimulationWrapper::init_headless()
     glFinish();
 
     // Clear any OpenGL errors
-    while (glGetError() != GL_NO_ERROR);
+    while (glGetError() != GL_NO_ERROR)
+        ;
 
     // Verify OpenGL context
     GLint major = 0;
@@ -207,9 +271,9 @@ bool SimulationWrapper::init_headless()
 }
 
 // Window resize callback
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    SimulationWrapper* sim = static_cast<SimulationWrapper*>(glfwGetWindowUserPointer(window));
+    SimulationWrapper *sim = static_cast<SimulationWrapper *>(glfwGetWindowUserPointer(window));
     if (sim)
     {
         // Update global viewport settings
@@ -221,7 +285,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 }
 
 // Initialize windowed mode (with graphics)
-bool SimulationWrapper::init_windowed(int width, int height, const std::string& title)
+bool SimulationWrapper::init_windowed(int width, int height, const std::string &title)
 {
     // Initialize GLFW
     if (!glfwInit())
@@ -249,14 +313,14 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string& 
     }
 
     // Set up window context and callbacks
-    glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
-    glfwSetWindowUserPointer(static_cast<GLFWwindow*>(m_window), this);
-    glfwSetFramebufferSizeCallback(static_cast<GLFWwindow*>(m_window), framebuffer_size_callback);
-    glfwSwapInterval(1);  // Enable vsync
+    glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
+    glfwSetWindowUserPointer(static_cast<GLFWwindow *>(m_window), this);
+    glfwSetFramebufferSizeCallback(static_cast<GLFWwindow *>(m_window), framebuffer_size_callback);
+    glfwSwapInterval(1); // Enable vsync
 
     // Show and focus window
-    glfwShowWindow(static_cast<GLFWwindow*>(m_window));
-    glfwFocusWindow(static_cast<GLFWwindow*>(m_window));
+    glfwShowWindow(static_cast<GLFWwindow *>(m_window));
+    glfwFocusWindow(static_cast<GLFWwindow *>(m_window));
 
     // Process initial events
     for (int i = 0; i < 5; i++)
@@ -273,7 +337,8 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string& 
     glFinish();
 
     // Clear any OpenGL errors
-    while (glGetError() != GL_NO_ERROR);
+    while (glGetError() != GL_NO_ERROR)
+        ;
 
     // Verify OpenGL context
     GLint major = 0;
@@ -297,7 +362,7 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string& 
             g_axisInitialized = true;
 
             // Configure axis appearance
-            Axis::Style& style = Axis::GetStyle();
+            Axis::Style &style = Axis::GetStyle();
             style.majorGridColor = glm::vec3(0.4f, 0.4f, 0.6f);
             style.minorGridColor = glm::vec3(0.25f, 0.25f, 0.35f);
             style.subMinorGridColor = glm::vec3(0.15f, 0.15f, 0.25f);
@@ -352,30 +417,94 @@ void SimulationWrapper::process_input()
     {
         GLFWwindow* glfwWindow = static_cast<GLFWwindow*>(m_window);
         glfwMakeContextCurrent(glfwWindow);
-
+        
+        // Update keyboard state for this frame
+        update_keyboard_state();
+        
         // Handle ESC key to close window
-        static bool escWasPressed = false;
-        bool escIsPressed = (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS);
-
-        if (escIsPressed && !escWasPressed)
+        if (is_key_just_pressed(GLFW_KEY_ESCAPE))
             glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
-        escWasPressed = escIsPressed;
-
-        // Process camera controls
+        
+        // Process camera controls (WASD, zoom, etc.)
         g_camera.ProcessInput(glfwWindow, 0.016f);
     }
+}
+void SimulationWrapper::update_keyboard_state()
+{
+    if (!m_window)
+        return;
+    GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
+
+    // Save previous state
+    for (int i = 0; i < MAX_KEYS; ++i)
+        m_previousKeys[i] = m_currentKeys[i];
+
+    // Read current state
+    for (int i = 0; i < MAX_KEYS; ++i)
+        m_currentKeys[i] = (glfwGetKey(glfwWindow, i) == GLFW_PRESS);
+}
+
+bool SimulationWrapper::is_key_pressed(int key) const
+{
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
+    return m_currentKeys[key];
+}
+
+bool SimulationWrapper::is_key_just_pressed(int key) const
+{
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
+    return m_currentKeys[key] && !m_previousKeys[key];
+}
+
+bool SimulationWrapper::is_key_just_released(int key) const
+{
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
+    return !m_currentKeys[key] && m_previousKeys[key];
+}
+
+KeyState KeyboardMonitor::get_key_state(const std::string &name) const
+{
+    int code = key_name_to_code(name);
+    if (code == -1)
+        return KeyState(false, false);
+    bool pressed = m_sim->is_key_pressed(code);
+    bool released = m_sim->is_key_just_released(code);
+    return KeyState(pressed, released);
+}
+
+void SimulationWrapper::set_camera_position(float x, float y)
+{
+    g_camera.position = glm::vec2(x, y);
+}
+
+std::pair<float, float> SimulationWrapper::get_camera_position() const
+{
+    return {g_camera.position.x, g_camera.position.y};
+}
+
+void SimulationWrapper::set_camera_zoom(float zoom)
+{
+    g_camera.zoom = zoom;
+}
+
+float SimulationWrapper::get_camera_zoom() const
+{
+    return g_camera.zoom;
 }
 
 // Check if window should close
 bool SimulationWrapper::should_close() const
 {
     if (!m_headless && m_window)
-        return glfwWindowShouldClose(static_cast<GLFWwindow*>(m_window));
+        return glfwWindowShouldClose(static_cast<GLFWwindow *>(m_window));
     return false;
 }
 
 // ============================================================================
-// NEW: COLLISION PARAMETER MANAGEMENT
+//  COLLISION PARAMETER MANAGEMENT
 // ============================================================================
 
 void SimulationWrapper::set_collision_parameters(bool enable_warm_start, int max_contact_iterations)
@@ -405,10 +534,11 @@ std::pair<bool, int> SimulationWrapper::get_collision_parameters() const
 void SimulationWrapper::update(float dt)
 {
     ensure_initialized();
-    if (m_paused) return;
+    if (m_paused)
+        return;
 
     if (m_window)
-        glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
+        glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     const float FIXED_STEP = 0.001f;
     static float accumulator = 0.0f;
@@ -421,7 +551,8 @@ void SimulationWrapper::update(float dt)
     {
         m_simulationTime += FIXED_STEP;
 
-        while (glGetError() != GL_NO_ERROR);
+        while (glGetError() != GL_NO_ERROR)
+            ;
 
         GLuint computeProgram = Objects::GetComputeProgram();
         if (computeProgram && Objects::IsComputeShaderReady())
@@ -443,29 +574,44 @@ void SimulationWrapper::update(float dt)
             GLint equationModeLoc = glGetUniformLocation(computeProgram, "uEquationMode");
             GLint numObjectsLoc = glGetUniformLocation(computeProgram, "uNumObjects");
 
-            // NEW: Get collision parameter uniforms
+            //  Get collision parameter uniforms
             GLint enableWarmStartLoc = glGetUniformLocation(computeProgram, "uEnableWarmStart");
             GLint maxContactIterationsLoc = glGetUniformLocation(computeProgram, "uMaxContactIterations");
 
             // Apply Uniforms
-            if (dtLoc != -1) glUniform1f(dtLoc, FIXED_STEP);
-            if (timeLoc != -1) glUniform1f(timeLoc, m_simulationTime);
-            if (kLoc != -1) glUniform1f(kLoc, 1.0f);
-            if (bLoc != -1) glUniform1f(bLoc, 0.1f);
-            if (gLoc != -1) glUniform1f(gLoc, 9.81f);
-            if (gravityDirLoc != -1) glUniform2f(gravityDirLoc, 0.0f, -1.0f);
-            if (restitutionLoc != -1) glUniform1f(restitutionLoc, 0.7f);
-            if (couplingLoc != -1) glUniform1f(couplingLoc, 1.0f);
-            if (externalForceLoc != -1) glUniform2f(externalForceLoc, 0.0f, 0.0f);
-            if (driveFreqLoc != -1) glUniform1f(driveFreqLoc, 1.0f);
-            if (driveAmpLoc != -1) glUniform1f(driveAmpLoc, 0.0f);
-            if (equationModeLoc != -1) glUniform1i(equationModeLoc, 0);
-            if (numObjectsLoc != -1) glUniform1i(numObjectsLoc, Objects::GetNumObjects());
+            if (dtLoc != -1)
+                glUniform1f(dtLoc, FIXED_STEP);
+            if (timeLoc != -1)
+                glUniform1f(timeLoc, m_simulationTime);
+            if (kLoc != -1)
+                glUniform1f(kLoc, 1.0f);
+            if (bLoc != -1)
+                glUniform1f(bLoc, 0.1f);
+            if (gLoc != -1)
+                glUniform1f(gLoc, 9.81f);
+            if (gravityDirLoc != -1)
+                glUniform2f(gravityDirLoc, 0.0f, -1.0f);
+            if (restitutionLoc != -1)
+                glUniform1f(restitutionLoc, 0.7f);
+            if (couplingLoc != -1)
+                glUniform1f(couplingLoc, 1.0f);
+            if (externalForceLoc != -1)
+                glUniform2f(externalForceLoc, 0.0f, 0.0f);
+            if (driveFreqLoc != -1)
+                glUniform1f(driveFreqLoc, 1.0f);
+            if (driveAmpLoc != -1)
+                glUniform1f(driveAmpLoc, 0.0f);
+            if (equationModeLoc != -1)
+                glUniform1i(equationModeLoc, 0);
+            if (numObjectsLoc != -1)
+                glUniform1i(numObjectsLoc, Objects::GetNumObjects());
 
-            // NEW: Apply collision parameters
+            //  Apply collision parameters
             auto collision_params = get_collision_parameters();
-            if (enableWarmStartLoc != -1) glUniform1i(enableWarmStartLoc, collision_params.first ? 1 : 0);
-            if (maxContactIterationsLoc != -1) glUniform1i(maxContactIterationsLoc, collision_params.second);
+            if (enableWarmStartLoc != -1)
+                glUniform1i(enableWarmStartLoc, collision_params.first ? 1 : 0);
+            if (maxContactIterationsLoc != -1)
+                glUniform1i(maxContactIterationsLoc, collision_params.second);
 
             // Run Compute Shader
             Objects::Update(m_currentBuffer, 1 - m_currentBuffer);
@@ -489,14 +635,16 @@ void SimulationWrapper::update(float dt)
 // ============================================================================
 void SimulationWrapper::render()
 {
-    if (m_headless || !m_window) return;
+    if (m_headless || !m_window)
+        return;
 
-    glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
+    glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     int w, h;
-    glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_window), &w, &h);
+    glfwGetFramebufferSize(static_cast<GLFWwindow *>(m_window), &w, &h);
 
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0)
+        return;
 
     // Set up viewport and clear screen
     glViewport(0, 0, w, h);
@@ -510,14 +658,16 @@ void SimulationWrapper::render()
     glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-g_camera.position, 0.0f));
     glm::mat4 projView = projection * view;
 
-    while (glGetError() != GL_NO_ERROR);
+    while (glGetError() != GL_NO_ERROR)
+        ;
 
     // Only render axis if grid is enabled
     if (m_enable_grid && g_axisInitialized && g_axisShaderProgram)
     {
         glUseProgram(g_axisShaderProgram);
         GLenum err = glGetError();
-        if (err != GL_NO_ERROR) return;
+        if (err != GL_NO_ERROR)
+            return;
 
         Axis::Update(g_camera, w, h);
         Axis::Draw(g_axisShaderProgram, projView);
@@ -540,15 +690,17 @@ void SimulationWrapper::render()
         GLint projLoc = glGetUniformLocation(objectProgram, "uProjection");
         GLint viewLoc = glGetUniformLocation(objectProgram, "uView");
 
-        if (projLoc != -1) glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        if (viewLoc != -1) glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        if (projLoc != -1)
+            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        if (viewLoc != -1)
+            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         Objects::Draw(m_currentBuffer);
         glUseProgram(0);
     }
 
     // Swap buffers and poll events
-    glfwSwapBuffers(static_cast<GLFWwindow*>(m_window));
+    glfwSwapBuffers(static_cast<GLFWwindow *>(m_window));
     glfwPollEvents();
 }
 
@@ -580,19 +732,19 @@ void SimulationWrapper::set_collision_shape(int index, PyCollisionShape shape)
     switch (shape)
     {
     case PyCollisionShape::NONE:
-        cppShape = static_cast<CollisionShape>(0);  // COLLISION_NONE
+        cppShape = static_cast<CollisionShape>(0); // COLLISION_NONE
         break;
     case PyCollisionShape::CIRCLE:
-        cppShape = static_cast<CollisionShape>(1);  // COLLISION_CIRCLE
+        cppShape = static_cast<CollisionShape>(1); // COLLISION_CIRCLE
         break;
     case PyCollisionShape::AABB:
-        cppShape = static_cast<CollisionShape>(2);  // COLLISION_AABB
+        cppShape = static_cast<CollisionShape>(2); // COLLISION_AABB
         break;
     case PyCollisionShape::POLYGON:
-        cppShape = static_cast<CollisionShape>(3);  // COLLISION_POLYGON
+        cppShape = static_cast<CollisionShape>(3); // COLLISION_POLYGON
         break;
     default:
-        cppShape = static_cast<CollisionShape>(0);  // COLLISION_NONE
+        cppShape = static_cast<CollisionShape>(0); // COLLISION_NONE
     }
 
     Objects::SetCollisionShape(index, cppShape);
@@ -708,7 +860,7 @@ int SimulationWrapper::add_object(
     newObject.charge = charge;
     newObject.visualSkinType = static_cast<int>(skin);
     newObject.collisionShapeType = 0; // COLLISION_NONE (will be auto-assigned)
-    newObject.equationID = 0; // Default equation
+    newObject.equationID = 0;         // Default equation
     newObject._pad1 = 0;
     newObject.color = glm::vec4(r, g, b, a);
     newObject.collisionData = glm::vec4(0.0f);
@@ -730,8 +882,7 @@ int SimulationWrapper::add_object(
         // Clamp polygon sides to valid range
         int minPolySides = 3;
         int maxPolySides = 12;
-        polygon_sides = (polygon_sides < minPolySides) ? minPolySides :
-            ((polygon_sides > maxPolySides) ? maxPolySides : polygon_sides);
+        polygon_sides = (polygon_sides < minPolySides) ? minPolySides : ((polygon_sides > maxPolySides) ? maxPolySides : polygon_sides);
         // For polygons: size = radius, polygon_sides = number of sides, ignore width/height
         newObject.visualData = glm::vec4(size, static_cast<float>(polygon_sides), rotation, angular_velocity);
         newObject.color = glm::vec4(r, g, b, a);
@@ -794,7 +945,7 @@ void SimulationWrapper::update_object(
 
     if (index < static_cast<int>(objects.size()))
     {
-        Object& p = objects[index];
+        Object &p = objects[index];
         int skinType = p.visualSkinType;
 
         // Update basic properties
@@ -805,24 +956,24 @@ void SimulationWrapper::update_object(
         p.color = glm::vec4(r, g, b, a);
 
         // Update visualData based on current skin type
-        if (skinType == 0)  // CIRCLE
+        if (skinType == 0) // CIRCLE
         {
             // For circles: width parameter is radius
-            p.visualData.x = width;  // radius
+            p.visualData.x = width; // radius
             p.visualData.z = rotation;
             p.visualData.w = angular_velocity;
         }
-        else if (skinType == 1)  // RECTANGLE
+        else if (skinType == 1) // RECTANGLE
         {
             p.visualData.x = width;
             p.visualData.y = height;
             p.visualData.z = rotation;
             p.visualData.w = angular_velocity;
         }
-        else if (skinType == 2)  // POLYGON
+        else if (skinType == 2) // POLYGON
         {
             // For polygons: width parameter is radius, preserve sides
-            p.visualData.x = width;  // radius
+            p.visualData.x = width; // radius
             // Keep existing polygon sides (visualData.y)
             p.visualData.z = rotation;
             p.visualData.w = angular_velocity;
@@ -864,7 +1015,7 @@ ObjectState SimulationWrapper::get_object(int index) const
     if (index >= static_cast<int>(objects.size()))
         throw std::runtime_error("Object data corrupted");
 
-    const Object& p = objects[index];
+    const Object &p = objects[index];
     ObjectState state;
 
     // Extract object properties
@@ -879,21 +1030,21 @@ ObjectState SimulationWrapper::get_object(int index) const
     state.skin_type = p.visualSkinType;
 
     // Extract visual properties based on skin type
-    if (p.visualSkinType == 0)  // CIRCLE
+    if (p.visualSkinType == 0) // CIRCLE
     {
         state.radius = p.visualData.x;
         state.width = p.visualData.x * 2.0f;  // diameter
         state.height = p.visualData.x * 2.0f; // diameter
         state.polygon_sides = 0;
     }
-    else if (p.visualSkinType == 1)  // RECTANGLE
+    else if (p.visualSkinType == 1) // RECTANGLE
     {
         state.width = p.visualData.x;
         state.height = p.visualData.y;
         state.radius = 0.0f;
         state.polygon_sides = 0;
     }
-    else if (p.visualSkinType == 2)  // POLYGON
+    else if (p.visualSkinType == 2) // POLYGON
     {
         state.radius = p.visualData.x;
         state.width = p.visualData.x * 2.0f;  // diameter
@@ -923,20 +1074,22 @@ void SimulationWrapper::set_rotation(int index, float rotation)
 
     if (index < static_cast<int>(objects.size()))
     {
-        Object& p = objects[index];
+        Object &p = objects[index];
         p.visualData.z = rotation;
         Objects::UpdateObjectCPU(index, p);
     }
 }
 
 // Batch retrieval of multiple objects' states
-std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int>& indices) const {
+std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int> &indices) const
+{
     ensure_initialized();
 
     std::vector<BatchGetData> results;
     results.reserve(indices.size());
 
-    if (indices.empty()) {
+    if (indices.empty())
+    {
         return results;
     }
 
@@ -944,12 +1097,14 @@ std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int>& i
     std::vector<Object> allObjects;
     Objects::FetchToCPU(m_currentBuffer, allObjects);
 
-    for (int index : indices) {
-        if (index < 0 || index >= static_cast<int>(allObjects.size())) {
+    for (int index : indices)
+    {
+        if (index < 0 || index >= static_cast<int>(allObjects.size()))
+        {
             throw std::runtime_error("Invalid object index in batch_get: " + std::to_string(index));
         }
 
-        const Object& p = allObjects[index];
+        const Object &p = allObjects[index];
         BatchGetData data;
 
         // Extract object properties
@@ -964,19 +1119,22 @@ std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int>& i
         data.skin_type = p.visualSkinType;
 
         // Extract visual properties based on skin type
-        if (p.visualSkinType == 0) { // CIRCLE
+        if (p.visualSkinType == 0)
+        { // CIRCLE
             data.radius = p.visualData.x;
             data.width = p.visualData.x * 2.0f;
             data.height = p.visualData.x * 2.0f;
             data.polygon_sides = 0;
         }
-        else if (p.visualSkinType == 1) { // RECTANGLE
+        else if (p.visualSkinType == 1)
+        { // RECTANGLE
             data.width = p.visualData.x;
             data.height = p.visualData.y;
             data.radius = 0.0f;
             data.polygon_sides = 0;
         }
-        else if (p.visualSkinType == 2) { // POLYGON
+        else if (p.visualSkinType == 2)
+        { // POLYGON
             data.radius = p.visualData.x;
             data.width = p.visualData.x * 2.0f;
             data.height = p.visualData.x * 2.0f;
@@ -996,10 +1154,12 @@ std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int>& i
 }
 
 // Batch update of multiple objects' properties
-void SimulationWrapper::batch_update(const std::vector<BatchUpdateData>& updates) {
+void SimulationWrapper::batch_update(const std::vector<BatchUpdateData> &updates)
+{
     ensure_initialized();
 
-    if (updates.empty()) {
+    if (updates.empty())
+    {
         return;
     }
 
@@ -1008,14 +1168,16 @@ void SimulationWrapper::batch_update(const std::vector<BatchUpdateData>& updates
     Objects::FetchToCPU(m_currentBuffer, objects);
 
     // Apply all updates
-    for (const auto& update : updates) {
+    for (const auto &update : updates)
+    {
         int index = update.index;
 
-        if (index < 0 || index >= static_cast<int>(objects.size())) {
+        if (index < 0 || index >= static_cast<int>(objects.size()))
+        {
             throw std::runtime_error("Invalid object index in batch_update: " + std::to_string(index));
         }
 
-        Object& p = objects[index];
+        Object &p = objects[index];
         int skinType = p.visualSkinType;
 
         // Update basic properties
@@ -1026,19 +1188,22 @@ void SimulationWrapper::batch_update(const std::vector<BatchUpdateData>& updates
         p.color = glm::vec4(update.r, update.g, update.b, update.a);
 
         // Update visualData based on current skin type
-        if (skinType == 0) { // CIRCLE
-            p.visualData.x = update.width;  // radius
+        if (skinType == 0)
+        {                                  // CIRCLE
+            p.visualData.x = update.width; // radius
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
         }
-        else if (skinType == 1) { // RECTANGLE
+        else if (skinType == 1)
+        { // RECTANGLE
             p.visualData.x = update.width;
             p.visualData.y = update.height;
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
         }
-        else if (skinType == 2) { // POLYGON
-            p.visualData.x = update.width;  // radius
+        else if (skinType == 2)
+        {                                  // POLYGON
+            p.visualData.x = update.width; // radius
             // Keep existing polygon sides (don't update from BatchUpdateData)
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
@@ -1066,7 +1231,7 @@ void SimulationWrapper::set_angular_velocity(int index, float angular_velocity)
 
     if (index < static_cast<int>(objects.size()))
     {
-        Object& p = objects[index];
+        Object &p = objects[index];
         p.visualData.w = angular_velocity;
         Objects::UpdateObjectCPU(index, p);
     }
@@ -1085,19 +1250,19 @@ void SimulationWrapper::set_dimensions(int index, float width, float height)
 
     if (index < static_cast<int>(objects.size()))
     {
-        Object& p = objects[index];
+        Object &p = objects[index];
         int skinType = p.visualSkinType;
 
-        if (skinType == 1)  // RECTANGLE
+        if (skinType == 1) // RECTANGLE
         {
             p.visualData.x = width;
             p.visualData.y = height;
             Objects::UpdateObjectCPU(index, p);
         }
-        else if (skinType == 0 || skinType == 2)  // CIRCLE or POLYGON
+        else if (skinType == 0 || skinType == 2) // CIRCLE or POLYGON
         {
             // For circles/polygons, width = radius
-            p.visualData.x = width;  // radius
+            p.visualData.x = width; // radius
             Objects::UpdateObjectCPU(index, p);
         }
         else
@@ -1120,19 +1285,19 @@ void SimulationWrapper::set_radius(int index, float radius)
 
     if (index < static_cast<int>(objects.size()))
     {
-        Object& p = objects[index];
+        Object &p = objects[index];
         int skinType = p.visualSkinType;
 
-        if (skinType == 0 || skinType == 2)  // CIRCLE or POLYGON
+        if (skinType == 0 || skinType == 2) // CIRCLE or POLYGON
         {
             p.visualData.x = radius;
             Objects::UpdateObjectCPU(index, p);
         }
-        else if (skinType == 1)  // RECTANGLE
+        else if (skinType == 1) // RECTANGLE
         {
             // For rectangles, set width/height to 2*radius to make it square
-            p.visualData.x = radius * 2.0f;  // width
-            p.visualData.y = radius * 2.0f;  // height
+            p.visualData.x = radius * 2.0f; // width
+            p.visualData.y = radius * 2.0f; // height
             Objects::UpdateObjectCPU(index, p);
         }
         else
@@ -1181,7 +1346,7 @@ float SimulationWrapper::get_angular_velocity(int index) const
 // ============================================================================
 
 // Set physics equation for an object
-void SimulationWrapper::set_equation(int object_index, const std::string& equation_string)
+void SimulationWrapper::set_equation(int object_index, const std::string &equation_string)
 {
     ensure_initialized();
 
@@ -1195,14 +1360,14 @@ void SimulationWrapper::set_equation(int object_index, const std::string& equati
         ParsedEquation eq = ParseEquation(equation_string, context);
         Objects::SetEquation(equation_string, eq, object_index);
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         throw std::runtime_error("Equation parsing failed: " + std::string(e.what()));
     }
 }
 
 // Add distance constraint between two objects
-void SimulationWrapper::add_distance_constraint(int object_index, const DistanceConstraint& constraint)
+void SimulationWrapper::add_distance_constraint(int object_index, const DistanceConstraint &constraint)
 {
     ensure_initialized();
 
@@ -1221,16 +1386,16 @@ void SimulationWrapper::add_distance_constraint(int object_index, const Distance
     Constraint c;
     c.type = CONSTRAINT_DISTANCE;
     c.targetObjectID = constraint.target_object;
-    c.param1 = constraint.rest_length;      // Only distance parameter
-    c.param2 = 0.0f;                        // Unused
-    c.param3 = 0.0f;                        // Unused
-    c.param4 = 0.0f;                        // Unused
+    c.param1 = constraint.rest_length; // Only distance parameter
+    c.param2 = 0.0f;                   // Unused
+    c.param3 = 0.0f;                   // Unused
+    c.param4 = 0.0f;                   // Unused
 
     Objects::AddConstraint(object_index, c);
 }
 
 // Add boundary (box) constraint to an object
-void SimulationWrapper::add_boundary_constraint(int object_index, const BoundaryConstraint& constraint)
+void SimulationWrapper::add_boundary_constraint(int object_index, const BoundaryConstraint &constraint)
 {
     ensure_initialized();
 
@@ -1274,7 +1439,7 @@ void SimulationWrapper::clear_all_constraints()
 // ============================================================================
 
 // Set global physics parameters
-void SimulationWrapper::set_parameter(const std::string& name, float value)
+void SimulationWrapper::set_parameter(const std::string &name, float value)
 {
     ensure_initialized();
 
@@ -1289,13 +1454,16 @@ void SimulationWrapper::set_parameter(const std::string& name, float value)
 }
 
 // Get current value of a global physics parameter
-float SimulationWrapper::get_parameter(const std::string& name) const
+float SimulationWrapper::get_parameter(const std::string &name) const
 {
     ensure_initialized();
 
-    if (name == "gravity" || name == "g") return 9.81f;
-    if (name == "damping" || name == "b") return 0.1f;
-    if (name == "stiffness" || name == "k") return 1.0f;
+    if (name == "gravity" || name == "g")
+        return 9.81f;
+    if (name == "damping" || name == "b")
+        return 0.1f;
+    if (name == "stiffness" || name == "k")
+        return 1.0f;
 
     throw std::runtime_error("Unknown parameter: " + name);
 }
@@ -1306,27 +1474,30 @@ float SimulationWrapper::get_parameter(const std::string& name) const
 
 // Save simulation state to file
 void SimulationWrapper::save_to_file(
-    const std::string& filename,
-    const std::string& title,
-    const std::string& author,
-    const std::string& description)
+    const std::string &filename,
+    const std::string &title,
+    const std::string &author,
+    const std::string &description)
 {
     ensure_initialized();
 
     if (m_window)
-        glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
+        glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     // Open file for writing
-    FILE* file = fopen(filename.c_str(), "w");
+    FILE *file = fopen(filename.c_str(), "w");
     if (!file)
         throw std::runtime_error("Failed to open file: " + filename);
 
     // Write header information
     fprintf(file, "# Simulation State File\n");
     fprintf(file, "# Created with ProjStellar\n");
-    if (!title.empty()) fprintf(file, "# Title: %s\n", title.c_str());
-    if (!author.empty()) fprintf(file, "# Author: %s\n", author.c_str());
-    if (!description.empty()) fprintf(file, "# Description: %s\n", description.c_str());
+    if (!title.empty())
+        fprintf(file, "# Title: %s\n", title.c_str());
+    if (!author.empty())
+        fprintf(file, "# Author: %s\n", author.c_str());
+    if (!description.empty())
+        fprintf(file, "# Description: %s\n", description.c_str());
     fprintf(file, "# Version: 1.0\n\n");
 
     // Save system parameters
@@ -1346,10 +1517,12 @@ void SimulationWrapper::save_to_file(
     fprintf(file, "count = %d\n\n", numObjects);
 
     std::vector<Object> objects;
-    try {
+    try
+    {
         Objects::FetchToCPU(m_currentBuffer, objects);
     }
-    catch (const std::exception& e) {
+    catch (const std::exception &e)
+    {
         fclose(file);
         throw std::runtime_error("Failed to fetch object data: " + std::string(e.what()));
     }
@@ -1357,7 +1530,7 @@ void SimulationWrapper::save_to_file(
     // Write each object's state
     for (int i = 0; i < numObjects && i < static_cast<int>(objects.size()); ++i)
     {
-        const Object& p = objects[i];
+        const Object &p = objects[i];
 
         fprintf(file, "OBJECT %d\n", i);
         fprintf(file, "position = %.6f %.6f\n", p.position.x, p.position.y);
@@ -1390,7 +1563,7 @@ void SimulationWrapper::save_to_file(
 }
 
 // Load simulation state from file
-void SimulationWrapper::load_from_file(const std::string& filename)
+void SimulationWrapper::load_from_file(const std::string &filename)
 {
     ensure_initialized();
 
@@ -1438,9 +1611,12 @@ void SimulationWrapper::load_from_file(const std::string& filename)
                     value.erase(0, value.find_first_not_of(" \t"));
                     value.erase(value.find_last_not_of(" \t") + 1);
 
-                    if (key == "gravity") set_parameter("gravity", std::stof(value));
-                    else if (key == "damping") set_parameter("damping", std::stof(value));
-                    else if (key == "stiffness") set_parameter("stiffness", std::stof(value));
+                    if (key == "gravity")
+                        set_parameter("gravity", std::stof(value));
+                    else if (key == "damping")
+                        set_parameter("damping", std::stof(value));
+                    else if (key == "stiffness")
+                        set_parameter("stiffness", std::stof(value));
                 }
             }
             // Parse camera state
@@ -1544,9 +1720,12 @@ void SimulationWrapper::load_from_file(const std::string& filename)
                         {
                             int skin_type = std::stoi(value);
                             current_object.visualSkinType = skin_type;
-                            if (skin_type == 0) current_skin = PySkinType::PY_SKIN_CIRCLE;
-                            else if (skin_type == 1) current_skin = PySkinType::PY_SKIN_RECTANGLE;
-                            else if (skin_type == 2) current_skin = PySkinType::PY_SKIN_POLYGON;
+                            if (skin_type == 0)
+                                current_skin = PySkinType::PY_SKIN_CIRCLE;
+                            else if (skin_type == 1)
+                                current_skin = PySkinType::PY_SKIN_RECTANGLE;
+                            else if (skin_type == 2)
+                                current_skin = PySkinType::PY_SKIN_POLYGON;
                         }
                         else if (key == "color")
                         {
@@ -1595,7 +1774,7 @@ void SimulationWrapper::load_from_file(const std::string& filename)
                 (current_skin == PySkinType::PY_SKIN_POLYGON) ? static_cast<int>(current_object.visualData.y) : 0);
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         throw std::runtime_error("Error parsing simulation file: " + std::string(e.what()));
     }
@@ -1629,8 +1808,8 @@ void SimulationWrapper::reset()
 
 // Run batch simulations (for parameter studies, optimization, etc.)
 void SimulationWrapper::run_batch(
-    const std::vector<BatchConfig>& configs,
-    std::function<void(int, const std::vector<ObjectState>&)> callback)
+    const std::vector<BatchConfig> &configs,
+    std::function<void(int, const std::vector<ObjectState> &)> callback)
 {
     ensure_initialized();
 
@@ -1640,7 +1819,7 @@ void SimulationWrapper::run_batch(
     // Run each configuration
     for (size_t i = 0; i < configs.size(); ++i)
     {
-        const auto& config = configs[i];
+        const auto &config = configs[i];
 
         // Reset simulation
         reset();
@@ -1651,7 +1830,7 @@ void SimulationWrapper::run_batch(
             remove_object(0);
 
         // Create objects from configuration
-        for (const auto& pconfig : config.objects)
+        for (const auto &pconfig : config.objects)
         {
             int pid = add_object(
                 pconfig.x, pconfig.y,
@@ -1668,7 +1847,7 @@ void SimulationWrapper::run_batch(
             if (!pconfig.equation.empty())
                 set_equation(pid, pconfig.equation);
 
-            for (const auto& constraint : pconfig.constraints)
+            for (const auto &constraint : pconfig.constraints)
             {
                 if (constraint.type == 0)
                 {
@@ -1718,8 +1897,8 @@ void SimulationWrapper::run_batch(
 
 // Save simulation results to CSV file
 void SimulationWrapper::save_results(
-    const std::string& filename,
-    const std::vector<ObjectState>& states)
+    const std::string &filename,
+    const std::vector<ObjectState> &states)
 {
     std::ofstream file(filename);
     if (!file)
@@ -1727,21 +1906,21 @@ void SimulationWrapper::save_results(
 
     // Write CSV header
     file << "object_id,x,y,vx,vy,mass,charge,rotation,angular_velocity,"
-        << "width,height,radius,polygon_sides,skin_type,r,g,b,a\n";
+         << "width,height,radius,polygon_sides,skin_type,r,g,b,a\n";
 
     // Write each object's state
     for (size_t i = 0; i < states.size(); ++i)
     {
-        const auto& s = states[i];
+        const auto &s = states[i];
         file << i << ","
-            << s.x << "," << s.y << ","
-            << s.vx << "," << s.vy << ","
-            << s.mass << "," << s.charge << ","
-            << s.rotation << "," << s.angular_velocity << ","
-            << s.width << "," << s.height << ","
-            << s.radius << "," << s.polygon_sides << ","
-            << s.skin_type << ","
-            << s.r << "," << s.g << "," << s.b << "," << s.a << "\n";
+             << s.x << "," << s.y << ","
+             << s.vx << "," << s.vy << ","
+             << s.mass << "," << s.charge << ","
+             << s.rotation << "," << s.angular_velocity << ","
+             << s.width << "," << s.height << ","
+             << s.radius << "," << s.polygon_sides << ","
+             << s.skin_type << ","
+             << s.r << "," << s.g << "," << s.b << "," << s.a << "\n";
     }
 }
 
@@ -1755,7 +1934,7 @@ void SimulationWrapper::update_shader_loading()
     ensure_initialized();
 
     if (m_window)
-        glfwMakeContextCurrent(static_cast<GLFWwindow*>(m_window));
+        glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     Objects::UpdateShaderLoadingStatus();
 
@@ -1794,7 +1973,8 @@ std::string SimulationWrapper::get_shader_load_status() const
 // Clean up all simulation resources
 void SimulationWrapper::cleanup()
 {
-    if (!m_initialized) return;
+    if (!m_initialized)
+        return;
 
     // Clean up axis system if initialized
     if (g_axisInitialized)
@@ -1816,7 +1996,7 @@ void SimulationWrapper::cleanup()
     // Destroy window and terminate GLFW
     if (m_window)
     {
-        glfwDestroyWindow(static_cast<GLFWwindow*>(m_window));
+        glfwDestroyWindow(static_cast<GLFWwindow *>(m_window));
         m_window = nullptr;
     }
 

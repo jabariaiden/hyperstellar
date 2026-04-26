@@ -29,12 +29,12 @@ static GLuint g_objectConstraintsSSBO = 0;
 
 // Collision system buffers
 static GLuint g_collisionPropsSSBO = 0;
-static GLuint g_contactBufferSSBO = 0;  // NEW: Contact persistence buffer
+static GLuint g_contactBufferSSBO = 0;  //  Contact persistence buffer
 static std::vector<CollisionProperties> g_collisionProperties(Objects::MAX_OBJECTS);
 static std::vector<std::vector<bool>> g_collisionMatrix(Objects::MAX_OBJECTS,
     std::vector<bool>(Objects::MAX_OBJECTS, true));
 
-// NEW: Collision system parameters
+//  Collision system parameters
 static bool g_enableWarmStart = false;
 static int g_maxContactIterations = 3;
 static bool g_useAnalyticalCollision = true;  // Use analytical elastic collisions
@@ -247,9 +247,12 @@ static void InitializeContactBuffer()
     {
         glGenBuffers(1, &g_contactBufferSSBO);
 
-        // Allocate space for contacts (MAX_OBJECTS * MAX_CONTACTS_PER_OBJECT * sizeof(ContactPoint))
-        // Using 64 bytes per contact point as in GLSL
-        size_t contactBufferSize = Objects::MAX_OBJECTS * 4 * 64; // 4 contacts per object
+        // Calculate exact size: MAX_OBJECTS * MAX_CONTACTS_PER_OBJECT * sizeof(ContactPoint)
+        // ContactPoint in GLSL: objectA(4), objectB(4), normal(8), position(8), penetration(4),
+        // accumulatedNormalImpulse(4), accumulatedTangentImpulse(4), frameCount(4) = 40 bytes
+        // With std430 alignment, it pads to 48 bytes. Use 48 to be safe.
+        const size_t contactPointSize = 48;
+        size_t contactBufferSize = Objects::MAX_OBJECTS * 4 * contactPointSize;
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_contactBufferSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
@@ -267,6 +270,24 @@ static void InitializeContactBuffer()
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
+}
+
+// Clear all contact data (useful for resetting simulation)
+static void ClearContactBuffer()
+{
+    if (g_contactBufferSSBO == 0) return;
+
+    const size_t contactPointSize = 48;
+    size_t contactBufferSize = Objects::MAX_OBJECTS * 4 * contactPointSize;
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_contactBufferSSBO);
+    void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+    if (data)
+    {
+        memset(data, 0, contactBufferSize);
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    }
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 // Compact constraint array by removing invalid constraints
@@ -516,7 +537,7 @@ void Objects::UpdateConstraint(int objectIndex, int constraintLocalIndex, const 
 }
 
 // ============================================================================
-// NEW: COLLISION PARAMETER MANAGEMENT
+//  COLLISION PARAMETER MANAGEMENT
 // ============================================================================
 
 void Objects::SetCollisionParameters(bool enableWarmStart, int maxContactIterations)
@@ -769,7 +790,7 @@ void Objects::Update(int inputIndex, int outputIndex)
     GLint numObjectsLoc = glGetUniformLocation(g_programCompute, "uNumObjects");
     if (numObjectsLoc != -1) glUniform1i(numObjectsLoc, g_numObjects);
 
-    // NEW: Set collision system parameters
+    //  Set collision system parameters
     GLint enableWarmStartLoc = glGetUniformLocation(g_programCompute, "uEnableWarmStart");
     if (enableWarmStartLoc != -1) glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
 
@@ -786,7 +807,7 @@ void Objects::Update(int inputIndex, int outputIndex)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
 
-    // NEW: Bind contact buffer if warm starting is enabled
+    //  Bind contact buffer if warm starting is enabled
     if (g_enableWarmStart)
     {
         if (g_contactBufferSSBO == 0)
@@ -1220,6 +1241,9 @@ void Objects::ResetToInitialConditions()
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
     }
+
+    //  Clear contact buffer to remove stale warm start data
+    ClearContactBuffer();
 }
 
 // ============================================================================
@@ -1331,7 +1355,7 @@ void Objects::Cleanup()
     SafeDeleteBuffers(&g_constraintsSSBO, 1);
     SafeDeleteBuffers(&g_objectConstraintsSSBO, 1);
     SafeDeleteBuffers(&g_collisionPropsSSBO, 1);
-    SafeDeleteBuffers(&g_contactBufferSSBO, 1);  // NEW: Delete contact buffer
+    SafeDeleteBuffers(&g_contactBufferSSBO, 1);  //  Delete contact buffer
 
     // Clear all data structures
     g_numObjects = 0;
