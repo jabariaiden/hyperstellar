@@ -342,36 +342,6 @@ sim.cleanup()
 
 
 ```
-### 50,000 particle ring (GPU benchmark)
-
-```python
-import hyperstellar as se
-import math
-
-N, dt = 50000, 0.0006
-sim = se.Simulation(headless=False)
-while not sim.are_all_shaders_ready():
-    sim.update_shader_loading()
-while sim.object_count() > 0:
-    sim.remove_object(0)
-
-R = (N * 0.4) / (2 * math.pi)
-K, V = 1.5, math.sqrt(1.5 * R)
-
-for i in range(N):
-    angle = (i / N) * 2 * math.pi
-    x, y = math.cos(angle) * R + R, math.sin(angle) * R
-    vx, vy = -math.sin(angle) * V, math.cos(angle) * V
-    obj = sim.add_object(x=x, y=y, vx=vx, vy=vy, size=0.15)
-    sim.set_collision_enabled(obj, False)
-    sim.set_equation(obj, f"-(x-{R})*{K/R}, -y*{K/R}, 0, 0.5, 0.2, 1.0, 1.0")
-
-while not sim.should_close():
-    sim.update(dt)
-    sim.render()
-    sim.process_input()
-```
-
 ---
 
 ## Core Concepts
