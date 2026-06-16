@@ -3,12 +3,9 @@ name: Build Wheels
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
-  # ============================================================================
-  # WINDOWS WHEEL (Python 3.13)
-  # ============================================================================
   build-windows:
     runs-on: windows-latest
     steps:
@@ -22,7 +19,7 @@ jobs:
       - name: Install Python deps
         run: pip install build pybind11 wheel setuptools
 
-      - name: Build wheel
+      - name: Build
         run: .\build_python.ps1
         shell: pwsh
 
@@ -32,9 +29,6 @@ jobs:
           name: wheel-windows
           path: dist/*.whl
 
-  # ============================================================================
-  # LINUX WHEEL (Python 3.13)
-  # ============================================================================
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -50,15 +44,16 @@ jobs:
             libglfw3-dev libgl1-mesa-dev libx11-dev \
             python3.13 python3.13-dev python3.13-venv
 
-      - name: Set up venv
-        run: |
-          python3.13 -m venv ~/hyperstellar_env
-          source ~/hyperstellar_env/bin/activate
-          pip install build pybind11 wheel setuptools
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
-      - name: Build wheel
+      - name: Install Python deps
+        run: pip install build pybind11 wheel setuptools
+
+      - name: Build
         run: |
-          source ~/hyperstellar_env/bin/activate
           chmod +x build_python.sh
           ./build_python.sh
 
@@ -68,9 +63,6 @@ jobs:
           name: wheel-linux
           path: dist/*.whl
 
-  # ============================================================================
-  # PUBLISH TO PYPI (only on version tag e.g. v1.0.0)
-  # ============================================================================
   publish:
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest

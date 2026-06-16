@@ -244,6 +244,10 @@ public:
     std::vector<BatchGetData> batch_get(const std::vector<int>& indices) const;
     void batch_update(const std::vector<BatchUpdateData>& updates);
 
+    //paint 
+    void paint(const std::string& equation);
+    void set_paint_resolution(int width, int height);
+
     // Convenience methods for specific properties
     void set_rotation(int index, float rotation);
     void set_angular_velocity(int index, float angular_velocity);

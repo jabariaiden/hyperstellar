@@ -9,14 +9,26 @@
 #include <cstdio>
 #include <iostream>
 #include <mutex>
+#include <fstream>
+#include <filesystem>
+#include <sstream>
+#include <cstring>
 #include <glad/glad.h>
 
-// Platform-specific includes for module path detection
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <dlfcn.h>
 #endif
+
+namespace fs = std::filesystem;
+
+// Simple hash for shader sources + driver info
+static uint32_t simpleHash(const std::string& s) {
+    uint32_t h = 0;
+    for (char c : s) h = (h << 5) + h + static_cast<uint32_t>(c);
+    return h;
+}
 
 enum class ShaderLoadState
 {
@@ -38,7 +50,6 @@ struct ShaderPaths
     std::string geometry;
     std::string fragment;
     std::string compute;
-
     bool IsComputeShader() const { return !compute.empty(); }
     bool HasGeometry() const { return !geometry.empty(); }
 };
@@ -53,101 +64,55 @@ struct ShaderSources
     bool hasGeometry = false;
 };
 
-// Helper function to get shader path relative to module location
+// Helper to get shader path relative to module location (unchanged)
 static std::string GetShaderPath(const std::string& shaderName) {
     static std::string shaderBasePath;
-
     if (shaderBasePath.empty()) {
 #ifdef _WIN32
-        // Get path to this DLL/.pyd
         char modulePath[1024];
         HMODULE hm = NULL;
-
-        // Get the address of this function to locate our module
         if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
             GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
             (LPCSTR)&GetShaderPath, &hm)) {
             GetModuleFileNameA(hm, modulePath, sizeof(modulePath));
-
-            // Extract directory and add "shaders/"
             std::string fullPath(modulePath);
             size_t lastSlash = fullPath.find_last_of("\\/");
             if (lastSlash != std::string::npos) {
                 shaderBasePath = fullPath.substr(0, lastSlash + 1) + "shaders\\";
-                std::cout << "[ShaderLoader] Module located at: " << fullPath << std::endl;
-                std::cout << "[ShaderLoader] Shader directory: " << shaderBasePath << std::endl;
-
-                // Debug: Check if directory exists
-#ifdef _WIN32
-                DWORD attrib = GetFileAttributesA(shaderBasePath.c_str());
-                if (attrib == INVALID_FILE_ATTRIBUTES || !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
-                    std::cerr << "[ShaderLoader] WARNING: Shader directory not found: " << shaderBasePath << std::endl;
-                }
-                else {
-                    std::cout << "[ShaderLoader] ✓ Shader directory exists" << std::endl;
-                }
-#endif
-            }
-            else {
-                std::cerr << "[ShaderLoader] WARNING: Could not extract directory from: " << fullPath << std::endl;
-                shaderBasePath = "./shaders/";
-            }
-        }
-        else {
-            std::cerr << "[ShaderLoader] WARNING: Could not get module handle, using default path" << std::endl;
-            shaderBasePath = "./shaders/";
-        }
+            } else shaderBasePath = ".\\shaders\\";
+        } else shaderBasePath = ".\\shaders\\";
 #else
-        // Linux/macOS: use dladdr to get module path
         Dl_info info;
         if (dladdr((void*)&GetShaderPath, &info)) {
             std::string fullPath(info.dli_fname);
             size_t lastSlash = fullPath.find_last_of("/");
-            if (lastSlash != std::string::npos) {
+            if (lastSlash != std::string::npos)
                 shaderBasePath = fullPath.substr(0, lastSlash + 1) + "shaders/";
-            }
-            else {
-                shaderBasePath = "./shaders/";
-            }
-        }
-        else {
-            shaderBasePath = "./shaders/";
-        }
+            else shaderBasePath = "./shaders/";
+        } else shaderBasePath = "./shaders/";
 #endif
-
-        std::cout << "[ShaderLoader] Using shader base path: " << shaderBasePath << std::endl;
     }
-
     return shaderBasePath + shaderName;
 }
 
-// Helper function to strip UTF-8 BOM from string
+static std::string GetCacheDirectory() {
+    fs::path cachePath;
+#ifdef _WIN32
+    const char* localAppData = getenv("LOCALAPPDATA");
+    if (localAppData) cachePath = fs::path(localAppData) / "hyperstellar" / "cache";
+    else cachePath = fs::current_path() / "shader_cache";
+#else
+    const char* home = getenv("HOME");
+    if (home) cachePath = fs::path(home) / ".cache" / "hyperstellar";
+    else cachePath = fs::current_path() / "shader_cache";
+#endif
+    fs::create_directories(cachePath);
+    return cachePath.string();
+}
+
 static std::string StripUTF8BOM(const std::string& content) {
-    if (content.size() >= 3) {
-        // Check for UTF-8 BOM: EF BB BF
-        unsigned char bom[3] = {
-            (unsigned char)content[0],
-            (unsigned char)content[1],
-            (unsigned char)content[2]
-        };
-
-        if (bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF) {
-            std::cout << "[AsyncLoader] ✓ Stripped UTF-8 BOM (3 bytes)" << std::endl;
-            return content.substr(3);
-        }
-
-        // Also check for UTF-16 BOM patterns (though less likely for GLSL)
-        if (bom[0] == 0xFF && bom[1] == 0xFE) {
-            std::cout << "[AsyncLoader] ✓ Stripped UTF-16 LE BOM (2 bytes)" << std::endl;
-            return content.substr(2);
-        }
-
-        if (bom[0] == 0xFE && bom[1] == 0xFF) {
-            std::cout << "[AsyncLoader] ✓ Stripped UTF-16 BE BOM (2 bytes)" << std::endl;
-            return content.substr(2);
-        }
-    }
-
+    if (content.size() >= 3 && (unsigned char)content[0] == 0xEF && (unsigned char)content[1] == 0xBB && (unsigned char)content[2] == 0xBF)
+        return content.substr(3);
     return content;
 }
 
@@ -159,491 +124,281 @@ public:
     {
     }
 
-    ~AsyncShaderLoader()
-    {
-        // Clean up any OpenGL resources if shader was created
-        if (m_program != 0)
-        {
-            glDeleteProgram(m_program);
-            m_program = 0;
-        }
+    ~AsyncShaderLoader() {
+        if (m_program != 0) glDeleteProgram(m_program);
     }
 
-    // Load compute shader
     void LoadComputeShaderAsync(const std::string& computePath,
         std::function<void(GLuint)> onComplete,
-        std::function<void(const std::string&)> onError)
-    {
+        std::function<void(const std::string&)> onError) {
         ShaderPaths paths;
-        paths.compute = computePath;  // Just filename, GetShaderPath will add directory
+        paths.compute = computePath;
         LoadShaderAsync(paths, onComplete, onError);
     }
 
-    // Load graphics pipeline (vert + frag + optional geom)
-    void LoadGraphicsShaderAsync(const std::string& vertPath,
-        const std::string& fragPath,
-        const std::string& geomPath,
-        std::function<void(GLuint)> onComplete,
-        std::function<void(const std::string&)> onError)
-    {
+    void LoadGraphicsShaderAsync(const std::string& vertPath, const std::string& fragPath,
+        const std::string& geomPath, std::function<void(GLuint)> onComplete,
+        std::function<void(const std::string&)> onError) {
         ShaderPaths paths;
-        paths.vertex = vertPath;      // Just filename
-        paths.fragment = fragPath;    // Just filename
-        paths.geometry = geomPath;    // Just filename
+        paths.vertex = vertPath;
+        paths.fragment = fragPath;
+        paths.geometry = geomPath;
         LoadShaderAsync(paths, onComplete, onError);
     }
 
-    // MUST be called from main thread (OpenGL context thread)
-    void Update()
-    {
-        static int debugCounter = 0;
-        if (debugCounter++ % 100 == 0)
-        {
-            std::cout << "[AsyncLoader::Update] State=" << (int)m_state.load()
-                << ", Progress=" << m_progress.load() << std::endl;
-            std::flush(std::cout);
-        }
-
-        // Check if files are ready for compilation
-        if (m_state == ShaderLoadState::FILES_READY)
-        {
-            std::cout << "[AsyncLoader::Update] FILES_READY detected, starting compilation..." << std::endl;
-            std::flush(std::cout);
-
+    void Update() {
+        if (m_state == ShaderLoadState::FILES_READY) {
             CompileShadersOnMainThread();
         }
-
-        // Check if we just completed AND haven't called callback yet
-        if (m_state == ShaderLoadState::COMPLETE && m_onComplete)
-        {
-            GLuint completedProgram = m_program;
-
-            // Mark callback as processed by clearing it
+        if (m_state == ShaderLoadState::COMPLETE && m_onComplete) {
             auto callback = std::move(m_onComplete);
             m_onComplete = nullptr;
-
-            // Reset state
             m_state = ShaderLoadState::IDLE;
-            //remove program from loader since ownership is passed to caller
-            //m_program = 0;
-
-            // Call the callback
-            std::cout << "[AsyncLoader::Update] Calling completion callback with program " << completedProgram << std::endl;
-            std::flush(std::cout);
-            callback(completedProgram);
-        }
-        else if (m_state == ShaderLoadState::FAILED && m_onError)
-        {
-            std::string error = m_errorMessage;
+            callback(m_program);
+        } else if (m_state == ShaderLoadState::FAILED && m_onError) {
             auto callback = std::move(m_onError);
             m_onError = nullptr;
-
             m_state = ShaderLoadState::IDLE;
-
-            std::cout << "[AsyncLoader::Update] Calling error callback" << std::endl;
-            std::flush(std::cout);
-            callback(error);
+            callback(m_errorMessage);
         }
     }
 
     ShaderLoadState GetState() const { return m_state; }
     float GetProgress() const { return m_progress; }
-
-    std::string GetStatusMessage() const
-    {
-        switch (m_state)
-        {
-        case ShaderLoadState::IDLE:
-            return "Idle";
-        case ShaderLoadState::READING_FILES:
-            return "Reading shader files...";
-        case ShaderLoadState::FILES_READY:
-            return "Files loaded, ready to compile...";
-        case ShaderLoadState::COMPILING_VERTEX:
-            return "Compiling vertex shader...";
-        case ShaderLoadState::COMPILING_GEOMETRY:
-            return "Compiling geometry shader...";
-        case ShaderLoadState::COMPILING_FRAGMENT:
-            return "Compiling fragment shader...";
-        case ShaderLoadState::COMPILING_COMPUTE:
-            return "Compiling compute shader (may take 5-10s on Intel HD)...";
-        case ShaderLoadState::LINKING:
-            return "Linking program...";
-        case ShaderLoadState::COMPLETE:
-            return "Complete!";
-        case ShaderLoadState::FAILED:
-            return "Failed: " + m_errorMessage;
-        default:
-            return "Unknown";
+    std::string GetStatusMessage() const {
+        switch (m_state) {
+            case ShaderLoadState::IDLE: return "Idle";
+            case ShaderLoadState::READING_FILES: return "Reading shader files...";
+            case ShaderLoadState::FILES_READY: return "Files loaded, ready to compile...";
+            case ShaderLoadState::COMPILING_VERTEX: return "Compiling vertex shader...";
+            case ShaderLoadState::COMPILING_GEOMETRY: return "Compiling geometry shader...";
+            case ShaderLoadState::COMPILING_FRAGMENT: return "Compiling fragment shader...";
+            case ShaderLoadState::COMPILING_COMPUTE: return "Compiling compute shader...";
+            case ShaderLoadState::LINKING: return "Linking program...";
+            case ShaderLoadState::COMPLETE: return "Complete!";
+            case ShaderLoadState::FAILED: return "Failed: " + m_errorMessage;
+            default: return "Unknown";
         }
-    }
-
-    bool IsLoading() const
-    {
-        return m_state != ShaderLoadState::IDLE &&
-            m_state != ShaderLoadState::COMPLETE &&
-            m_state != ShaderLoadState::FAILED;
     }
 
 private:
     void LoadShaderAsync(const ShaderPaths& paths,
         std::function<void(GLuint)> onComplete,
-        std::function<void(const std::string&)> onError)
-    {
-        if (m_state != ShaderLoadState::IDLE && m_state != ShaderLoadState::COMPLETE)
-        {
-            std::cout << "[AsyncLoader] Already loading, ignoring request" << std::endl;
-            return;
-        }
-
-        std::cout << "[AsyncLoader] Starting shader load..." << std::endl;
-        std::flush(std::cout);
+        std::function<void(const std::string&)> onError) {
+        if (m_state != ShaderLoadState::IDLE && m_state != ShaderLoadState::COMPLETE) return;
 
         m_state = ShaderLoadState::READING_FILES;
         m_progress = 0.0f;
-        m_shouldStop = false;
         m_onComplete = onComplete;
         m_onError = onError;
         m_program = 0;
 
-        // Read files on MAIN THREAD to avoid MinGW file I/O issues
-        std::cout << "[AsyncLoader] Reading shader files on main thread..." << std::endl;
-        std::flush(std::cout);
-
+        // Read files on main thread
         ShaderSources sources;
         sources.isCompute = paths.IsComputeShader();
         sources.hasGeometry = paths.HasGeometry();
 
-        std::cout << "[AsyncLoader] IsCompute=" << sources.isCompute
-            << ", HasGeometry=" << sources.hasGeometry << std::endl;
-        std::flush(std::cout);
+        auto read = [&](const std::string& path, std::string& dest) -> bool {
+            if (path.empty()) return true;
+            std::string full = GetShaderPath(path);
+            FILE* f = fopen(full.c_str(), "rb");
+            if (!f) { SetError("Cannot open: " + full); return false; }
+            fseek(f, 0, SEEK_END);
+            long size = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            std::string content;
+            content.resize(size);
+            fread(&content[0], 1, size, f);
+            fclose(f);
+            dest = StripUTF8BOM(content);
+            return true;
+        };
 
-        try {
-            // Read vertex shader
-            if (!paths.vertex.empty())
-            {
-                std::string fullPath = GetShaderPath(paths.vertex);
-                std::cout << "[AsyncLoader] Reading vertex: " << fullPath << std::endl;
-                std::flush(std::cout);
-                std::string rawContent = ReadTextFile(fullPath);
-                sources.vertex = StripUTF8BOM(rawContent);
+        if (!read(paths.vertex, sources.vertex)) return;
+        if (!read(paths.geometry, sources.geometry)) return;
+        if (!read(paths.fragment, sources.fragment)) return;
+        if (!read(paths.compute, sources.compute)) return;
 
-                if (sources.vertex.empty())
-                {
-                    SetError("Failed to read vertex shader: " + fullPath);
-                    return;
-                }
-                std::cout << "[AsyncLoader] ✓ Vertex shader loaded (" << sources.vertex.length() << " bytes)" << std::endl;
-                std::flush(std::cout);
-            }
+        m_sources = sources;
+        m_progress = 0.1f;
+        m_state = ShaderLoadState::FILES_READY;
+    }
 
-            // Read geometry shader (optional)
-            if (!paths.geometry.empty())
-            {
-                std::string fullPath = GetShaderPath(paths.geometry);
-                std::cout << "[AsyncLoader] Reading geometry: " << fullPath << std::endl;
-                std::flush(std::cout);
-                std::string rawContent = ReadTextFile(fullPath);
-                sources.geometry = StripUTF8BOM(rawContent);
+    // ------------------------------------------------------------------
+    // CACHE METHODS
+    // ------------------------------------------------------------------
+    std::string GetCacheKey() const {
+        // Combine all shader sources + driver info
+        std::string all = m_sources.vertex + m_sources.geometry + m_sources.fragment + m_sources.compute;
+        uint32_t srcHash = simpleHash(all);
+        const char* vendor = (const char*)glGetString(GL_VENDOR);
+        const char* version = (const char*)glGetString(GL_VERSION);
+        uint32_t vendorHash = simpleHash(vendor ? vendor : "");
+        uint32_t versionHash = simpleHash(version ? version : "");
+        uint32_t key = srcHash ^ (vendorHash << 16) ^ versionHash;
+        return std::to_string(key);
+    }
 
-                if (!sources.geometry.empty())
-                {
-                    std::cout << "[AsyncLoader] ✓ Geometry shader loaded (" << sources.geometry.length() << " bytes)" << std::endl;
-                }
-                else
-                {
-                    std::cout << "[AsyncLoader] ⚠ Geometry shader empty (optional)" << std::endl;
-                }
-                std::flush(std::cout);
-            }
+    std::string GetCachePath() const {
+        return GetCacheDirectory() + "/compute_" + GetCacheKey() + ".bin";
+    }
 
-            // Read fragment shader
-            if (!paths.fragment.empty())
-            {
-                std::string fullPath = GetShaderPath(paths.fragment);
-                std::cout << "[AsyncLoader] Reading fragment: " << fullPath << std::endl;
-                std::flush(std::cout);
-                std::string rawContent = ReadTextFile(fullPath);
-                sources.fragment = StripUTF8BOM(rawContent);
+    bool TryLoadCachedBinary() {
+        std::string cachePath = GetCachePath();
+        std::ifstream in(cachePath, std::ios::binary);
+        if (!in) return false;
 
-                if (sources.fragment.empty())
-                {
-                    SetError("Failed to read fragment shader: " + fullPath);
-                    return;
-                }
-                std::cout << "[AsyncLoader] ✓ Fragment shader loaded (" << sources.fragment.length() << " bytes)" << std::endl;
-                std::flush(std::cout);
-            }
+        GLsizei binaryLength;
+        GLenum binaryFormat;
+        in.read(reinterpret_cast<char*>(&binaryLength), sizeof(binaryLength));
+        in.read(reinterpret_cast<char*>(&binaryFormat), sizeof(binaryFormat));
+        std::vector<unsigned char> binaryData(binaryLength);
+        in.read(reinterpret_cast<char*>(binaryData.data()), binaryLength);
+        in.close();
 
-            // Read compute shader
-            if (!paths.compute.empty())
-            {
-                std::string fullPath = GetShaderPath(paths.compute);
-                std::cout << "[AsyncLoader] Reading compute: " << fullPath << std::endl;
-                std::flush(std::cout);
-                std::string rawContent = ReadTextFile(fullPath);
-                sources.compute = StripUTF8BOM(rawContent);
-
-                if (sources.compute.empty())
-                {
-                    SetError("Failed to read compute shader: " + fullPath);
-                    return;
-                }
-                std::cout << "[AsyncLoader] ✓ Compute shader loaded (" << sources.compute.length() << " bytes)" << std::endl;
-                std::flush(std::cout);
-            }
-
-            // Store sources
-            m_sources = sources;
-            m_progress = 0.1f;
-
-            std::cout << "[AsyncLoader] All files loaded, setting FILES_READY" << std::endl;
-            std::flush(std::cout);
-
-            m_state = ShaderLoadState::FILES_READY;
+        GLuint prog = glCreateProgram();
+        glProgramBinary(prog, binaryFormat, binaryData.data(), binaryLength);
+        GLint success;
+        glGetProgramiv(prog, GL_LINK_STATUS, &success);
+        if (success == GL_TRUE) {
+            m_program = prog;
+            m_progress = 1.0f;
+            m_state = ShaderLoadState::COMPLETE;
+            std::cout << "[AsyncLoader] Loaded cached binary from " << cachePath << std::endl;
+            return true;
         }
-        catch (const std::exception& e)
-        {
-            std::cerr << "[AsyncLoader] EXCEPTION: " << e.what() << std::endl;
-            std::flush(std::cerr);
-            SetError(std::string("Exception during file loading: ") + e.what());
-        }
-        catch (...)
-        {
-            std::cerr << "[AsyncLoader] UNKNOWN EXCEPTION!" << std::endl;
-            std::flush(std::cerr);
-            SetError("Unknown exception during file loading");
+        glDeleteProgram(prog);
+        return false;
+    }
+
+    void SaveBinaryToCache(GLuint program) {
+        GLint binaryLength = 0;
+        glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &binaryLength);
+        if (binaryLength <= 0) return;
+
+        std::vector<unsigned char> binaryData(binaryLength);
+        GLenum binaryFormat = 0;
+        glGetProgramBinary(program, binaryLength, &binaryLength, &binaryFormat, binaryData.data());
+
+        std::string cachePath = GetCachePath();
+        std::ofstream out(cachePath, std::ios::binary);
+        if (out) {
+            out.write(reinterpret_cast<char*>(&binaryLength), sizeof(binaryLength));
+            out.write(reinterpret_cast<char*>(&binaryFormat), sizeof(binaryFormat));
+            out.write(reinterpret_cast<char*>(binaryData.data()), binaryLength);
+            std::cout << "[AsyncLoader] Saved binary to " << cachePath << std::endl;
         }
     }
 
-    // Main thread - OpenGL compilation
-    void CompileShadersOnMainThread()
-    {
-        ShaderSources sources = m_sources;
-
-        GLuint vertShader = 0, geomShader = 0, fragShader = 0, compShader = 0;
-
-        if (sources.isCompute)
-        {
-            // Compute shader pipeline
-            m_state = ShaderLoadState::COMPILING_COMPUTE;
-            m_progress = 0.2f;
-
-            std::cout << "[AsyncLoader] Compiling compute shader..." << std::endl;
-            std::flush(std::cout);
-
-            compShader = CompileShader(GL_COMPUTE_SHADER, sources.compute, "compute");
-            if (compShader == 0)
-                return;
-
-            m_progress = 0.8f;
-        }
-        else
-        {
-            // Graphics pipeline
-            float progressStep = sources.hasGeometry ? 0.2f : 0.3f;
-            float currentProgress = 0.1f;
-
-            // Vertex shader
-            m_state = ShaderLoadState::COMPILING_VERTEX;
-            currentProgress += 0.05f;
-            m_progress = currentProgress;
-
-            std::cout << "[AsyncLoader] Compiling vertex shader..." << std::endl;
-            std::flush(std::cout);
-
-            vertShader = CompileShader(GL_VERTEX_SHADER, sources.vertex, "vertex");
-            if (vertShader == 0)
-                return;
-
-            currentProgress += progressStep;
-            m_progress = currentProgress;
-
-            // Geometry shader (optional)
-            if (sources.hasGeometry && !sources.geometry.empty())
-            {
-                m_state = ShaderLoadState::COMPILING_GEOMETRY;
-                currentProgress += 0.05f;
-                m_progress = currentProgress;
-
-                std::cout << "[AsyncLoader] Compiling geometry shader..." << std::endl;
-                std::flush(std::cout);
-
-                geomShader = CompileShader(GL_GEOMETRY_SHADER, sources.geometry, "geometry");
-                if (geomShader == 0)
-                {
-                    glDeleteShader(vertShader);
-                    return;
-                }
-
-                currentProgress += progressStep;
-                m_progress = currentProgress;
-            }
-
-            // Fragment shader
-            m_state = ShaderLoadState::COMPILING_FRAGMENT;
-            currentProgress += 0.05f;
-            m_progress = currentProgress;
-
-            std::cout << "[AsyncLoader] Compiling fragment shader..." << std::endl;
-            std::flush(std::cout);
-
-            fragShader = CompileShader(GL_FRAGMENT_SHADER, sources.fragment, "fragment");
-            if (fragShader == 0)
-            {
-                glDeleteShader(vertShader);
-                if (geomShader)
-                    glDeleteShader(geomShader);
-                return;
-            }
-
-            m_progress = 0.8f;
-        }
-
-        // Link program
-        m_state = ShaderLoadState::LINKING;
-        m_progress = 0.85f;
-
-        std::cout << "[AsyncLoader] Linking shader program..." << std::endl;
-        std::flush(std::cout);
-
-        GLuint program = glCreateProgram();
-
-        if (compShader)
-        {
-            glAttachShader(program, compShader);
-        }
-        else
-        {
-            glAttachShader(program, vertShader);
-            if (geomShader)
-                glAttachShader(program, geomShader);
-            glAttachShader(program, fragShader);
-        }
-
-        glLinkProgram(program);
-
-        GLint success;
-        glGetProgramiv(program, GL_LINK_STATUS, &success);
-        if (!success)
-        {
-            char infoLog[1024];
-            glGetProgramInfoLog(program, 1024, nullptr, infoLog);
-            SetError(std::string("Program linking failed:\n") + infoLog);
-
-            if (compShader)
-                glDeleteShader(compShader);
-            if (vertShader)
-                glDeleteShader(vertShader);
-            if (geomShader)
-                glDeleteShader(geomShader);
-            if (fragShader)
-                glDeleteShader(fragShader);
-            glDeleteProgram(program);
+    // ------------------------------------------------------------------
+    // COMPILATION (with cache attempt)
+    // ------------------------------------------------------------------
+    void CompileShadersOnMainThread() {
+        // Try to load from cache first (only for compute shader)
+        if (m_sources.isCompute && TryLoadCachedBinary()) {
             return;
         }
 
-        // Cleanup shaders
-        if (compShader)
-            glDeleteShader(compShader);
-        if (vertShader)
+        GLuint vertShader = 0, geomShader = 0, fragShader = 0, compShader = 0;
+
+        if (m_sources.isCompute) {
+            m_state = ShaderLoadState::COMPILING_COMPUTE;
+            m_progress = 0.2f;
+            compShader = CompileShader(GL_COMPUTE_SHADER, m_sources.compute, "compute");
+            if (compShader == 0) return;
+            m_progress = 0.8f;
+        } else {
+            // Graphics pipeline (vertex, geometry, fragment)
+            float step = m_sources.hasGeometry ? 0.2f : 0.3f;
+            float prog = 0.2f;
+            m_state = ShaderLoadState::COMPILING_VERTEX;
+            vertShader = CompileShader(GL_VERTEX_SHADER, m_sources.vertex, "vertex");
+            if (vertShader == 0) return;
+            prog += step;
+            m_progress = prog;
+
+            if (m_sources.hasGeometry && !m_sources.geometry.empty()) {
+                m_state = ShaderLoadState::COMPILING_GEOMETRY;
+                geomShader = CompileShader(GL_GEOMETRY_SHADER, m_sources.geometry, "geometry");
+                if (geomShader == 0) { glDeleteShader(vertShader); return; }
+                prog += step;
+                m_progress = prog;
+            }
+
+            m_state = ShaderLoadState::COMPILING_FRAGMENT;
+            fragShader = CompileShader(GL_FRAGMENT_SHADER, m_sources.fragment, "fragment");
+            if (fragShader == 0) { glDeleteShader(vertShader); if (geomShader) glDeleteShader(geomShader); return; }
+            m_progress = 0.8f;
+        }
+
+        m_state = ShaderLoadState::LINKING;
+        m_progress = 0.85f;
+        std::cout << "[AsyncLoader] Linking shader program..." << std::endl;
+
+        GLuint program = glCreateProgram();
+        if (compShader) glAttachShader(program, compShader);
+        else {
+            glAttachShader(program, vertShader);
+            if (geomShader) glAttachShader(program, geomShader);
+            glAttachShader(program, fragShader);
+        }
+        glLinkProgram(program);
+
+        GLint linkStatus;
+        glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
+        if (!linkStatus) {
+            char log[1024];
+            glGetProgramInfoLog(program, 1024, nullptr, log);
+            SetError(std::string("Linking failed:\n") + log);
+            glDeleteProgram(program);
+            if (compShader) glDeleteShader(compShader);
+            if (vertShader) glDeleteShader(vertShader);
+            if (geomShader) glDeleteShader(geomShader);
+            if (fragShader) glDeleteShader(fragShader);
+            return;
+        }
+
+        // Cleanup shader objects
+        if (compShader) glDeleteShader(compShader);
+        else {
             glDeleteShader(vertShader);
-        if (geomShader)
-            glDeleteShader(geomShader);
-        if (fragShader)
+            if (geomShader) glDeleteShader(geomShader);
             glDeleteShader(fragShader);
+        }
 
         m_program = program;
         m_progress = 1.0f;
         m_state = ShaderLoadState::COMPLETE;
 
-        std::cout << "[AsyncLoader] ✓ Shader compilation complete! Program ID: " << program << std::endl;
-        std::flush(std::cout);
+        // Save binary to cache (only for compute shader)
+        if (m_sources.isCompute) {
+            SaveBinaryToCache(program);
+        }
+        std::cout << "[AsyncLoader] ✓ Shader program ready (ID: " << program << ")" << std::endl;
     }
 
-    GLuint CompileShader(GLenum type, const std::string& source, const char* typeName)
-    {
+    GLuint CompileShader(GLenum type, const std::string& source, const char* typeName) {
         GLuint shader = glCreateShader(type);
         const char* src = source.c_str();
         glShaderSource(shader, 1, &src, nullptr);
         glCompileShader(shader);
-
         GLint success;
         glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            char infoLog[1024];
-            glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
-            SetError(std::string(typeName) + " shader compilation failed:\n" + infoLog);
+        if (!success) {
+            char log[1024];
+            glGetShaderInfoLog(shader, 1024, nullptr, log);
+            SetError(std::string(typeName) + " shader compile error:\n" + log);
             glDeleteShader(shader);
             return 0;
         }
-
-        std::cout << "[AsyncLoader] ✓ " << typeName << " shader compiled" << std::endl;
-        std::flush(std::cout);
         return shader;
     }
 
-    void SetError(const std::string& error)
-    {
+    void SetError(const std::string& error) {
         m_errorMessage = error;
         m_state = ShaderLoadState::FAILED;
         m_progress = 0.0f;
         std::cerr << "[AsyncLoader] ERROR: " << error << std::endl;
-        std::flush(std::cerr);
-    }
-
-    std::string ReadTextFile(const std::string& fullPath)
-    {
-        std::cout << "[AsyncLoader] Opening file with C API: " << fullPath << std::endl;
-        std::flush(std::cout);
-
-        // Use C file I/O to avoid MinGW std::ifstream issues
-        FILE* file = fopen(fullPath.c_str(), "rb");
-
-        if (!file)
-        {
-            std::cerr << "[AsyncLoader] fopen failed for: " << fullPath << std::endl;
-#ifdef _WIN32
-            DWORD error = GetLastError();
-            std::cerr << "[AsyncLoader] Windows error code: " << error << std::endl;
-#endif
-            std::flush(std::cerr);
-            return "";
-        }
-
-        // Get file size
-        fseek(file, 0, SEEK_END);
-        long size = ftell(file);
-        fseek(file, 0, SEEK_SET);
-
-        if (size <= 0)
-        {
-            std::cerr << "[AsyncLoader] Invalid file size: " << fullPath << std::endl;
-            std::flush(std::cerr);
-            fclose(file);
-            return "";
-        }
-
-        // Read content
-        std::string content;
-        content.resize(size);
-
-        size_t bytesRead = fread(&content[0], 1, size, file);
-        fclose(file);
-
-        if (bytesRead != (size_t)size)
-        {
-            std::cerr << "[AsyncLoader] Read size mismatch for: " << fullPath
-                << " (expected " << size << ", got " << bytesRead << ")" << std::endl;
-            std::flush(std::cerr);
-            return "";
-        }
-
-        std::cout << "[AsyncLoader] ✓ File read successfully: " << bytesRead << " bytes" << std::endl;
-        std::flush(std::cout);
-
-        return content;
     }
 
     std::atomic<ShaderLoadState> m_state;
@@ -653,8 +408,6 @@ private:
     std::string m_errorMessage;
     std::function<void(GLuint)> m_onComplete;
     std::function<void(const std::string&)> m_onError;
-
-    // Shader sources (no longer needs mutex since no threading)
     ShaderSources m_sources;
 };
 

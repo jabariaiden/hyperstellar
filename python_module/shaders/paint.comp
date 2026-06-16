@@ -1,0 +1,434 @@
+#version 430 core
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// ----------------------------------------------------------------------------
+// OBJECT STRUCTURE (same as math.comp, read‑only)
+// ----------------------------------------------------------------------------
+struct Object {
+    vec2 position;
+    vec2 velocity;
+    float mass;
+    float charge;
+    int visualSkinType;
+    int collisionShapeType;
+    vec4 visualData;
+    vec4 collisionData;
+    vec4 color;
+    int equationID;
+    int _pad1;
+    int _padEnd[2];
+};
+layout(std430, binding = 0) readonly buffer ObjectsIn { Object objectsIn[]; };
+
+// ----------------------------------------------------------------------------
+// TOKEN AND CONSTANT BUFFERS (paint‑specific)
+// ----------------------------------------------------------------------------
+layout(std430, binding = 2) readonly buffer PaintTokens { int allTokens[]; };
+layout(std430, binding = 3) readonly buffer PaintConstants { float allConstants[]; };
+
+// ----------------------------------------------------------------------------
+// OUTPUT TEXTURE
+// ----------------------------------------------------------------------------
+layout(rgba8, binding = 0) writeonly uniform image2D uPaintTarget;
+
+// ----------------------------------------------------------------------------
+// UNIFORMS
+// ----------------------------------------------------------------------------
+uniform int uNumObjects;
+uniform float uTime;
+uniform float uCameraX;
+uniform float uCameraY;
+uniform float uZoom;
+uniform int uScreenWidth;
+uniform int uScreenHeight;
+uniform float uHalfWidth;
+uniform float uHalfHeight;
+uniform int uColorMode;  // 0 = RGB, 1 = HSV (reserved for future)
+uniform int uTokenOffset_r;
+uniform int uTokenCount_r;
+uniform int uConstOffset_r;
+uniform int uTokenOffset_g;
+uniform int uTokenCount_g;
+uniform int uConstOffset_g;
+uniform int uTokenOffset_b;
+uniform int uTokenCount_b;
+uniform int uConstOffset_b;
+uniform int uTexWidth;      // paint texture width (quality setting)
+uniform int uTexHeight;     // paint texture height
+uniform float uScaleX;
+uniform float uScaleY;
+
+// ----------------------------------------------------------------------------
+// TOKEN CODES (must match parser)
+// ----------------------------------------------------------------------------
+const int TOKEN_NUMBER       = 0;
+const int TOKEN_VARIABLE     = 1;
+const int TOKEN_OBJECT_REF   = 2;
+const int TOKEN_ADD          = 3;
+const int TOKEN_SUB          = 4;
+const int TOKEN_MUL          = 5;
+const int TOKEN_DIV          = 6;
+const int TOKEN_NEG          = 7;
+const int TOKEN_POW          = 8;
+const int TOKEN_SIN          = 9;
+const int TOKEN_COS          = 10;
+const int TOKEN_TAN          = 11;
+const int TOKEN_SQRT         = 12;
+const int TOKEN_LOG          = 13;
+const int TOKEN_EXP          = 14;
+const int TOKEN_ABS          = 15;
+const int TOKEN_MIN          = 16;
+const int TOKEN_MAX          = 17;
+const int TOKEN_CLAMP        = 18;
+const int TOKEN_FLOOR        = 19;
+const int TOKEN_CEIL         = 20;
+const int TOKEN_FRAC         = 21;
+const int TOKEN_MOD          = 22;
+const int TOKEN_ATAN2        = 23;
+const int TOKEN_REAL         = 24;
+const int TOKEN_IMAG         = 25;
+const int TOKEN_CONJ         = 26;
+const int TOKEN_ARG          = 27;
+const int TOKEN_SIGN         = 28;
+const int TOKEN_STEP         = 29;
+const int TOKEN_OPEN_PAREN   = 30;
+const int TOKEN_CLOSE_PAREN  = 31;
+const int TOKEN_COMMA        = 32;
+const int TOKEN_DERIVATIVE   = 33;
+const int TOKEN_DOT          = 34;
+const int TOKEN_CROSS        = 35;
+const int TOKEN_NORM         = 36;
+const int TOKEN_SELECT       = 37;
+const int TOKEN_NOISE        = 38;
+const int TOKEN_RAND         = 39;
+const int TOKEN_SUM_NEIGHBORS = 40;
+const int TOKEN_NEIGHBOR_INDEX = 41;
+const int TOKEN_TENSOR_LIT   = 42;
+const int TOKEN_LT           = 43;
+const int TOKEN_LE           = 44;
+const int TOKEN_GT           = 45;
+const int TOKEN_GE           = 46;
+const int TOKEN_EQ           = 47;
+const int TOKEN_NE           = 48;
+
+// ----------------------------------------------------------------------------
+// VARIABLE HASHES
+// ----------------------------------------------------------------------------
+const int VAR_HASH_X        = 1;
+const int VAR_HASH_Y        = 2;
+const int VAR_HASH_VX       = 3;
+const int VAR_HASH_VY       = 4;
+const int VAR_HASH_AX       = 5;
+const int VAR_HASH_AY       = 6;
+const int VAR_HASH_T        = 7;
+const int VAR_HASH_THETA    = 8;
+const int VAR_HASH_OMEGA    = 27;
+const int VAR_HASH_MASS     = 22;
+const int VAR_HASH_CHARGE   = 23;
+const int VAR_HASH_R        = 9;
+const int VAR_HASH_G        = 10;
+const int VAR_HASH_B        = 11;
+const int VAR_HASH_A        = 12;
+const int VAR_HASH_VIS_X    = 100;
+const int VAR_HASH_VIS_Y    = 101;
+const int VAR_HASH_RADIUS   = 102;
+const int VAR_HASH_WIDTH    = 103;
+const int VAR_HASH_HEIGHT   = 104;
+const int VAR_HASH_PI       = 17;
+const int VAR_HASH_E        = 18;
+const int VAR_HASH_I        = 16;
+const int VAR_HASH_K        = 19;
+const int VAR_HASH_B_DAMP   = 20;
+const int VAR_HASH_G_GRAV   = 21;
+const int VAR_HASH_COUPLING = 24;
+const int VAR_HASH_FREQ     = 25;
+const int VAR_HASH_AMP      = 26;
+// Paint‑specific variables
+const int VAR_HASH_PX       = 200;
+const int VAR_HASH_PY       = 201;
+
+// ----------------------------------------------------------------------------
+// UTILITIES (copy from math.comp)
+// ----------------------------------------------------------------------------
+float safeDivide(float n, float d) {
+    return (abs(d) < 1e-6) ? 0.0 : n / d;
+}
+float safePow(float b, float e) {
+    return pow(max(0.0, b), e);
+}
+float safeLog(float v) {
+    return log(max(1e-6, v));
+}
+float safeExp(float v) {
+    return exp(clamp(v, -50.0, 50.0));
+}
+bool isInvalid(float v) {
+    return isinf(v) || isnan(v);
+}
+float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }
+float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0; }
+
+// Complex arithmetic (only needed for completeness – rarely used in paint)
+vec2 cAdd(vec2 a, vec2 b) { return a + b; }
+vec2 cSub(vec2 a, vec2 b) { return a - b; }
+vec2 cMul(vec2 a, vec2 b) { return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
+vec2 cDiv(vec2 a, vec2 b) {
+    float d = b.x*b.x + b.y*b.y;
+    if (abs(d) < 1e-6) return vec2(0.0);
+    return vec2((a.x*b.x + a.y*b.y)/d, (a.y*b.x - a.x*b.y)/d);
+}
+vec2 cLog(vec2 z) { return vec2(safeLog(length(z)), atan(z.y, z.x)); }
+vec2 cExp(vec2 z) { float ea = safeExp(z.x); return vec2(ea*cos(z.y), ea*sin(z.y)); }
+vec2 cPow(vec2 b, vec2 e) { if(length(b)<1e-6) return vec2(0.0); return cExp(cMul(e, cLog(b))); }
+vec2 cSin(vec2 z) { return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y)); }
+vec2 cCos(vec2 z) { return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y)); }
+vec2 cTan(vec2 z) { return cDiv(cSin(z), cCos(z)); }
+
+// Random & Perlin (same as math.comp)
+float rand(vec2 seed) { return fract(sin(dot(seed, vec2(12.9898,78.233)))*43758.5453); }
+float smoothNoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p), u = f*f*(3.0-2.0*f);
+    float a = rand(i), b = rand(i+vec2(1,0)), c = rand(i+vec2(0,1)), d = rand(i+vec2(1,1));
+    return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+}
+float noise(vec2 p) {
+    float sum=0.0, amp=0.5, freq=4.0;
+    for(int i=0;i<3;i++) { sum += amp * smoothNoise(p*freq); amp*=0.5; freq*=2.0; }
+    return sum;
+}
+
+// ----------------------------------------------------------------------------
+// OBJECT PROPERTY GETTER (copied)
+// ----------------------------------------------------------------------------
+float getObjectProperty(int idx, int hash, int self) {
+    if(idx<0 || idx>=uNumObjects || idx==self) return 0.0;
+    Object o = objectsIn[idx];
+    switch(hash) {
+        case VAR_HASH_X: return o.position.x;
+        case VAR_HASH_Y: return o.position.y;
+        case VAR_HASH_VX: return o.velocity.x;
+        case VAR_HASH_VY: return o.velocity.y;
+        case VAR_HASH_AX: return o.collisionData.x;
+        case VAR_HASH_AY: return o.collisionData.y;
+        case VAR_HASH_MASS: return o.mass;
+        case VAR_HASH_CHARGE: return o.charge;
+        case VAR_HASH_THETA: return o.visualData.z;
+        case VAR_HASH_OMEGA: return o.visualData.w;
+        case VAR_HASH_R: return o.color.r;
+        case VAR_HASH_G: return o.color.g;
+        case VAR_HASH_B: return o.color.b;
+        case VAR_HASH_A: return o.color.a;
+        case VAR_HASH_VIS_X: return o.visualData.x;
+        case VAR_HASH_VIS_Y: return o.visualData.y;
+        case VAR_HASH_RADIUS: return o.visualData.x;
+        case VAR_HASH_WIDTH: return o.visualData.x;
+        case VAR_HASH_HEIGHT: return o.visualData.y;
+        default: return 0.0;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// GET VARIABLE VALUE BY HASH (extended with px, py)
+// ----------------------------------------------------------------------------
+float getVariableValue(int hash,
+                       float x, float y, float vx, float vy, float ax, float ay,
+                       float theta, float omega, vec4 color,
+                       float mass, float charge) {
+    switch(hash) {
+        case VAR_HASH_X: return x;
+        case VAR_HASH_Y: return y;
+        case VAR_HASH_VX: return vx;
+        case VAR_HASH_VY: return vy;
+        case VAR_HASH_AX: return ax;
+        case VAR_HASH_AY: return ay;
+        case VAR_HASH_T: return uTime;
+        case VAR_HASH_THETA: return theta;
+        case VAR_HASH_OMEGA: return omega;
+        case VAR_HASH_R: return color.r;
+        case VAR_HASH_G: return color.g;
+        case VAR_HASH_B: return color.b;
+        case VAR_HASH_A: return color.a;
+        case VAR_HASH_PI: return 3.14159265359;
+        case VAR_HASH_E: return 2.71828182846;
+        case VAR_HASH_K: return 0.0; // not used
+        case VAR_HASH_B_DAMP: return 0.0;
+        case VAR_HASH_G_GRAV: return 0.0;
+        case VAR_HASH_MASS: return mass;
+        case VAR_HASH_CHARGE: return charge;
+        case VAR_HASH_COUPLING: return 0.0;
+        case VAR_HASH_FREQ: return 0.0;
+        case VAR_HASH_AMP: return 0.0;
+        case VAR_HASH_PX: return x;   // x is the world‑space pixel coordinate
+        case VAR_HASH_PY: return y;
+        default: return 0.0;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// SCALAR EVALUATOR (simplified, no recursion, used only for paint)
+// ----------------------------------------------------------------------------
+float evalPaintScalar(float x, float y,
+                      int tokenOffset, int tokenCount, int constantOffset) {
+    if (tokenCount <= 0) return 0.0;
+    float stack[32];
+    int sp = 0;
+    int idx = tokenOffset;
+    int end = tokenOffset + tokenCount;
+    while (idx < end) {
+        int token = allTokens[idx++];
+        if (token == TOKEN_NUMBER) {
+            int ci = allTokens[idx++];
+            stack[sp++] = allConstants[constantOffset + ci];
+        }
+        else if (token == TOKEN_VARIABLE) {
+            int h = allTokens[idx++];
+            if (h == VAR_HASH_PX) stack[sp++] = x;
+            else if (h == VAR_HASH_PY) stack[sp++] = y;
+            else stack[sp++] = getVariableValue(h, x, y, 0,0,0,0,0,0, vec4(1), 1, 0);
+        }
+        else if (token == TOKEN_OBJECT_REF) {
+            int obj = allTokens[idx++];
+            int prop = allTokens[idx++];
+            stack[sp++] = getObjectProperty(obj, prop, -1);
+        }
+        else if (token == TOKEN_DERIVATIVE) {
+            // derivatives not supported in paint – skip
+            int dummy1 = allTokens[idx++];
+            int dummy2 = allTokens[idx++];
+            int dummy3 = allTokens[idx++];
+            int subc = allTokens[idx++];
+            idx += subc;
+            stack[sp++] = 0.0;
+        }
+        else if (token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
+                 token == TOKEN_DIV || token == TOKEN_POW ||
+                 token == TOKEN_LT || token == TOKEN_LE || token == TOKEN_GT ||
+                 token == TOKEN_GE || token == TOKEN_EQ || token == TOKEN_NE) {
+            if (sp < 2) { stack[0]=0.0; sp=1; continue; }
+            float b = stack[--sp];
+            float a = stack[--sp];
+            if (token == TOKEN_ADD) stack[sp++] = a + b;
+            else if (token == TOKEN_SUB) stack[sp++] = a - b;
+            else if (token == TOKEN_MUL) stack[sp++] = a * b;
+            else if (token == TOKEN_DIV) stack[sp++] = safeDivide(a, b);
+            else if (token == TOKEN_POW) stack[sp++] = safePow(a, b);
+            else if (token == TOKEN_LT) stack[sp++] = (a < b) ? 1.0 : 0.0;
+            else if (token == TOKEN_LE) stack[sp++] = (a <= b) ? 1.0 : 0.0;
+            else if (token == TOKEN_GT) stack[sp++] = (a > b) ? 1.0 : 0.0;
+            else if (token == TOKEN_GE) stack[sp++] = (a >= b) ? 1.0 : 0.0;
+            else if (token == TOKEN_EQ) stack[sp++] = (abs(a-b)<1e-6) ? 1.0 : 0.0;
+            else stack[sp++] = (abs(a-b)>=1e-6) ? 1.0 : 0.0;
+        }
+        else if (token == TOKEN_NEG || token == TOKEN_SIN || token == TOKEN_COS ||
+                 token == TOKEN_TAN || token == TOKEN_EXP || token == TOKEN_LOG ||
+                 token == TOKEN_SQRT || token == TOKEN_ABS || token == TOKEN_FLOOR ||
+                 token == TOKEN_CEIL || token == TOKEN_FRAC || token == TOKEN_SIGN ||
+                 token == TOKEN_STEP) {
+            if (sp < 1) { stack[0]=0.0; sp=1; continue; }
+            float a = stack[--sp];
+            if (token == TOKEN_NEG) stack[sp++] = -a;
+            else if (token == TOKEN_SIN) stack[sp++] = sin(a);
+            else if (token == TOKEN_COS) stack[sp++] = cos(a);
+            else if (token == TOKEN_TAN) stack[sp++] = tan(a);
+            else if (token == TOKEN_EXP) stack[sp++] = safeExp(a);
+            else if (token == TOKEN_LOG) stack[sp++] = safeLog(a);
+            else if (token == TOKEN_SQRT) stack[sp++] = sqrt(max(0.0,a));
+            else if (token == TOKEN_ABS) stack[sp++] = abs(a);
+            else if (token == TOKEN_FLOOR) stack[sp++] = floor(a);
+            else if (token == TOKEN_CEIL) stack[sp++] = ceil(a);
+            else if (token == TOKEN_FRAC) stack[sp++] = fract(a);
+            else if (token == TOKEN_SIGN) stack[sp++] = signFunc(a);
+            else stack[sp++] = stepFunc(a);
+        }
+        else if (token == TOKEN_MOD) {
+            if (sp < 2) { stack[0]=0.0; sp=1; continue; }
+            float b = stack[--sp];
+            float a = stack[--sp];
+            stack[sp++] = (abs(b)<1e-6) ? 0.0 : mod(a, b);
+        }
+        else if (token == TOKEN_MIN || token == TOKEN_MAX) {
+            if (sp < 2) { stack[0]=0.0; sp=1; continue; }
+            float b = stack[--sp];
+            float a = stack[--sp];
+            stack[sp++] = (token == TOKEN_MIN) ? min(a,b) : max(a,b);
+        }
+        else if (token == TOKEN_ATAN2) {
+            if (sp < 2) { stack[0]=0.0; sp=1; continue; }
+            float xv = stack[--sp];
+            float yv = stack[--sp];
+            stack[sp++] = atan(yv, xv);
+        }
+        else if (token == TOKEN_CLAMP) {
+            if (sp < 3) { stack[0]=0.0; sp=1; continue; }
+            float maxv = stack[--sp];
+            float minv = stack[--sp];
+            float val = stack[--sp];
+            stack[sp++] = clamp(val, minv, maxv);
+        }
+        else if (token == TOKEN_NOISE) {
+            if (sp < 2) { stack[sp++]=0.0; continue; }
+            float yv = stack[--sp];
+            float xv = stack[--sp];
+            stack[sp++] = noise(vec2(xv, yv));
+        }
+        else if (token == TOKEN_RAND) {
+            stack[sp++] = rand(vec2(uTime, float(int(x*1000+y*1000))));
+        }
+        // Other tokens (SELECT, SUM_NEIGHBORS, TENSOR_LIT, DOT, CROSS, NORM) not used in paint
+        // For simplicity, we ignore them.
+    }
+    return (sp > 0) ? stack[0] : 0.0;
+}
+// ----------------------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------------------
+void main() {
+    // Current texel (paint texture pixel) being computed
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    if (coord.x >= uTexWidth || coord.y >= uTexHeight) return;
+
+    // ------------------------------------------------------------------------
+    // 1. Map the paint texel to the screen pixel it will cover (stretching)
+    //    This ensures that a low‑resolution paint texture covers the whole window.
+    // ------------------------------------------------------------------------
+    float screenX = (float(coord.x) + 0.5) * float(uScreenWidth) / float(uTexWidth);
+    float screenY = (float(coord.y) + 0.5) * float(uScreenHeight) / float(uTexHeight);
+
+    // ------------------------------------------------------------------------
+    // 2. Convert screen pixel to Normalized Device Coordinates (NDC)
+    //    NDC X: -1 (left) to +1 (right)
+    //    NDC Y: -1 (bottom) to +1 (top)  – note the Y flip because screen origin is top‑left
+    // ------------------------------------------------------------------------
+    float ndcX = (screenX / uScreenWidth) * 2.0 - 1.0;
+    float ndcY = 1.0 - (screenY / uScreenHeight) * 2.0;
+
+    // ------------------------------------------------------------------------
+    // 3. Unproject NDC to world using the orthographic parameters
+    //    This mirrors Camera::GetProjectionMatrix exactly:
+    //      left   = camera.x - halfWidth
+    //      right  = camera.x + halfWidth
+    //      bottom = camera.y - halfHeight
+    //      top    = camera.y + halfHeight
+    //    Therefore:
+    //      world.x = camera.x + ndcX * halfWidth
+    //      world.y = camera.y + ndcY * halfHeight
+    // ------------------------------------------------------------------------
+    float px = uCameraX + ndcX * uHalfWidth;
+    float py = uCameraY + ndcY * uHalfHeight;
+
+    // ------------------------------------------------------------------------
+    // 4. Evaluate the paint equation for R, G, B channels
+    //    evalPaintScalar uses the token/constant buffers and the world position
+    // ------------------------------------------------------------------------
+    float r = evalPaintScalar(px, py, uTokenOffset_r, uTokenCount_r, uConstOffset_r);
+    float g = evalPaintScalar(px, py, uTokenOffset_g, uTokenCount_g, uConstOffset_g);
+    float b = evalPaintScalar(px, py, uTokenOffset_b, uTokenCount_b, uConstOffset_b);
+
+    // Clamp to valid range [0,1]
+    r = clamp(r, 0.0, 1.0);
+    g = clamp(g, 0.0, 1.0);
+    b = clamp(b, 0.0, 1.0);
+
+    // Write to the output texture at this texel
+    imageStore(uPaintTarget, coord, vec4(r, g, b, 1.0));
+}

@@ -1,5 +1,6 @@
 #include "simulation_wrapper.h"
 #include "../include/objects.h"
+#include "../include/gpu_serializer.h"
 #include "../include/parser.h"
 #include "../include/constraints.h"
 #include "../include/async_shader_loader.h"
@@ -284,6 +285,10 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     }
 }
 
+void SimulationWrapper::set_paint_resolution(int width, int height)
+{
+    Objects::SetPaintResolution(width, height);
+}
 // Initialize windowed mode (with graphics)
 bool SimulationWrapper::init_windowed(int width, int height, const std::string &title)
 {
@@ -302,6 +307,8 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
     glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
     glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_MAXIMIZED, GLFW_FALSE); // Prevent maximised/fullscreen
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);  // Ensure window decorations
 
     // Create window
     m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
@@ -311,6 +318,12 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
         glfwTerminate();
         return false;
     }
+
+    // Force windowed mode and exact dimensions, too lazy to handle all the edge cases of monitor setups and fullscreen modes ;)
+    glfwSetWindowMonitor(static_cast<GLFWwindow *>(m_window), nullptr, 100, 100, width, height, GLFW_DONT_CARE);
+    glfwSetWindowSize(static_cast<GLFWwindow *>(m_window), width, height);
+    glfwSetWindowPos(static_cast<GLFWwindow *>(m_window), 100, 100);
+    glfwRestoreWindow(static_cast<GLFWwindow *>(m_window)); // Remove any maximised state
 
     // Set up window context and callbacks
     glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
@@ -322,7 +335,7 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
     glfwShowWindow(static_cast<GLFWwindow *>(m_window));
     glfwFocusWindow(static_cast<GLFWwindow *>(m_window));
 
-    // Process initial events
+    // Process initial events to let the window settle
     for (int i = 0; i < 5; i++)
         glfwPollEvents();
 
@@ -392,7 +405,7 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
         }
     }
 
-    // Initialize object system
+    // Initialize object system (includes paint shader and texture, but not resized on window resize)
     if (!Objects::Init(m_window))
     {
         std::cerr << "Failed to initialize object system" << std::endl;
@@ -415,16 +428,16 @@ void SimulationWrapper::process_input()
 {
     if (!m_headless && m_window)
     {
-        GLFWwindow* glfwWindow = static_cast<GLFWwindow*>(m_window);
+        GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
         glfwMakeContextCurrent(glfwWindow);
-        
+
         // Update keyboard state for this frame
         update_keyboard_state();
-        
+
         // Handle ESC key to close window
         if (is_key_just_pressed(GLFW_KEY_ESCAPE))
             glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
-        
+
         // Process camera controls (WASD, zoom, etc.)
         g_camera.ProcessInput(glfwWindow, 0.016f);
     }
@@ -550,6 +563,7 @@ void SimulationWrapper::update(float dt)
     while (accumulator >= FIXED_STEP && stepCount < MAX_STEPS_PER_FRAME)
     {
         m_simulationTime += FIXED_STEP;
+        g_simulationTime = m_simulationTime;
 
         while (glGetError() != GL_NO_ERROR)
             ;
@@ -631,6 +645,27 @@ void SimulationWrapper::update(float dt)
 }
 
 // ============================================================================
+//  Painting management
+// ============================================================================
+void SimulationWrapper::paint(const std::string &equation)
+{
+    ParserContext ctx;
+    ctx.registerVariable("px", ParserContext::DOMAIN_SPATIAL, false);
+    ctx.registerVariable("py", ParserContext::DOMAIN_SPATIAL, false);
+
+    ParsedEquation parsed = ParseEquation(equation, ctx);
+
+    // Serialise only the R, G, B components
+    std::unordered_map<float, int> cm;
+    GPUSerializedEquation gpu = serializeEquationForGPU(parsed);
+
+    Objects::SetPaintEquation(
+        gpu.tokenBuffer_r, gpu.constantBuffer_r,
+        gpu.tokenBuffer_g, gpu.constantBuffer_g,
+        gpu.tokenBuffer_b, gpu.constantBuffer_b);
+}
+
+// ============================================================================
 // Render simulation to screen
 // ============================================================================
 void SimulationWrapper::render()
@@ -655,8 +690,8 @@ void SimulationWrapper::render()
 
     // Calculate camera matrices
     glm::mat4 projection = g_camera.GetProjectionMatrix(w, h);
-    glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(-g_camera.position, 0.0f));
-    glm::mat4 projView = projection * view;
+    glm::mat4 view = glm::mat4(1.0f); // identity — ortho already encodes camera position
+    glm::mat4 projView = projection;
 
     while (glGetError() != GL_NO_ERROR)
         ;
@@ -673,7 +708,8 @@ void SimulationWrapper::render()
         Axis::Draw(g_axisShaderProgram, projView);
         glUseProgram(0);
     }
-
+    // Render paint shader
+    Objects::DispatchPaint(w, h, g_camera.position.x, g_camera.position.y, g_camera.zoom, m_currentBuffer);
     // Render physics objects
     GLuint objectProgram = Objects::GetQuadProgram();
     if (objectProgram && Objects::IsQuadShaderReady())
@@ -1349,16 +1385,49 @@ float SimulationWrapper::get_angular_velocity(int index) const
 void SimulationWrapper::set_equation(int object_index, const std::string &equation_string)
 {
     ensure_initialized();
-
     if (object_index < 0 || object_index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
 
+    // Check if this is legacy comma‑separated format (no '=', contains ',')
+    bool isLegacy = (equation_string.find('=') == std::string::npos &&
+                     equation_string.find(',') != std::string::npos);
+
+    std::string finalEquation = equation_string;
+    if (isLegacy)
+    {
+        // Split by commas
+        std::vector<std::string> parts;
+        std::stringstream ss(equation_string);
+        std::string part;
+        while (std::getline(ss, part, ','))
+        {
+            // Trim whitespace
+            part.erase(0, part.find_first_not_of(" \t\n\r"));
+            part.erase(part.find_last_not_of(" \t\n\r") + 1);
+            parts.push_back(part);
+        }
+        // Pad to at least 7 parts (ax, ay, angular, r, g, b, a)
+        while (parts.size() < 7)
+            parts.push_back("0");
+
+        // Map to new‑style assignments
+        std::string newStyle;
+        newStyle += "ax = " + parts[0] + ";\n";
+        newStyle += "ay = " + parts[1] + ";\n";
+        newStyle += "angular = " + parts[2] + ";\n";
+        newStyle += "color.r = " + parts[3] + ";\n";
+        newStyle += "color.g = " + parts[4] + ";\n";
+        newStyle += "color.b = " + parts[5] + ";\n";
+        newStyle += "color.a = " + parts[6] + ";\n";
+        finalEquation = newStyle;
+    }
+
     try
     {
-        // Parse and apply equation
         ParserContext context;
-        ParsedEquation eq = ParseEquation(equation_string, context);
-        Objects::SetEquation(equation_string, eq, object_index);
+        // Register px, py if needed (not required here)
+        ParsedEquation eq = ParseEquation(finalEquation, context);
+        Objects::SetEquation(finalEquation, eq, object_index);
     }
     catch (const std::exception &e)
     {

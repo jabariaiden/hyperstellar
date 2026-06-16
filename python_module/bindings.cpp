@@ -111,11 +111,10 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("g", &ObjectState::g, "Green color component (0.0-1.0)")
         .def_readwrite("b", &ObjectState::b, "Blue color component (0.0-1.0)")
         .def_readwrite("a", &ObjectState::a, "Alpha/opacity (0.0-1.0)")
-        .def("__repr__", [](const ObjectState& p) {
-        return "<ObjectState pos=(" + std::to_string(p.x) + ", " +
-            std::to_string(p.y) + ") vel=(" + std::to_string(p.vx) +
-            ", " + std::to_string(p.vy) + ") mass=" + std::to_string(p.mass) + ">";
-            });
+        .def("__repr__", [](const ObjectState &p)
+             { return "<ObjectState pos=(" + std::to_string(p.x) + ", " +
+                      std::to_string(p.y) + ") vel=(" + std::to_string(p.vx) +
+                      ", " + std::to_string(p.vy) + ") mass=" + std::to_string(p.mass) + ">"; });
 
     // =========================================================================
     // OBJECT CONFIG (for batch mode)
@@ -151,10 +150,9 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("a", &ObjectConfig::a, "Alpha/opacity")
         .def_readwrite("polygon_sides", &ObjectConfig::polygon_sides, "Polygon sides")
         .def_readwrite("equation", &ObjectConfig::equation, "Physics equation")
-        .def("__repr__", [](const ObjectConfig& p) {
-        return "<ObjectConfig pos=(" + std::to_string(p.x) + ", " +
-            std::to_string(p.y) + ") mass=" + std::to_string(p.mass) + ">";
-            });
+        .def("__repr__", [](const ObjectConfig &p)
+             { return "<ObjectConfig pos=(" + std::to_string(p.x) + ", " +
+                      std::to_string(p.y) + ") mass=" + std::to_string(p.mass) + ">"; });
 
     py::class_<ConstraintConfig>(m, "ConstraintConfig", R"pbdoc(
         Constraint configuration for batch mode.
@@ -242,15 +240,14 @@ PYBIND11_MODULE(stellar, m)
             rest_length (float): Desired distance between objects
         )pbdoc")
         .def(py::init<int, float>(),
-            py::arg("target_object") = 0,
-            py::arg("rest_length") = 5.0f,
-            "Create distance constraint")
+             py::arg("target_object") = 0,
+             py::arg("rest_length") = 5.0f,
+             "Create distance constraint")
         .def_readwrite("target_object", &DistanceConstraint::target_object, "Target object ID")
         .def_readwrite("rest_length", &DistanceConstraint::rest_length, "Desired distance")
-        .def("__repr__", [](const DistanceConstraint& c) {
-        return "<DistanceConstraint target=" + std::to_string(c.target_object) +
-            " length=" + std::to_string(c.rest_length) + ">";
-            });
+        .def("__repr__", [](const DistanceConstraint &c)
+             { return "<DistanceConstraint target=" + std::to_string(c.target_object) +
+                      " length=" + std::to_string(c.rest_length) + ">"; });
 
     py::class_<BoundaryConstraint>(m, "BoundaryConstraint", R"pbdoc(
         Keep object within a rectangular boundary.
@@ -262,20 +259,19 @@ PYBIND11_MODULE(stellar, m)
             max_y (float): Maximum Y boundary
         )pbdoc")
         .def(py::init<float, float, float, float>(),
-            py::arg("min_x") = -10.0f,
-            py::arg("max_x") = 10.0f,
-            py::arg("min_y") = -10.0f,
-            py::arg("max_y") = 10.0f,
-            "Create boundary constraint")
+             py::arg("min_x") = -10.0f,
+             py::arg("max_x") = 10.0f,
+             py::arg("min_y") = -10.0f,
+             py::arg("max_y") = 10.0f,
+             "Create boundary constraint")
         .def_readwrite("min_x", &BoundaryConstraint::min_x, "Minimum X")
         .def_readwrite("max_x", &BoundaryConstraint::max_x, "Maximum X")
         .def_readwrite("min_y", &BoundaryConstraint::min_y, "Minimum Y")
         .def_readwrite("max_y", &BoundaryConstraint::max_y, "Maximum Y")
-        .def("__repr__", [](const BoundaryConstraint& c) {
-        return "<BoundaryConstraint x=[" + std::to_string(c.min_x) + "," +
-            std::to_string(c.max_x) + "] y=[" + std::to_string(c.min_y) +
-            "," + std::to_string(c.max_y) + "]>";
-            });
+        .def("__repr__", [](const BoundaryConstraint &c)
+             { return "<BoundaryConstraint x=[" + std::to_string(c.min_x) + "," +
+                      std::to_string(c.max_x) + "] y=[" + std::to_string(c.min_y) +
+                      "," + std::to_string(c.max_y) + "]>"; });
 
     // =========================================================================
     // COLLISION CONFIG
@@ -294,7 +290,8 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("shape", &CollisionConfig::shape, "Collision shape type")
         .def_readwrite("restitution", &CollisionConfig::restitution, "Bounciness (0.0-1.0)")
         .def_readwrite("friction", &CollisionConfig::friction, "Surface friction (0.0-1.0)")
-        .def("__repr__", [](const CollisionConfig& c) {
+        .def("__repr__", [](const CollisionConfig &c)
+             {
         std::string shapeStr;
         switch (c.shape) {
         case PyCollisionShape::NONE: shapeStr = "NONE"; break;
@@ -304,8 +301,7 @@ PYBIND11_MODULE(stellar, m)
         }
         return "<CollisionConfig shape=" + shapeStr +
             " restitution=" + std::to_string(c.restitution) +
-            " friction=" + std::to_string(c.friction) + ">";
-            });
+            " friction=" + std::to_string(c.friction) + ">"; });
 
     // =========================================================================
     // KEYBOARD STATE
@@ -321,10 +317,9 @@ PYBIND11_MODULE(stellar, m)
         .def_property_readonly("pressed", &KeyState::pressed)
         .def_property_readonly("released", &KeyState::released)
         .def_property_readonly("held", &KeyState::pressed)
-        .def("__repr__", [](const KeyState& ks) {
-            return "<KeyState pressed=" + std::to_string(ks.pressed()) +
-                   " released=" + std::to_string(ks.released()) + ">";
-        });
+        .def("__repr__", [](const KeyState &ks)
+             { return "<KeyState pressed=" + std::to_string(ks.pressed()) +
+                      " released=" + std::to_string(ks.released()) + ">"; });
 
     py::class_<KeyboardMonitor>(m, "KeyboardMonitor", R"pbdoc(
         Provides access to keyboard states via attributes or indexing.
@@ -337,13 +332,11 @@ PYBIND11_MODULE(stellar, m)
         Escape, Enter, Tab, Backspace, Delete, Home, End, PageUp, PageDown,
         Insert, Up, Down, Left, Right, F1-F12.
     )pbdoc")
-        .def(py::init<SimulationWrapper*>())
-        .def("__getattr__", [](KeyboardMonitor& km, const std::string& name) {
-            return km.get_key_state(name);
-        })
-        .def("__getitem__", [](KeyboardMonitor& km, const std::string& name) {
-            return km.get_key_state(name);
-        })
+        .def(py::init<SimulationWrapper *>())
+        .def("__getattr__", [](KeyboardMonitor &km, const std::string &name)
+             { return km.get_key_state(name); })
+        .def("__getitem__", [](KeyboardMonitor &km, const std::string &name)
+             { return km.get_key_state(name); })
         .def("get_key_state", &KeyboardMonitor::get_key_state,
              py::arg("key_name"),
              "Get the state of a specific key by name.");
@@ -358,12 +351,12 @@ PYBIND11_MODULE(stellar, m)
         Can run in headless mode (no window) or with OpenGL visualization.
         )pbdoc")
         .def(py::init<bool, int, int, std::string, bool>(),
-            py::arg("headless") = true,
-            py::arg("width") = 1280,
-            py::arg("height") = 720,
-            py::arg("title") = "Physics Simulation",
-            py::arg("enable_grid") = true,
-            R"pbdoc(
+             py::arg("headless") = true,
+             py::arg("width") = 1280,
+             py::arg("height") = 720,
+             py::arg("title") = "Physics Simulation",
+             py::arg("enable_grid") = true,
+             R"pbdoc(
              Create a new simulation instance.
              
              Args:
@@ -380,16 +373,23 @@ PYBIND11_MODULE(stellar, m)
 
         // Window management
         .def("render", &SimulationWrapper::render,
-            "Render the current frame to the window (visual mode only)")
+             "Render the current frame to the window (visual mode only)")
+        .def("paint", &SimulationWrapper::paint,
+             py::arg("equation"),
+             "Set a procedural paint equation. Variables: px, py, t, p[id].x etc. "
+             "Assign color.r, color.g, color.b.")
+        .def("set_paint_resolution", &SimulationWrapper::set_paint_resolution,
+             py::arg("width"), py::arg("height"),
+             "Set internal resolution for paint shader (default = window size)")
         .def("process_input", &SimulationWrapper::process_input,
-            "Process window input and camera controls (visual mode only)")
+             "Process window input and camera controls (visual mode only)")
         .def("should_close", &SimulationWrapper::should_close,
-            "Check if window should close (visual mode only)")
+             "Check if window should close (visual mode only)")
 
         // Grid control
         .def("set_grid_enabled", &SimulationWrapper::set_grid_enabled,
-            py::arg("enabled"),
-            R"pbdoc(
+             py::arg("enabled"),
+             R"pbdoc(
              Enable or disable grid/axis rendering.
              
              Args:
@@ -397,7 +397,7 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("get_grid_enabled", &SimulationWrapper::get_grid_enabled,
-            R"pbdoc(
+             R"pbdoc(
              Check if grid/axis rendering is enabled.
              
              Returns:
@@ -406,8 +406,8 @@ PYBIND11_MODULE(stellar, m)
 
         // Core simulation
         .def("update", &SimulationWrapper::update,
-            py::arg("dt") = 0.016f,
-            R"pbdoc(
+             py::arg("dt") = 0.016f,
+             R"pbdoc(
              Update physics simulation by dt seconds.
              
              Args:
@@ -419,17 +419,17 @@ PYBIND11_MODULE(stellar, m)
 
         // Object management
         .def("add_object", &SimulationWrapper::add_object,
-            py::arg("x") = 0.0f, py::arg("y") = 0.0f,
-            py::arg("vx") = 0.0f, py::arg("vy") = 0.0f,
-            py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
-            py::arg("rotation") = 0.0f, py::arg("angular_velocity") = 0.0f,
-            py::arg("skin") = PySkinType::PY_SKIN_CIRCLE,
-            py::arg("size") = 0.3f,
-            py::arg("width") = 0.5f, py::arg("height") = 0.3f,
-            py::arg("r") = 1.0f, py::arg("g") = 1.0f,
-            py::arg("b") = 1.0f, py::arg("a") = 1.0f,
-            py::arg("polygon_sides") = 6,
-            R"pbdoc(
+             py::arg("x") = 0.0f, py::arg("y") = 0.0f,
+             py::arg("vx") = 0.0f, py::arg("vy") = 0.0f,
+             py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
+             py::arg("rotation") = 0.0f, py::arg("angular_velocity") = 0.0f,
+             py::arg("skin") = PySkinType::PY_SKIN_CIRCLE,
+             py::arg("size") = 0.3f,
+             py::arg("width") = 0.5f, py::arg("height") = 0.3f,
+             py::arg("r") = 1.0f, py::arg("g") = 1.0f,
+             py::arg("b") = 1.0f, py::arg("a") = 1.0f,
+             py::arg("polygon_sides") = 6,
+             R"pbdoc(
              Add an object with full property control.
              
              Args:
@@ -453,14 +453,14 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("update_object", &SimulationWrapper::update_object,
-            py::arg("index"),
-            py::arg("x"), py::arg("y"),
-            py::arg("vx"), py::arg("vy"),
-            py::arg("mass"), py::arg("charge"),
-            py::arg("rotation"), py::arg("angular_velocity"),
-            py::arg("width"), py::arg("height"),
-            py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a"),
-            R"pbdoc(
+             py::arg("index"),
+             py::arg("x"), py::arg("y"),
+             py::arg("vx"), py::arg("vy"),
+             py::arg("mass"), py::arg("charge"),
+             py::arg("rotation"), py::arg("angular_velocity"),
+             py::arg("width"), py::arg("height"),
+             py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a"),
+             R"pbdoc(
              Update all properties of an existing object.
              
              Args:
@@ -472,8 +472,8 @@ PYBIND11_MODULE(stellar, m)
 
         // Batch operations
         .def("batch_get", &SimulationWrapper::batch_get,
-            py::arg("indices"),
-            R"pbdoc(
+             py::arg("indices"),
+             R"pbdoc(
              Get properties for multiple objects at once.
              
              Args:
@@ -489,8 +489,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("batch_update", &SimulationWrapper::batch_update,
-            py::arg("updates"),
-            R"pbdoc(
+             py::arg("updates"),
+             R"pbdoc(
              Update multiple objects at once.
              
              Args:
@@ -505,15 +505,15 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("remove_object", &SimulationWrapper::remove_object,
-            py::arg("index"),
-            "Remove an object by ID")
+             py::arg("index"),
+             "Remove an object by ID")
 
         .def("object_count", &SimulationWrapper::object_count,
-            "Get number of objects in simulation")
+             "Get number of objects in simulation")
 
         .def("get_object", &SimulationWrapper::get_object,
-            py::arg("index"),
-            R"pbdoc(
+             py::arg("index"),
+             R"pbdoc(
              Get complete object state.
              
              Args:
@@ -525,33 +525,33 @@ PYBIND11_MODULE(stellar, m)
 
         // Convenience methods
         .def("set_rotation", &SimulationWrapper::set_rotation,
-            py::arg("index"), py::arg("rotation"),
-            "Set rotation angle in radians")
+             py::arg("index"), py::arg("rotation"),
+             "Set rotation angle in radians")
 
         .def("set_angular_velocity", &SimulationWrapper::set_angular_velocity,
-            py::arg("index"), py::arg("angular_velocity"),
-            "Set angular velocity in rad/s")
+             py::arg("index"), py::arg("angular_velocity"),
+             "Set angular velocity in rad/s")
 
         .def("set_dimensions", &SimulationWrapper::set_dimensions,
-            py::arg("index"), py::arg("width"), py::arg("height"),
-            "Set width and height for rectangle objects")
+             py::arg("index"), py::arg("width"), py::arg("height"),
+             "Set width and height for rectangle objects")
 
         .def("set_radius", &SimulationWrapper::set_radius,
-            py::arg("index"), py::arg("radius"),
-            "Set radius for circle/polygon objects")
+             py::arg("index"), py::arg("radius"),
+             "Set radius for circle/polygon objects")
 
         .def("get_rotation", &SimulationWrapper::get_rotation,
-            py::arg("index"),
-            "Get rotation angle in radians")
+             py::arg("index"),
+             "Get rotation angle in radians")
 
         .def("get_angular_velocity", &SimulationWrapper::get_angular_velocity,
-            py::arg("index"),
-            "Get angular velocity in rad/s")
+             py::arg("index"),
+             "Get angular velocity in rad/s")
 
         // Equations
         .def("set_equation", &SimulationWrapper::set_equation,
-            py::arg("object_index"), py::arg("equation_string"),
-            R"pbdoc(
+             py::arg("object_index"), py::arg("equation_string"),
+             R"pbdoc(
              Set physics equation for object.
              
              Args:
@@ -570,24 +570,24 @@ PYBIND11_MODULE(stellar, m)
 
         // Constraints
         .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint,
-            py::arg("object_index"), py::arg("constraint"),
-            "Add distance constraint between objects")
+             py::arg("object_index"), py::arg("constraint"),
+             "Add distance constraint between objects")
 
         .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint,
-            py::arg("object_index"), py::arg("constraint"),
-            "Add boundary constraint to object")
+             py::arg("object_index"), py::arg("constraint"),
+             "Add boundary constraint to object")
 
         .def("clear_constraints", &SimulationWrapper::clear_constraints,
-            py::arg("object_index"),
-            "Clear all constraints from object")
+             py::arg("object_index"),
+             "Clear all constraints from object")
 
         .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints,
-            "Clear all constraints from all objects")
+             "Clear all constraints from all objects")
 
         // Collision management
         .def("set_collision_enabled", &SimulationWrapper::set_collision_enabled,
-            py::arg("index"), py::arg("enabled"),
-            R"pbdoc(
+             py::arg("index"), py::arg("enabled"),
+             R"pbdoc(
              Enable or disable collision detection for an object.
              
              Args:
@@ -599,8 +599,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("set_collision_shape", &SimulationWrapper::set_collision_shape,
-            py::arg("index"), py::arg("shape"),
-            R"pbdoc(
+             py::arg("index"), py::arg("shape"),
+             R"pbdoc(
              Set collision shape for an object.
              
              Args:
@@ -614,8 +614,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("set_collision_properties", &SimulationWrapper::set_collision_properties,
-            py::arg("index"), py::arg("restitution"), py::arg("friction"),
-            R"pbdoc(
+             py::arg("index"), py::arg("restitution"), py::arg("friction"),
+             R"pbdoc(
              Set collision physical properties.
              
              Args:
@@ -633,8 +633,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("get_collision_config", &SimulationWrapper::get_collision_config,
-            py::arg("index"),
-            R"pbdoc(
+             py::arg("index"),
+             R"pbdoc(
              Get collision configuration for an object.
              
              Args:
@@ -649,8 +649,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("enable_collision_between", &SimulationWrapper::enable_collision_between,
-            py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
-            R"pbdoc(
+             py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
+             R"pbdoc(
              Enable or disable collision detection between two specific objects.
              
              Args:
@@ -666,8 +666,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         .def("is_collision_enabled", &SimulationWrapper::is_collision_enabled,
-            py::arg("index"),
-            R"pbdoc(
+             py::arg("index"),
+             R"pbdoc(
              Check if collision detection is enabled for an object.
              
              Args:
@@ -677,10 +677,10 @@ PYBIND11_MODULE(stellar, m)
                  bool: True if collisions are enabled
              )pbdoc")
 
-            // For set_collision_parameters (void return)
-            .def("set_collision_parameters", &SimulationWrapper::set_collision_parameters,
-                py::arg("enable_warm_start"), py::arg("max_contact_iterations"),
-                R"pbdoc(
+        // For set_collision_parameters (void return)
+        .def("set_collision_parameters", &SimulationWrapper::set_collision_parameters,
+             py::arg("enable_warm_start"), py::arg("max_contact_iterations"),
+             R"pbdoc(
      Set global collision parameters.
      
      Args:
@@ -688,9 +688,9 @@ PYBIND11_MODULE(stellar, m)
          max_contact_iterations (int): Maximum iterations for contact resolution (1-20)
      )pbdoc")
 
-            // For get_collision_parameters
-            .def("get_collision_parameters", &SimulationWrapper::get_collision_parameters,
-                R"pbdoc(
+        // For get_collision_parameters
+        .def("get_collision_parameters", &SimulationWrapper::get_collision_parameters,
+             R"pbdoc(
      Get global collision parameters.
      
      Returns:
@@ -698,8 +698,8 @@ PYBIND11_MODULE(stellar, m)
      )pbdoc")
 
         // Batch processing
-        .def("run_batch", [](SimulationWrapper& self, const std::vector<BatchConfig>& configs, py::object callback)
-            {
+        .def("run_batch", [](SimulationWrapper &self, const std::vector<BatchConfig> &configs, py::object callback)
+             {
                 py::gil_scoped_release release;
 
                 if (callback.is_none()) {
@@ -711,10 +711,8 @@ PYBIND11_MODULE(stellar, m)
                             py::gil_scoped_acquire acquire;
                             callback(batch_idx, results);
                         });
-                }
-            },
-            py::arg("configs"), py::arg("callback") = py::none(),
-            R"pbdoc(
+                } }, py::arg("configs"), py::arg("callback") = py::none(),
+             R"pbdoc(
              Run multiple simulations in batch mode.
              
              Args:
@@ -726,9 +724,8 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         // Parameters
-        .def("set_parameter", &SimulationWrapper::set_parameter,
-            py::arg("name"), py::arg("value"),
-            R"pbdoc(
+        .def("set_parameter", &SimulationWrapper::set_parameter, py::arg("name"), py::arg("value"),
+             R"pbdoc(
              Set global simulation parameter.
              
              Args:
@@ -741,59 +738,40 @@ PYBIND11_MODULE(stellar, m)
              - "stiffness": Default constraint stiffness
              )pbdoc")
 
-        .def("get_parameter", &SimulationWrapper::get_parameter,
-            py::arg("name"),
-            "Get global parameter value by name")
+        .def("get_parameter", &SimulationWrapper::get_parameter, py::arg("name"), "Get global parameter value by name")
 
         // Simulation control
-        .def("set_paused", &SimulationWrapper::set_paused,
-            py::arg("paused"),
-            "Pause or resume simulation")
+        .def("set_paused", &SimulationWrapper::set_paused, py::arg("paused"), "Pause or resume simulation")
 
-        .def("is_paused", &SimulationWrapper::is_paused,
-            "Check if simulation is paused")
+        .def("is_paused", &SimulationWrapper::is_paused, "Check if simulation is paused")
 
-        .def("update_shader_loading", [](SimulationWrapper& self)
-            {
+        .def("update_shader_loading", [](SimulationWrapper &self)
+             {
                 py::gil_scoped_release release;
-                self.update_shader_loading();
-            },
-            "Update shader loading status")
+                self.update_shader_loading(); }, "Update shader loading status")
 
-        .def("are_all_shaders_ready", [](const SimulationWrapper& self)
-            {
+        .def("are_all_shaders_ready", [](const SimulationWrapper &self)
+             {
                 py::gil_scoped_release release;
-                return self.are_all_shaders_ready();
-            },
-            "Check if all shaders are loaded")
+                return self.are_all_shaders_ready(); }, "Check if all shaders are loaded")
 
-        .def("get_shader_load_progress", [](const SimulationWrapper& self)
-            {
+        .def("get_shader_load_progress", [](const SimulationWrapper &self)
+             {
                 py::gil_scoped_release release;
-                return self.get_shader_load_progress();
-            },
-            "Get shader loading progress (0.0 to 1.0)")
+                return self.get_shader_load_progress(); }, "Get shader loading progress (0.0 to 1.0)")
 
-        .def("get_shader_load_status", [](const SimulationWrapper& self)
-            {
+        .def("get_shader_load_status", [](const SimulationWrapper &self)
+             {
                 py::gil_scoped_release release;
-                return self.get_shader_load_status();
-            },
-            "Get current shader loading status message")
+                return self.get_shader_load_status(); }, "Get current shader loading status message")
 
-        .def("reset", &SimulationWrapper::reset,
-            "Reset simulation to initial state (keeps objects)")
+        .def("reset", &SimulationWrapper::reset, "Reset simulation to initial state (keeps objects)")
 
-        .def("cleanup", &SimulationWrapper::cleanup,
-            "Explicitly cleanup resources")
+        .def("cleanup", &SimulationWrapper::cleanup, "Explicitly cleanup resources")
 
         // File I/O
-        .def("save_to_file", &SimulationWrapper::save_to_file,
-            py::arg("filename"),
-            py::arg("title") = "",
-            py::arg("author") = "",
-            py::arg("description") = "",
-            R"pbdoc(
+        .def("save_to_file", &SimulationWrapper::save_to_file, py::arg("filename"), py::arg("title") = "", py::arg("author") = "", py::arg("description") = "",
+             R"pbdoc(
              Save simulation state to .stellar file.
              
              Args:
@@ -803,9 +781,8 @@ PYBIND11_MODULE(stellar, m)
                  description (str): Simulation description
              )pbdoc")
 
-        .def("load_from_file", &SimulationWrapper::load_from_file,
-            py::arg("filename"),
-            R"pbdoc(
+        .def("load_from_file", &SimulationWrapper::load_from_file, py::arg("filename"),
+             R"pbdoc(
              Load simulation state from .stellar file.
              
              Args:
@@ -813,24 +790,16 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         // Keyboard property (added)
-        .def_property_readonly("keyboard", [](SimulationWrapper& self) {
-            return KeyboardMonitor(&self);
-        }, "Keyboard state monitor (e.g., sim.keyboard.Z.pressed, sim.keyboard.Space.released)")
+        .def_property_readonly("keyboard", [](SimulationWrapper &self)
+                               { return KeyboardMonitor(&self); }, "Keyboard state monitor (e.g., sim.keyboard.Z.pressed, sim.keyboard.Space.released)")
 
         // Camera controls (added)
-        .def("set_camera_position", &SimulationWrapper::set_camera_position,
-             py::arg("x"), py::arg("y"),
-             "Set the camera position in world coordinates.")
-        .def("get_camera_position", &SimulationWrapper::get_camera_position,
-             "Return the current camera position as a tuple (x, y).")
-        .def("set_camera_zoom", &SimulationWrapper::set_camera_zoom,
-             py::arg("zoom"), "Set the camera zoom level (1.0 = default).")
-        .def("get_camera_zoom", &SimulationWrapper::get_camera_zoom,
-             "Return the current camera zoom level.")
+        .def("set_camera_position", &SimulationWrapper::set_camera_position, py::arg("x"), py::arg("y"), "Set the camera position in world coordinates.")
+        .def("get_camera_position", &SimulationWrapper::get_camera_position, "Return the current camera position as a tuple (x, y).")
+        .def("set_camera_zoom", &SimulationWrapper::set_camera_zoom, py::arg("zoom"), "Set the camera zoom level (1.0 = default).")
+        .def("get_camera_zoom", &SimulationWrapper::get_camera_zoom, "Return the current camera zoom level.")
 
         // Properties
-        .def_property_readonly("is_headless", &SimulationWrapper::is_headless,
-            "Check if simulation is running in headless mode")
-        .def_property_readonly("is_initialized", &SimulationWrapper::is_initialized,
-            "Check if simulation is fully initialized");
+        .def_property_readonly("is_headless", &SimulationWrapper::is_headless, "Check if simulation is running in headless mode")
+        .def_property_readonly("is_initialized", &SimulationWrapper::is_initialized, "Check if simulation is fully initialized");
 }

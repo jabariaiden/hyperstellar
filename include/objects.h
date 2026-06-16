@@ -31,6 +31,7 @@ struct Object
     // Total: 96 bytes (was 80 bytes)
 };
 static_assert(sizeof(Object) == 96, "Object struct size must be 96 bytes!");
+extern float g_simulationTime;
 
 // Extended Equation mapping structure for rotation and color
 struct EquationMapping
@@ -87,11 +88,11 @@ const int MAX_CONTACTS_PER_OBJECT = 4;
 // Collision properties per object
 struct CollisionProperties
 {
-    int enabled;           // 0 = disabled, 1 = enabled
-    int shapeType;         // CollisionShape enum
-    float restitution;     // Bounciness (0-1)
-    float friction;        // Surface friction (0-1)
-    float mass_factor;     // Mass multiplier for collision response
+    int enabled;       // 0 = disabled, 1 = enabled
+    int shapeType;     // CollisionShape enum
+    float restitution; // Bounciness (0-1)
+    float friction;    // Surface friction (0-1)
+    float mass_factor; // Mass multiplier for collision response
     int _pad1, _pad2, _pad3;
 };
 
@@ -102,8 +103,17 @@ namespace Objects
     static const int MAX_OBJECTS = 100000;
     static const int MAX_EQUATIONS = 256;
 
+    void InitPaintShader(int screenWidth, int screenHeight);
+    void SetPaintEquation(const std::vector<int> &tokens_r, const std::vector<float> &consts_r,
+                                 const std::vector<int> &tokens_g, const std::vector<float> &consts_g,
+                                 const std::vector<int> &tokens_b, const std::vector<float> &consts_b);
+    void DispatchPaint(int screenWidth, int screenHeight, float camX, float camY, float zoom, int objectBufferIndex);
+    void SetPaintResolution(int width, int height);
+    void ResizePaintTexture(int screenWidth, int screenHeight);
+    void CleanupPaint();
+
     // Core functions
-    bool Init(void* glfwWindow = nullptr);
+    bool Init(void *glfwWindow = nullptr);
     void Update(int inputIndex, int outputIndex);
     void Draw(int sourceIndex);
     void Cleanup();
@@ -121,7 +131,7 @@ namespace Objects
     const Object *GetObjectDataDirect(int sourceIndex);
     Object *GetObjectDataDirectMutable(int sourceIndex);
 
-    // Constraint management 
+    // Constraint management
     void CompactConstraintArray();
     void AddConstraint(int objectIndex, const Constraint &constraint);
     void RemoveConstraint(int objectIndex, int constraintLocalIndex);
@@ -137,7 +147,7 @@ namespace Objects
     void EnableCollisionBetween(int obj1, int obj2, bool enable);
     bool IsCollisionEnabled(int objectIndex);
     void SetCollisionParameters(bool enableWarmStart, int maxContactIterations);
-    void GetCollisionParameters(bool& enableWarmStart, int& maxContactIterations);
+    void GetCollisionParameters(bool &enableWarmStart, int &maxContactIterations);
 
     // Object management
     void AddObject();

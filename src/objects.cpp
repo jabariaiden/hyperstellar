@@ -1,11 +1,13 @@
 #include "objects.h"
 #include "shader_utils.h"
+#include "../include/globals.h"
 #include "utils.h"
 #include "debug_helpers.h"
 #include "gpu_serializer.h"
 #include "constraints.h"
 #include "async_shader_loader.h"
 #include <GLFW/glfw3.h>
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <cstring>
 #include <algorithm>
@@ -14,10 +16,18 @@
 #include <atomic>
 
 // Static buffer IDs for double-buffered object data
-static GLuint g_objectSSBO[2] = { 0, 0 };
-static GLuint g_renderVAO[2] = { 0, 0 };
+static GLuint g_objectSSBO[2] = {0, 0};
+static GLuint g_renderVAO[2] = {0, 0};
 static GLuint g_programCompute = 0;
 static GLuint g_programQuad = 0;
+
+// Paint shader resources
+static int g_paintWidth = 0;
+static int g_paintHeight = 0;
+
+// Paint shader and related resources
+static AsyncShaderLoader g_paintLoader;
+static bool g_paintShaderReady = false;
 
 // Equation and constraint storage buffers
 static GLuint g_allTokensSSBO = 0;
@@ -29,18 +39,19 @@ static GLuint g_objectConstraintsSSBO = 0;
 
 // Collision system buffers
 static GLuint g_collisionPropsSSBO = 0;
-static GLuint g_contactBufferSSBO = 0;  //  Contact persistence buffer
+static GLuint g_contactBufferSSBO = 0; //  Contact persistence buffer
 static std::vector<CollisionProperties> g_collisionProperties(Objects::MAX_OBJECTS);
 static std::vector<std::vector<bool>> g_collisionMatrix(Objects::MAX_OBJECTS,
-    std::vector<bool>(Objects::MAX_OBJECTS, true));
+                                                        std::vector<bool>(Objects::MAX_OBJECTS, true));
 
 //  Collision system parameters
 static bool g_enableWarmStart = false;
 static int g_maxContactIterations = 3;
-static bool g_useAnalyticalCollision = true;  // Use analytical elastic collisions
+static bool g_useAnalyticalCollision = true; // Use analytical elastic collisions
 
 // Object count and data storage
 static int g_numObjects = 0;
+float g_simulationTime = 0.0f;
 static std::vector<int> g_allTokens;
 static std::vector<float> g_allConstants;
 static std::vector<EquationMapping> g_equationMappings(Objects::MAX_EQUATIONS);
@@ -57,7 +68,7 @@ static float g_currentSystemDamping = 0.1f;
 static float g_currentSystemStiffness = 1.0f;
 
 // Memory mapping for direct CPU access
-static Object* g_mappedSSBO[2] = { nullptr, nullptr };
+static Object *g_mappedSSBO[2] = {nullptr, nullptr};
 static bool g_useMapBuffer = true;
 
 // Async shader loading
@@ -66,35 +77,54 @@ static AsyncShaderLoader g_quadLoader;
 static bool g_computeShaderReady = false;
 static bool g_quadShaderReady = false;
 
+static GLuint g_paintShaderProgram = 0;
+static GLuint g_paintTexture = 0;
+static GLuint g_paintTokenSSBO = 0;
+static GLuint g_paintConstSSBO = 0;
+static GLuint g_paintQuadVAO = 0;
+static GLuint g_paintQuadVBO = 0;
+static GLuint g_paintQuadProgram = 0;
+static bool g_hasPaintEquation = false;
+static std::vector<int> g_paintTokens_r, g_paintTokens_g, g_paintTokens_b;
+static std::vector<float> g_paintConsts_r, g_paintConsts_g, g_paintConsts_b;
+
 // Helper function to safely delete buffers
-static void SafeDeleteBuffers(GLuint* buf, GLsizei n)
+static void SafeDeleteBuffers(GLuint *buf, GLsizei n)
 {
-    if (n <= 0) return;
+    if (n <= 0)
+        return;
     std::vector<GLuint> toDelete;
     for (GLsizei i = 0; i < n; ++i)
-        if (buf[i]) toDelete.push_back(buf[i]);
+        if (buf[i])
+            toDelete.push_back(buf[i]);
     if (!toDelete.empty())
         glDeleteBuffers(static_cast<GLsizei>(toDelete.size()), toDelete.data());
-    for (GLsizei i = 0; i < n; ++i) buf[i] = 0;
+    for (GLsizei i = 0; i < n; ++i)
+        buf[i] = 0;
 }
 
 // Helper function to safely delete vertex arrays
-static void SafeDeleteVertexArrays(GLuint* arr, GLsizei n)
+static void SafeDeleteVertexArrays(GLuint *arr, GLsizei n)
 {
-    if (n <= 0) return;
+    if (n <= 0)
+        return;
     std::vector<GLuint> toDelete;
     for (GLsizei i = 0; i < n; ++i)
-        if (arr[i]) toDelete.push_back(arr[i]);
+        if (arr[i])
+            toDelete.push_back(arr[i]);
     if (!toDelete.empty())
         glDeleteVertexArrays(static_cast<GLsizei>(toDelete.size()), toDelete.data());
-    for (GLsizei i = 0; i < n; ++i) arr[i] = 0;
+    for (GLsizei i = 0; i < n; ++i)
+        arr[i] = 0;
 }
 
 // Clamp a value between min and max
 static float clamp(float value, float min, float max)
 {
-    if (value < min) return min;
-    if (value > max) return max;
+    if (value < min)
+        return min;
+    if (value > max)
+        return max;
     return value;
 }
 
@@ -144,42 +174,42 @@ static void SetupRenderVAOFromSSBO(GLuint vaoID, GLuint ssboID)
 
     // Position attribute
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, position));
+                          (void *)offsetof(Object, position));
     glEnableVertexAttribArray(0);
 
     // Velocity attribute
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, velocity));
+                          (void *)offsetof(Object, velocity));
     glEnableVertexAttribArray(1);
 
     // Mass attribute
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, mass));
+                          (void *)offsetof(Object, mass));
     glEnableVertexAttribArray(2);
 
     // Charge attribute
     glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, charge));
+                          (void *)offsetof(Object, charge));
     glEnableVertexAttribArray(3);
 
     // Skin type attribute
     glVertexAttribIPointer(4, 1, GL_INT, sizeof(Object),
-        (void*)offsetof(Object, visualSkinType));
+                           (void *)offsetof(Object, visualSkinType));
     glEnableVertexAttribArray(4);
 
     // Visual data attribute
     glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, visualData));
+                          (void *)offsetof(Object, visualData));
     glEnableVertexAttribArray(5);
 
     // Color attribute
     glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(Object),
-        (void*)offsetof(Object, color));
+                          (void *)offsetof(Object, color));
     glEnableVertexAttribArray(6);
 
     // Equation ID attribute
     glVertexAttribIPointer(7, 1, GL_INT, sizeof(Object),
-        (void*)offsetof(Object, equationID));
+                           (void *)offsetof(Object, equationID));
     glEnableVertexAttribArray(7);
 
     glBindVertexArray(0);
@@ -192,9 +222,9 @@ static void UploadPackedEquationsToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_allTokensSSBO);
     if (!g_allTokens.empty())
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-            g_allTokens.size() * sizeof(int),
-            g_allTokens.data(),
-            GL_STATIC_DRAW);
+                     g_allTokens.size() * sizeof(int),
+                     g_allTokens.data(),
+                     GL_STATIC_DRAW);
     else
     {
         int dummy = 0;
@@ -204,9 +234,9 @@ static void UploadPackedEquationsToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_allConstantsSSBO);
     if (!g_allConstants.empty())
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-            g_allConstants.size() * sizeof(float),
-            g_allConstants.data(),
-            GL_STATIC_DRAW);
+                     g_allConstants.size() * sizeof(float),
+                     g_allConstants.data(),
+                     GL_STATIC_DRAW);
     else
     {
         float dummy = 0.0f;
@@ -222,9 +252,9 @@ static void UploadConstraintsToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_constraintsSSBO);
     if (!g_allConstraints.empty())
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-            g_allConstraints.size() * sizeof(Constraint),
-            g_allConstraints.data(),
-            GL_DYNAMIC_DRAW);
+                     g_allConstraints.size() * sizeof(Constraint),
+                     g_allConstraints.data(),
+                     GL_DYNAMIC_DRAW);
     else
     {
         Constraint dummy = {};
@@ -233,9 +263,9 @@ static void UploadConstraintsToGPU()
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectConstraintsSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-        Objects::MAX_OBJECTS * sizeof(ObjectConstraints),
-        g_objectConstraintMappings.data(),
-        GL_DYNAMIC_DRAW);
+                 Objects::MAX_OBJECTS * sizeof(ObjectConstraints),
+                 g_objectConstraintMappings.data(),
+                 GL_DYNAMIC_DRAW);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
@@ -256,12 +286,12 @@ static void InitializeContactBuffer()
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_contactBufferSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-            contactBufferSize,
-            nullptr,  // Initialize with zeros
-            GL_DYNAMIC_COPY);
+                     contactBufferSize,
+                     nullptr, // Initialize with zeros
+                     GL_DYNAMIC_COPY);
 
         // Clear buffer to zeros
-        void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+        void *data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
         if (data)
         {
             memset(data, 0, contactBufferSize);
@@ -275,13 +305,14 @@ static void InitializeContactBuffer()
 // Clear all contact data (useful for resetting simulation)
 static void ClearContactBuffer()
 {
-    if (g_contactBufferSSBO == 0) return;
+    if (g_contactBufferSSBO == 0)
+        return;
 
     const size_t contactPointSize = 48;
     size_t contactBufferSize = Objects::MAX_OBJECTS * 4 * contactPointSize;
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_contactBufferSSBO);
-    void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+    void *data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
     if (data)
     {
         memset(data, 0, contactBufferSize);
@@ -311,7 +342,7 @@ void Objects::CompactConstraintArray()
     // Update constraint offsets in object mappings
     for (int i = 0; i < MAX_OBJECTS; i++)
     {
-        ObjectConstraints& mapping = g_objectConstraintMappings[i];
+        ObjectConstraints &mapping = g_objectConstraintMappings[i];
         if (mapping.numConstraints > 0)
         {
             int oldOffset = mapping.constraintOffset;
@@ -332,7 +363,7 @@ void Objects::CompactConstraintArray()
 }
 
 // Add a constraint to an object
-void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
+void Objects::AddConstraint(int objectIndex, const Constraint &constraint)
 {
     if (objectIndex < 0 || objectIndex >= g_numObjects)
     {
@@ -346,7 +377,7 @@ void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
         if (constraint.targetObjectID < 0 || constraint.targetObjectID >= g_numObjects)
         {
             std::cerr << "[Objects] Distance constraint has invalid target: "
-                << constraint.targetObjectID << std::endl;
+                      << constraint.targetObjectID << std::endl;
             return;
         }
         if (constraint.targetObjectID == objectIndex)
@@ -355,10 +386,10 @@ void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
             return;
         }
 
-        if (constraint.param1 <= 0.0f)  // rest_length must be positive
+        if (constraint.param1 <= 0.0f) // rest_length must be positive
         {
             std::cerr << "[Objects] Distance constraint has invalid rest length: "
-                << constraint.param1 << std::endl;
+                      << constraint.param1 << std::endl;
             return;
         }
     }
@@ -376,7 +407,7 @@ void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
         }
     }
 
-    ObjectConstraints& mapping = g_objectConstraintMappings[objectIndex];
+    ObjectConstraints &mapping = g_objectConstraintMappings[objectIndex];
 
     // Add constraint to object's constraint list
     if (mapping.numConstraints == 0)
@@ -409,7 +440,7 @@ void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
 
             // Create new contiguous block
             int newOffset = static_cast<int>(g_allConstraints.size());
-            for (const auto& c : existingConstraints)
+            for (const auto &c : existingConstraints)
                 g_allConstraints.push_back(c);
             g_allConstraints.push_back(constraint);
 
@@ -425,10 +456,12 @@ void Objects::AddConstraint(int objectIndex, const Constraint& constraint)
 // Remove a constraint from an object
 void Objects::RemoveConstraint(int objectIndex, int constraintLocalIndex)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
-    ObjectConstraints& mapping = g_objectConstraintMappings[objectIndex];
-    if (constraintLocalIndex < 0 || constraintLocalIndex >= mapping.numConstraints) return;
+    ObjectConstraints &mapping = g_objectConstraintMappings[objectIndex];
+    if (constraintLocalIndex < 0 || constraintLocalIndex >= mapping.numConstraints)
+        return;
 
     // Mark constraint as invalid and shift others
     int globalIndex = mapping.constraintOffset + constraintLocalIndex;
@@ -460,10 +493,12 @@ void Objects::RemoveConstraint(int objectIndex, int constraintLocalIndex)
 // Clear all constraints from an object
 void Objects::ClearConstraints(int objectIndex)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
-    ObjectConstraints& mapping = g_objectConstraintMappings[objectIndex];
-    if (mapping.numConstraints == 0) return;
+    ObjectConstraints &mapping = g_objectConstraintMappings[objectIndex];
+    if (mapping.numConstraints == 0)
+        return;
 
     // Mark all constraints as invalid
     for (int i = 0; i < mapping.numConstraints; i++)
@@ -495,10 +530,12 @@ void Objects::ClearAllConstraints()
 std::vector<Constraint> Objects::GetConstraints(int objectIndex)
 {
     std::vector<Constraint> result;
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return result;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return result;
 
-    const ObjectConstraints& mapping = g_objectConstraintMappings[objectIndex];
-    if (mapping.numConstraints == 0) return result;
+    const ObjectConstraints &mapping = g_objectConstraintMappings[objectIndex];
+    if (mapping.numConstraints == 0)
+        return result;
 
     // Copy constraints to result vector
     for (int i = 0; i < mapping.numConstraints; i++)
@@ -508,12 +545,14 @@ std::vector<Constraint> Objects::GetConstraints(int objectIndex)
 }
 
 // Update an existing constraint
-void Objects::UpdateConstraint(int objectIndex, int constraintLocalIndex, const Constraint& newConstraint)
+void Objects::UpdateConstraint(int objectIndex, int constraintLocalIndex, const Constraint &newConstraint)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
-    ObjectConstraints& mapping = g_objectConstraintMappings[objectIndex];
-    if (constraintLocalIndex < 0 || constraintLocalIndex >= mapping.numConstraints) return;
+    ObjectConstraints &mapping = g_objectConstraintMappings[objectIndex];
+    if (constraintLocalIndex < 0 || constraintLocalIndex >= mapping.numConstraints)
+        return;
 
     // Validate updated constraint
     if (newConstraint.type == CONSTRAINT_DISTANCE)
@@ -568,7 +607,7 @@ void Objects::SetCollisionParameters(bool enableWarmStart, int maxContactIterati
     }
 }
 
-void Objects::GetCollisionParameters(bool& enableWarmStart, int& maxContactIterations)
+void Objects::GetCollisionParameters(bool &enableWarmStart, int &maxContactIterations)
 {
     enableWarmStart = g_enableWarmStart;
     maxContactIterations = g_maxContactIterations;
@@ -577,26 +616,28 @@ void Objects::GetCollisionParameters(bool& enableWarmStart, int& maxContactItera
 // ============================================================================
 // Initialize the objects system
 // ============================================================================
-bool Objects::Init(void* glfwWindow)
+bool Objects::Init(void *glfwWindow)
 {
     // Check OpenGL state
     GLenum err = glGetError();
-    if (err != GL_NO_ERROR) return false;
+    if (err != GL_NO_ERROR)
+        return false;
 
     // Test OpenGL buffer creation
     GLuint testBuffer;
     glGenBuffers(1, &testBuffer);
-    if (glGetError() != GL_NO_ERROR) return false;
+    if (glGetError() != GL_NO_ERROR)
+        return false;
     glDeleteBuffers(1, &testBuffer);
 
     // Initialize data structures
     g_equationMappings.resize(MAX_EQUATIONS);
     g_objectConstraintMappings.resize(MAX_OBJECTS);
 
-    for (auto& mapping : g_equationMappings)
+    for (auto &mapping : g_equationMappings)
         mapping = EquationMapping{};
 
-    for (auto& mapping : g_objectConstraintMappings)
+    for (auto &mapping : g_objectConstraintMappings)
         mapping = ObjectConstraints{};
 
     // Create default equation
@@ -608,21 +649,24 @@ bool Objects::Init(void* glfwWindow)
     // Create double-buffered SSBOs for objects
     if (g_objectSSBO[0] == 0)
     {
-        while (glGetError() != GL_NO_ERROR);
+        while (glGetError() != GL_NO_ERROR)
+            ;
         glGenBuffers(2, g_objectSSBO);
         err = glGetError();
-        if (err != GL_NO_ERROR) return false;
+        if (err != GL_NO_ERROR)
+            return false;
 
         // Allocate buffer memory
         for (int i = 0; i < 2; i++)
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferData(GL_SHADER_STORAGE_BUFFER,
-                MAX_OBJECTS * sizeof(Object),
-                nullptr,
-                GL_DYNAMIC_COPY);
+                         MAX_OBJECTS * sizeof(Object),
+                         nullptr,
+                         GL_DYNAMIC_COPY);
             err = glGetError();
-            if (err != GL_NO_ERROR) return false;
+            if (err != GL_NO_ERROR)
+                return false;
         }
         g_useMapBuffer = false;
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -634,7 +678,8 @@ bool Objects::Init(void* glfwWindow)
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Object), &defaultObject);
             err = glGetError();
-            if (err != GL_NO_ERROR) return false;
+            if (err != GL_NO_ERROR)
+                return false;
         }
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
@@ -644,19 +689,26 @@ bool Objects::Init(void* glfwWindow)
     {
         glGenVertexArrays(2, g_renderVAO);
         GLenum err = glGetError();
-        if (err != GL_NO_ERROR) return false;
+        if (err != GL_NO_ERROR)
+            return false;
 
         SetupRenderVAOFromSSBO(g_renderVAO[0], g_objectSSBO[0]);
         SetupRenderVAOFromSSBO(g_renderVAO[1], g_objectSSBO[1]);
     }
 
     // Create additional SSBOs
-    if (g_allTokensSSBO == 0) glGenBuffers(1, &g_allTokensSSBO);
-    if (g_allConstantsSSBO == 0) glGenBuffers(1, &g_allConstantsSSBO);
-    if (g_mappingsSSBO == 0) glGenBuffers(1, &g_mappingsSSBO);
-    if (g_initialPosSSBO == 0) glGenBuffers(1, &g_initialPosSSBO);
-    if (g_constraintsSSBO == 0) glGenBuffers(1, &g_constraintsSSBO);
-    if (g_objectConstraintsSSBO == 0) glGenBuffers(1, &g_objectConstraintsSSBO);
+    if (g_allTokensSSBO == 0)
+        glGenBuffers(1, &g_allTokensSSBO);
+    if (g_allConstantsSSBO == 0)
+        glGenBuffers(1, &g_allConstantsSSBO);
+    if (g_mappingsSSBO == 0)
+        glGenBuffers(1, &g_mappingsSSBO);
+    if (g_initialPosSSBO == 0)
+        glGenBuffers(1, &g_initialPosSSBO);
+    if (g_constraintsSSBO == 0)
+        glGenBuffers(1, &g_constraintsSSBO);
+    if (g_objectConstraintsSSBO == 0)
+        glGenBuffers(1, &g_objectConstraintsSSBO);
 
     // Initialize collision properties buffer
     if (g_collisionPropsSSBO == 0)
@@ -664,21 +716,21 @@ bool Objects::Init(void* glfwWindow)
         glGenBuffers(1, &g_collisionPropsSSBO);
 
         // Initialize collision properties with defaults
-        for (auto& prop : g_collisionProperties)
+        for (auto &prop : g_collisionProperties)
         {
-            prop.enabled = 1;  // Collisions enabled by default
+            prop.enabled = 1; // Collisions enabled by default
             prop.shapeType = COLLISION_NONE;
-            prop.restitution = 0.7f;  // Default bounciness
-            prop.friction = 0.3f;     // Default friction
+            prop.restitution = 0.7f; // Default bounciness
+            prop.friction = 0.3f;    // Default friction
             prop.mass_factor = 1.0f;
             prop._pad1 = prop._pad2 = prop._pad3 = 0;
         }
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-            MAX_OBJECTS * sizeof(CollisionProperties),
-            g_collisionProperties.data(),
-            GL_DYNAMIC_DRAW);
+                     MAX_OBJECTS * sizeof(CollisionProperties),
+                     g_collisionProperties.data(),
+                     GL_DYNAMIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
@@ -686,7 +738,8 @@ bool Objects::Init(void* glfwWindow)
     // g_contactBufferSSBO is initialized lazily when warm starting is enabled
 
     err = glGetError();
-    if (err != GL_NO_ERROR) return false;
+    if (err != GL_NO_ERROR)
+        return false;
 
     // Upload initial data to GPU
     UploadPackedEquationsToGPU();
@@ -695,11 +748,12 @@ bool Objects::Init(void* glfwWindow)
     // Upload equation mappings
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_mappingsSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-        MAX_EQUATIONS * sizeof(EquationMapping),
-        g_equationMappings.data(),
-        GL_DYNAMIC_DRAW);
+                 MAX_EQUATIONS * sizeof(EquationMapping),
+                 g_equationMappings.data(),
+                 GL_DYNAMIC_DRAW);
     err = glGetError();
-    if (err != GL_NO_ERROR) return false;
+    if (err != GL_NO_ERROR)
+        return false;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Load compute shader asynchronously
@@ -728,7 +782,7 @@ bool Objects::Init(void* glfwWindow)
                     glUseProgram(0);
                 }
             },
-            [](const std::string& error)
+            [](const std::string &error)
             {
                 std::cerr << "\n[Objects] Compute shader FAILED: " << error << std::endl;
                 g_computeShaderReady = false;
@@ -747,13 +801,13 @@ bool Objects::Init(void* glfwWindow)
                 g_programQuad = program;
                 g_quadShaderReady = true;
             },
-            [](const std::string& error)
+            [](const std::string &error)
             {
                 std::cerr << "\n[Objects] Quad shader FAILED: " << error << std::endl;
                 g_quadShaderReady = false;
             });
     }
-
+    InitPaintShader(g_width, g_height);
     return true;
 }
 
@@ -764,38 +818,47 @@ void Objects::Update(int inputIndex, int outputIndex)
 {
     UpdateShaderLoadingStatus();
 
-    if (g_programCompute == 0 || !g_computeShaderReady) return;
+    if (g_programCompute == 0 || !g_computeShaderReady)
+        return;
 
     // Clear OpenGL errors
     GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR);
+    while ((err = glGetError()) != GL_NO_ERROR)
+        ;
 
     // Validate compute shader program
     GLint isProgram = glIsProgram(g_programCompute);
-    if (!isProgram) return;
+    if (!isProgram)
+        return;
 
     GLint linkStatus;
     glGetProgramiv(g_programCompute, GL_LINK_STATUS, &linkStatus);
-    if (!linkStatus) return;
+    if (!linkStatus)
+        return;
 
     // Bind compute shader program
     glUseProgram(g_programCompute);
     err = glGetError();
-    if (err != GL_NO_ERROR) return;
+    if (err != GL_NO_ERROR)
+        return;
 
     // Set uniforms
     GLint equationModeLoc = glGetUniformLocation(g_programCompute, "uEquationMode");
-    if (equationModeLoc != -1) glUniform1i(equationModeLoc, 0);
+    if (equationModeLoc != -1)
+        glUniform1i(equationModeLoc, 0);
 
     GLint numObjectsLoc = glGetUniformLocation(g_programCompute, "uNumObjects");
-    if (numObjectsLoc != -1) glUniform1i(numObjectsLoc, g_numObjects);
+    if (numObjectsLoc != -1)
+        glUniform1i(numObjectsLoc, g_numObjects);
 
     //  Set collision system parameters
     GLint enableWarmStartLoc = glGetUniformLocation(g_programCompute, "uEnableWarmStart");
-    if (enableWarmStartLoc != -1) glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
+    if (enableWarmStartLoc != -1)
+        glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
 
     GLint maxContactIterationsLoc = glGetUniformLocation(g_programCompute, "uMaxContactIterations");
-    if (maxContactIterationsLoc != -1) glUniform1i(maxContactIterationsLoc, g_maxContactIterations);
+    if (maxContactIterationsLoc != -1)
+        glUniform1i(maxContactIterationsLoc, g_maxContactIterations);
 
     // Bind SSBOs for compute shader
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
@@ -820,24 +883,27 @@ void Objects::Update(int inputIndex, int outputIndex)
     // Dispatch compute shader
     int workGroupSize = 64;
     int numWorkGroups = (g_numObjects + workGroupSize - 1) / workGroupSize;
-    if (numWorkGroups < 1) numWorkGroups = 1;
+    if (numWorkGroups < 1)
+        numWorkGroups = 1;
 
     glDispatchCompute(numWorkGroups, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 
     // Clean up bindings
     glUseProgram(0);
-    for (int i = 0; i < 8; i++) glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, 0);
+    for (int i = 0; i < 8; i++)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, 0);
 }
 
 // ============================================================================
 // Add or retrieve equation ID for a given equation string
 // ============================================================================
-int Objects::AddOrGetEquation(const std::string& equationString, const ParsedEquation& eq)
+int Objects::AddOrGetEquation(const std::string &equationString, const ParsedEquation &eq)
 {
     // Return existing ID if equation already registered
     auto it = g_equationStringToID.find(equationString);
-    if (it != g_equationStringToID.end()) return it->second;
+    if (it != g_equationStringToID.end())
+        return it->second;
 
     // Serialize equation for GPU
     ParserContext context;
@@ -928,8 +994,8 @@ int Objects::AddOrGetEquation(const std::string& equationString, const ParsedEqu
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_mappingsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
-        MAX_EQUATIONS * sizeof(EquationMapping),
-        g_equationMappings.data());
+                    MAX_EQUATIONS * sizeof(EquationMapping),
+                    g_equationMappings.data());
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     return newID;
@@ -938,7 +1004,7 @@ int Objects::AddOrGetEquation(const std::string& equationString, const ParsedEqu
 // ============================================================================
 // Set equation for an object
 // ============================================================================
-void Objects::SetEquation(const std::string& equationString, const ParsedEquation& eq, int objectIndex)
+void Objects::SetEquation(const std::string &equationString, const ParsedEquation &eq, int objectIndex)
 {
     int eqID = AddOrGetEquation(equationString, eq);
 
@@ -957,8 +1023,8 @@ void Objects::SetEquation(const std::string& equationString, const ParsedEquatio
             {
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
                 glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                    objectIndex * sizeof(Object) + offsetof(Object, equationID),
-                    sizeof(int), &eqID);
+                                objectIndex * sizeof(Object) + offsetof(Object, equationID),
+                                sizeof(int), &eqID);
             }
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
@@ -976,7 +1042,7 @@ void Objects::UploadCpuDataToGpu()
 // ============================================================================
 // Fetch object data from GPU to CPU
 // ============================================================================
-void Objects::FetchToCPU(int sourceIndex, std::vector<Object>& out)
+void Objects::FetchToCPU(int sourceIndex, std::vector<Object> &out)
 {
     out.resize(g_numObjects);
     if (g_useMapBuffer && g_mappedSSBO[sourceIndex])
@@ -985,8 +1051,8 @@ void Objects::FetchToCPU(int sourceIndex, std::vector<Object>& out)
     {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[sourceIndex]);
         glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
-            g_numObjects * sizeof(Object),
-            out.data());
+                           g_numObjects * sizeof(Object),
+                           out.data());
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 }
@@ -996,7 +1062,8 @@ void Objects::FetchToCPU(int sourceIndex, std::vector<Object>& out)
 // ============================================================================
 void Objects::Draw(int sourceIndex)
 {
-    if (!g_programQuad) return;
+    if (!g_programQuad)
+        return;
 
     glUseProgram(g_programQuad);
     glBindVertexArray(g_renderVAO[sourceIndex]);
@@ -1034,9 +1101,9 @@ void Objects::AddObject()
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                g_numObjects * sizeof(Object),
-                sizeof(Object),
-                &newObject);
+                            g_numObjects * sizeof(Object),
+                            sizeof(Object),
+                            &newObject);
         }
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
@@ -1049,7 +1116,7 @@ void Objects::AddObject()
 // ============================================================================
 // Upload multiple objects at once
 // ============================================================================
-void Objects::UploadBulkObjects(const std::vector<Object>& objects, int startIndex)
+void Objects::UploadBulkObjects(const std::vector<Object> &objects, int startIndex)
 {
     if (startIndex < 0 || startIndex + static_cast<int>(objects.size()) > MAX_OBJECTS)
     {
@@ -1061,9 +1128,9 @@ void Objects::UploadBulkObjects(const std::vector<Object>& objects, int startInd
     if (g_useMapBuffer && g_mappedSSBO[0])
     {
         std::memcpy(&g_mappedSSBO[0][startIndex], objects.data(),
-            objects.size() * sizeof(Object));
+                    objects.size() * sizeof(Object));
         std::memcpy(&g_mappedSSBO[1][startIndex], objects.data(),
-            objects.size() * sizeof(Object));
+                    objects.size() * sizeof(Object));
     }
     else
     {
@@ -1071,9 +1138,9 @@ void Objects::UploadBulkObjects(const std::vector<Object>& objects, int startInd
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                startIndex * sizeof(Object),
-                objects.size() * sizeof(Object),
-                objects.data());
+                            startIndex * sizeof(Object),
+                            objects.size() * sizeof(Object),
+                            objects.data());
         }
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
@@ -1086,20 +1153,24 @@ void Objects::UploadBulkObjects(const std::vector<Object>& objects, int startInd
 // ============================================================================
 // Get direct pointer to object data (read-only)
 // ============================================================================
-const Object* Objects::GetObjectDataDirect(int sourceIndex)
+const Object *Objects::GetObjectDataDirect(int sourceIndex)
 {
-    if (sourceIndex < 0 || sourceIndex > 1) return nullptr;
-    if (g_useMapBuffer && g_mappedSSBO[sourceIndex]) return g_mappedSSBO[sourceIndex];
+    if (sourceIndex < 0 || sourceIndex > 1)
+        return nullptr;
+    if (g_useMapBuffer && g_mappedSSBO[sourceIndex])
+        return g_mappedSSBO[sourceIndex];
     return nullptr;
 }
 
 // ============================================================================
 // Get direct pointer to object data (mutable)
 // ============================================================================
-Object* Objects::GetObjectDataDirectMutable(int sourceIndex)
+Object *Objects::GetObjectDataDirectMutable(int sourceIndex)
 {
-    if (sourceIndex < 0 || sourceIndex > 1) return nullptr;
-    if (g_useMapBuffer && g_mappedSSBO[sourceIndex]) return g_mappedSSBO[sourceIndex];
+    if (sourceIndex < 0 || sourceIndex > 1)
+        return nullptr;
+    if (g_useMapBuffer && g_mappedSSBO[sourceIndex])
+        return g_mappedSSBO[sourceIndex];
     return nullptr;
 }
 
@@ -1121,13 +1192,14 @@ void Objects::RemoveObject(int index)
     // Remove constraints that reference the removed object
     for (int i = 0; i < g_numObjects; i++)
     {
-        if (i == removeIdx) continue;
+        if (i == removeIdx)
+            continue;
 
-        ObjectConstraints& pc = g_objectConstraintMappings[i];
+        ObjectConstraints &pc = g_objectConstraintMappings[i];
         for (int j = pc.numConstraints - 1; j >= 0; j--)
         {
             int globalIdx = pc.constraintOffset + j;
-            Constraint& c = g_allConstraints[globalIdx];
+            Constraint &c = g_allConstraints[globalIdx];
             if (c.type == CONSTRAINT_DISTANCE && c.targetObjectID == removeIdx)
                 RemoveConstraint(i, j);
         }
@@ -1155,18 +1227,18 @@ void Objects::RemoveObject(int index)
         Object lastObject;
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[0]);
         glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,
-            lastObjectIdx * sizeof(Object),
-            sizeof(Object),
-            &lastObject);
+                           lastObjectIdx * sizeof(Object),
+                           sizeof(Object),
+                           &lastObject);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
         for (int i = 0; i < 2; i++)
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                removeIdx * sizeof(Object),
-                sizeof(Object),
-                &lastObject);
+                            removeIdx * sizeof(Object),
+                            sizeof(Object),
+                            &lastObject);
         }
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
@@ -1179,11 +1251,11 @@ void Objects::RemoveObject(int index)
     // Update constraint references to the moved object
     for (int i = 0; i < g_numObjects - 1; i++)
     {
-        ObjectConstraints& pc = g_objectConstraintMappings[i];
+        ObjectConstraints &pc = g_objectConstraintMappings[i];
         for (int j = 0; j < pc.numConstraints; j++)
         {
             int globalIdx = pc.constraintOffset + j;
-            Constraint& c = g_allConstraints[globalIdx];
+            Constraint &c = g_allConstraints[globalIdx];
             if (c.type == CONSTRAINT_DISTANCE && c.targetObjectID == lastObjectIdx)
                 c.targetObjectID = removeIdx;
         }
@@ -1210,9 +1282,9 @@ void Objects::ResetToInitialConditions()
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[0]);
             glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                i * sizeof(Object) + offsetof(Object, equationID),
-                sizeof(int),
-                &preservedEqID);
+                               i * sizeof(Object) + offsetof(Object, equationID),
+                               sizeof(int),
+                               &preservedEqID);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
 
@@ -1234,9 +1306,9 @@ void Objects::ResetToInitialConditions()
             {
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[j]);
                 glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                    i * sizeof(Object),
-                    sizeof(Object),
-                    &resetObject);
+                                i * sizeof(Object),
+                                sizeof(Object),
+                                &resetObject);
             }
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
@@ -1249,7 +1321,7 @@ void Objects::ResetToInitialConditions()
 // ============================================================================
 // Update a single object's data from CPU
 // ============================================================================
-void Objects::UpdateObjectCPU(int index, const Object& newData)
+void Objects::UpdateObjectCPU(int index, const Object &newData)
 {
     if (index >= 0 && index < g_numObjects)
     {
@@ -1264,9 +1336,9 @@ void Objects::UpdateObjectCPU(int index, const Object& newData)
             {
                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
                 glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-                    index * sizeof(Object),
-                    sizeof(Object),
-                    &newData);
+                                index * sizeof(Object),
+                                sizeof(Object),
+                                &newData);
             }
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
@@ -1355,7 +1427,7 @@ void Objects::Cleanup()
     SafeDeleteBuffers(&g_constraintsSSBO, 1);
     SafeDeleteBuffers(&g_objectConstraintsSSBO, 1);
     SafeDeleteBuffers(&g_collisionPropsSSBO, 1);
-    SafeDeleteBuffers(&g_contactBufferSSBO, 1);  //  Delete contact buffer
+    SafeDeleteBuffers(&g_contactBufferSSBO, 1); //  Delete contact buffer
 
     // Clear all data structures
     g_numObjects = 0;
@@ -1375,12 +1447,248 @@ void Objects::Cleanup()
 }
 
 // ============================================================================
+// Initialize paint shader and related resources
+// ============================================================================
+void Objects::InitPaintShader(int screenWidth, int screenHeight)
+{
+    // Determine texture size (user‑set resolution or fallback to window size)
+    int texW = (g_paintWidth > 0) ? g_paintWidth : screenWidth;
+    int texH = (g_paintHeight > 0) ? g_paintHeight : screenHeight;
+
+    // Load paint.comp asynchronously
+    g_paintLoader.LoadComputeShaderAsync(
+        "paint.comp",
+        [](GLuint program)
+        {
+            g_paintShaderProgram = program;
+            g_paintShaderReady = true;
+            std::cout << "[AsyncLoader] Paint shader ready (ID: " << program << ")" << std::endl;
+        },
+        [](const std::string &error)
+        {
+            std::cerr << "[AsyncLoader] Paint shader FAILED: " << error << std::endl;
+            g_paintShaderReady = false;
+        });
+
+    // Create paint texture with chosen resolution
+    glGenTextures(1, &g_paintTexture);
+    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texW, texH);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create SSBOs for paint tokens and constants
+    glGenBuffers(1, &g_paintTokenSSBO);
+    glGenBuffers(1, &g_paintConstSSBO);
+
+    // Create fullscreen quad VAO and VBO
+    float verts[] = {
+        -1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1,
+        -1, -1, 0, 0, 1, 1, 1, 1, -1, 1, 0, 1};
+    glGenVertexArrays(1, &g_paintQuadVAO);
+    glGenBuffers(1, &g_paintQuadVBO);
+    glBindVertexArray(g_paintQuadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_paintQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
+    glBindVertexArray(0);
+
+    // Simple quad shader (draws the paint texture)
+    const char *quadVert = R"(
+        #version 430 core
+        layout(location=0) in vec2 pos;
+        layout(location=1) in vec2 uv;
+        out vec2 vUV;
+        void main() { vUV = uv; gl_Position = vec4(pos, 0, 1); }
+    )";
+    const char *quadFrag = R"(
+        #version 430 core
+        in vec2 vUV;
+        out vec4 FragColor;
+        uniform sampler2D uTex;
+        void main() { FragColor = texture(uTex, vUV); }
+    )";
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &quadVert, nullptr);
+    glCompileShader(vs);
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &quadFrag, nullptr);
+    glCompileShader(fs);
+    g_paintQuadProgram = glCreateProgram();
+    glAttachShader(g_paintQuadProgram, vs);
+    glAttachShader(g_paintQuadProgram, fs);
+    glLinkProgram(g_paintQuadProgram);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+}
+
+void Objects::ResizePaintTexture(int width, int height)
+{
+    if (g_paintTexture)
+    {
+        glDeleteTextures(1, &g_paintTexture);
+        g_paintTexture = 0;
+    }
+    glGenTextures(1, &g_paintTexture);
+    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Objects::SetPaintResolution(int width, int height)
+{
+    g_paintWidth = width;
+    g_paintHeight = height;
+    if (g_paintTexture)
+        ResizePaintTexture(width, height);
+}
+
+void Objects::SetPaintEquation(const std::vector<int> &tokens_r, const std::vector<float> &consts_r,
+                               const std::vector<int> &tokens_g, const std::vector<float> &consts_g,
+                               const std::vector<int> &tokens_b, const std::vector<float> &consts_b)
+{
+    g_paintTokens_r = tokens_r;
+    g_paintConsts_r = consts_r;
+    g_paintTokens_g = tokens_g;
+    g_paintConsts_g = consts_g;
+    g_paintTokens_b = tokens_b;
+    g_paintConsts_b = consts_b;
+    g_hasPaintEquation = true;
+
+    // Combine all tokens/constants into one buffer
+    std::vector<int> allTokens;
+    std::vector<float> allConsts;
+    allTokens.insert(allTokens.end(), tokens_r.begin(), tokens_r.end());
+    allTokens.insert(allTokens.end(), tokens_g.begin(), tokens_g.end());
+    allTokens.insert(allTokens.end(), tokens_b.begin(), tokens_b.end());
+    allConsts.insert(allConsts.end(), consts_r.begin(), consts_r.end());
+    allConsts.insert(allConsts.end(), consts_g.begin(), consts_g.end());
+    allConsts.insert(allConsts.end(), consts_b.begin(), consts_b.end());
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_paintTokenSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, allTokens.size() * sizeof(int), allTokens.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_paintConstSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, allConsts.size() * sizeof(float), allConsts.data(), GL_DYNAMIC_DRAW);
+}
+
+void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float camY, float zoom, int objectBufferIndex)
+{
+    // No paint equation set or shader not ready → nothing to draw
+    if (!g_hasPaintEquation || !g_paintShaderReady) return;
+
+    // ------------------------------------------------------------------------
+    // Paint resolution (user‑set via set_paint_resolution)
+    // Fallback to window size if not set
+    // ------------------------------------------------------------------------
+    int texW = (g_paintWidth > 0) ? g_paintWidth : screenWidth;
+    int texH = (g_paintHeight > 0) ? g_paintHeight : screenHeight;
+
+    // ------------------------------------------------------------------------
+    // Token/constant offsets for R, G, B channels
+    // (these are the same for all paint equations)
+    // ------------------------------------------------------------------------
+    int rOff = 0;
+    int rCount = (int)g_paintTokens_r.size();
+    int gOff = rCount;
+    int gCount = (int)g_paintTokens_g.size();
+    int bOff = rCount + gCount;
+    int bCount = (int)g_paintTokens_b.size();
+
+    int rConOff = 0;
+    int gConOff = (int)g_paintConsts_r.size();
+    int bConOff = gConOff + (int)g_paintConsts_g.size();
+
+    // ------------------------------------------------------------------------
+    // Orthographic projection parameters (exactly as in Camera::GetProjectionMatrix)
+    // halfHeight = zoom, halfWidth = zoom * aspect
+    // ------------------------------------------------------------------------
+    float aspect = (float)screenWidth / (float)screenHeight;
+    float halfHeight = zoom;
+    float halfWidth  = halfHeight * aspect;
+
+    glUseProgram(g_paintShaderProgram);
+
+    // ------------------------------------------------------------------------
+    // Bind SSBOs
+    // binding 0 : object data (read‑only)
+    // binding 2 : paint tokens
+    // binding 3 : paint constants
+    // ------------------------------------------------------------------------
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[objectBufferIndex]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_paintTokenSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_paintConstSSBO);
+
+    // Output texture (image unit 0)
+    glBindImageTexture(0, g_paintTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+
+    // ------------------------------------------------------------------------
+    // Camera and projection uniforms (analytical unproject)
+    // ------------------------------------------------------------------------
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uCameraX"), camX);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uCameraY"), camY);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uHalfWidth"), halfWidth);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uHalfHeight"), halfHeight);
+
+    // Screen dimensions (actual framebuffer size, for NDC conversion)
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uScreenWidth"), screenWidth);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uScreenHeight"), screenHeight);
+
+    // Paint texture dimensions (for dispatch and texel‑to‑screen stretching)
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTexWidth"), texW);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTexHeight"), texH);
+
+    // Simulation globals
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uNumObjects"), g_numObjects);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uTime"), g_simulationTime);
+
+    // Paint equation parameters
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uColorMode"), 0);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_r"), rOff);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_r"), rCount);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_r"), rConOff);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_g"), gOff);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_g"), gCount);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_g"), gConOff);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_b"), bOff);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_b"), bCount);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_b"), bConOff);
+
+    std::cout << "[Paint] camX=" << camX << " camY=" << camY 
+          << " halfW=" << halfWidth << " halfH=" << halfHeight 
+          << " screenW=" << screenWidth << " screenH=" << screenHeight << std::endl;
+
+    // ------------------------------------------------------------------------
+    // Dispatch the compute shader
+    // Work group size = 16x16, so ((texW+15)/16) groups in X, ((texH+15)/16) in Y
+    // This uses the paint resolution (texW/texH) – lower resolution = fewer groups = faster
+    // ------------------------------------------------------------------------
+    glDispatchCompute((texW + 15) / 16, (texH + 15) / 16, 1);
+
+    // Wait for compute writes to finish and ensure texture is ready for reading
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
+    // ------------------------------------------------------------------------
+    // Draw the paint texture as a fullscreen quad
+    // ------------------------------------------------------------------------
+    glUseProgram(g_paintQuadProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
+    glUniform1i(glGetUniformLocation(g_paintQuadProgram, "uTex"), 0);
+    glBindVertexArray(g_paintQuadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+// ============================================================================
 // Update shader loading status
 // ============================================================================
 void Objects::UpdateShaderLoadingStatus()
 {
     g_computeLoader.Update();
     g_quadLoader.Update();
+    g_paintLoader.Update();
 }
 
 // ============================================================================
@@ -1404,7 +1712,7 @@ bool Objects::IsQuadShaderReady()
 // ============================================================================
 bool Objects::AreAllShadersReady()
 {
-    return g_computeShaderReady && g_quadShaderReady;
+    return g_computeShaderReady && g_quadShaderReady && g_paintShaderReady;
 }
 
 // ============================================================================
@@ -1414,7 +1722,8 @@ float Objects::GetShaderLoadProgress()
 {
     float computeProgress = g_computeLoader.GetProgress();
     float quadProgress = g_quadLoader.GetProgress();
-    return (computeProgress + quadProgress) / 2.0f;
+    float paintProgress = g_paintLoader.GetProgress();
+    return (computeProgress + quadProgress + paintProgress) / 3.0f;
 }
 
 // ============================================================================
@@ -1422,9 +1731,14 @@ float Objects::GetShaderLoadProgress()
 // ============================================================================
 std::string Objects::GetShaderLoadStatusMessage()
 {
-    if (!g_computeShaderReady) return "[1/2] " + g_computeLoader.GetStatusMessage();
-    else if (!g_quadShaderReady) return "[2/2] " + g_quadLoader.GetStatusMessage();
-    else return "All shaders ready!";
+    if (!g_computeShaderReady)
+        return "[1/3] " + g_computeLoader.GetStatusMessage();
+    else if (!g_quadShaderReady)
+        return "[2/3] " + g_quadLoader.GetStatusMessage();
+    else if (!g_paintShaderReady)
+        return "[3/3] " + g_paintLoader.GetStatusMessage();
+    else
+        return "All shaders ready!";
 }
 
 // ============================================================================
@@ -1434,46 +1748,49 @@ std::string Objects::GetShaderLoadStatusMessage()
 // Enable or disable collisions for an object
 void Objects::SetCollisionEnabled(int objectIndex, bool enabled)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
     g_collisionProperties[objectIndex].enabled = enabled ? 1 : 0;
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-        objectIndex * sizeof(CollisionProperties),
-        sizeof(CollisionProperties),
-        &g_collisionProperties[objectIndex]);
+                    objectIndex * sizeof(CollisionProperties),
+                    sizeof(CollisionProperties),
+                    &g_collisionProperties[objectIndex]);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 // Set collision shape for an object
 void Objects::SetCollisionShape(int objectIndex, CollisionShape shape)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
     g_collisionProperties[objectIndex].shapeType = static_cast<int>(shape);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-        objectIndex * sizeof(CollisionProperties),
-        sizeof(CollisionProperties),
-        &g_collisionProperties[objectIndex]);
+                    objectIndex * sizeof(CollisionProperties),
+                    sizeof(CollisionProperties),
+                    &g_collisionProperties[objectIndex]);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 // Set collision material properties for an object
 void Objects::SetCollisionProperties(int objectIndex, float restitution, float friction)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
 
     g_collisionProperties[objectIndex].restitution = clamp(restitution, 0.0f, 1.0f);
     g_collisionProperties[objectIndex].friction = clamp(friction, 0.0f, 1.0f);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,
-        objectIndex * sizeof(CollisionProperties),
-        sizeof(CollisionProperties),
-        &g_collisionProperties[objectIndex]);
+                    objectIndex * sizeof(CollisionProperties),
+                    sizeof(CollisionProperties),
+                    &g_collisionProperties[objectIndex]);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
@@ -1489,7 +1806,8 @@ CollisionProperties Objects::GetCollisionProperties(int objectIndex)
 // Enable or disable collisions between two specific objects
 void Objects::EnableCollisionBetween(int obj1, int obj2, bool enable)
 {
-    if (obj1 < 0 || obj1 >= MAX_OBJECTS || obj2 < 0 || obj2 >= MAX_OBJECTS) return;
+    if (obj1 < 0 || obj1 >= MAX_OBJECTS || obj2 < 0 || obj2 >= MAX_OBJECTS)
+        return;
 
     g_collisionMatrix[obj1][obj2] = enable;
     g_collisionMatrix[obj2][obj1] = enable;
@@ -1498,6 +1816,7 @@ void Objects::EnableCollisionBetween(int obj1, int obj2, bool enable)
 // Check if collisions are enabled for an object
 bool Objects::IsCollisionEnabled(int objectIndex)
 {
-    if (objectIndex < 0 || objectIndex >= g_numObjects) return false;
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return false;
     return g_collisionProperties[objectIndex].enabled == 1;
 }
