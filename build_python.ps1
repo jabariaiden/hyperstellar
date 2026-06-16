@@ -67,7 +67,7 @@ try {
         Write-Host "   Building..." -ForegroundColor Gray
         cmake --build . --config Release
 
-        $pydFile = Get-ChildItem -Recurse -Filter "stellar.pyd" | Select-Object -First 1
+        $pydFile = Get-ChildItem -Recurse -Filter "stellar*.pyd" | Select-Object -First 1
         if ($pydFile) {
             $targetDir = "..\hyperstellar\src\hyperstellar\_native\windows-x64"
             mkdir $targetDir -Force
