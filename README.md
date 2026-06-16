@@ -109,7 +109,151 @@ while not sim.should_close():
     sim.render()
     sim.process_input()
 ```
+### 3 body system
+```python 
+"""
+============================================================================
+THREE‑BODY FIGURE‑EIGHT DEMO – Stellar Engine
+============================================================================
+This demo simulates the famous Chenciner–Montgomery figure‑eight solution
+to the three‑body problem. Three equal‑mass bodies chase each other in a
+stable, repeating figure‑eight orbit.
 
+The paint shader creates a dynamic background that visualises the
+gravitational potential field of the three bodies, giving a smooth
+glow effect around each object.
+
+Controls:
+  • WASD – pan the camera
+  • Scroll or QE – zoom in/out
+  • ESC – close the window
+
+Performance note: paint resolution is set to 80×60 for smooth
+performance on integrated graphics.
+============================================================================
+"""
+
+import hyperstellar as se
+
+# --------------------------------------------------------------------------
+# Simulation setup
+# --------------------------------------------------------------------------
+sim = se.Simulation(
+    headless=False,
+    width=1024,
+    height=768,
+    title="Three‑Body Figure‑Eight – Stellar Engine",
+    enable_grid=False       # Grid disabled for a cleaner visual
+)
+
+# Wait for shaders to compile (async loading)
+print("Loading shaders...")
+while not sim.are_all_shaders_ready():
+    sim.update_shader_loading()
+print("Shaders ready.")
+
+# Remove any default objects
+while sim.object_count() > 0:
+    sim.remove_object(0)
+
+# Optimisation: paint shader runs at a lower resolution for performance
+# This creates a 80×60 pixel texture that is upscaled to the window
+sim.set_paint_resolution(80, 60)
+
+# --------------------------------------------------------------------------
+# Three‑body initial conditions (figure‑eight orbit)
+# from Chenciner & Montgomery (2000)
+# --------------------------------------------------------------------------
+G, M = 1.0, 1.0  # Gravitational constant and mass (scaled for nice orbits)
+
+# Each body: x, y, vx, vy, r, g, b (position, velocity, colour)
+# The colours are static and define each planet's appearance.
+bodies = [
+    (-0.97000436, 0.24308753,  0.46620368,  0.43236573,  1.0, 0.3, 0.3),  # Red
+    ( 0.97000436,-0.24308753,  0.46620368,  0.43236573,  0.3, 1.0, 0.3),  # Green
+    ( 0.0,        0.0,        -0.93240737, -0.86473146,  0.3, 0.6, 1.0),  # Blue
+]
+
+# Create the three objects
+ids = []
+for x, y, vx, vy, r, g, b in bodies:
+    obj = sim.add_object(
+        x=x, y=y, vx=vx, vy=vy,
+        mass=M,
+        skin=se.SkinType.CIRCLE,
+        size=0.3,              # Visual radius
+        r=r, g=g, b=b, a=1.0   # Static colour (opaque)
+    )
+    ids.append(obj)
+
+# --------------------------------------------------------------------------
+# Gravity equations (N‑body with mutual attraction)
+# --------------------------------------------------------------------------
+# Each object feels the combined gravitational pull of the other two.
+# The equation uses `let` bindings for readability and performance.
+for idx, (a, b) in enumerate([(1,2), (0,2), (0,1)]):
+    sim.set_equation(ids[idx], f"""
+        let dx_a = p[{a}].x - x;
+        let dy_a = p[{a}].y - y;
+        let dx_b = p[{b}].x - x;
+        let dy_b = p[{b}].y - y;
+        let r2_a = dx_a*dx_a + dy_a*dy_a;
+        let r2_b = dx_b*dx_b + dy_b*dy_b;
+        ax = {G}*{M}*dx_a / (r2_a ^ 1.5) + {G}*{M}*dx_b / (r2_b ^ 1.5);
+        ay = {G}*{M}*dy_a / (r2_a ^ 1.5) + {G}*{M}*dy_b / (r2_b ^ 1.5);
+        angular = 0;  // No rotation for point masses
+    """)
+
+# --------------------------------------------------------------------------
+# Paint shader – dynamic background (gravitational potential field)
+# --------------------------------------------------------------------------
+# The paint shader runs every frame and creates a visual glow around each body.
+# It computes the distance from each pixel to each body and sums their
+# contributions to create a smooth field effect.
+#
+# Variables:
+#   px, py     – world‑space pixel coordinates (camera‑aligned)
+#   p[0].x, etc – positions of the three bodies
+#   t          – simulation time (unused here, but available)
+# --------------------------------------------------------------------------
+sim.paint("""
+    // Distance from current pixel to each body
+    let dx0 = p[0].x - px;
+    let dy0 = p[0].y - py;
+    let dx1 = p[1].x - px;
+    let dy1 = p[1].y - py;
+    let dx2 = p[2].x - px;
+    let dy2 = p[2].y - py;
+
+    // Softened distances (avoid singularities near the bodies)
+    let d0 = sqrt(dx0*dx0 + dy0*dy0 + 0.01);
+    let d1 = sqrt(dx1*dx1 + dy1*dy1 + 0.01);
+    let d2 = sqrt(dx2*dx2 + dy2*dy2 + 0.01);
+
+    // Total gravitational potential field
+    let field = 0.4 / d0 + 0.4 / d1 + 0.4 / d2;
+
+    // Map field strength to colour (red‑green‑blue glow)
+    color.r = field * 0.6;
+    color.g = field * 1.2;   // Green is dominant for a warm glow
+    color.b = field * 0.3;
+""")
+
+# --------------------------------------------------------------------------
+# Main loop
+# --------------------------------------------------------------------------
+print("Running three‑body demo. Close the window to exit.")
+print("Controls: WASD to pan, scroll to zoom.")
+
+while not sim.should_close():
+    sim.update(1.0 / 60.0)   # Fixed timestep for stability
+    sim.render()
+    sim.process_input()      # Handle keyboard/mouse input
+
+sim.cleanup()
+
+
+```
 ### 50,000 particle ring (GPU benchmark)
 
 ```python
