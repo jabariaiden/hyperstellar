@@ -1,4 +1,4 @@
-# Hyperstellar
+﻿# Hyperstellar
 ### Write math equations in Python. Run them on the GPU.
 
 Buckle up, because this isn't just another preset physics engine. Hyperstellar gives you the mathematical language to define *any* dynamical system, then GPU-accelerates it to thousands of frames per second. From orbital mechanics to fluid dynamics — if you can write the equation, you can simulate it.
@@ -16,7 +16,7 @@ Most Python simulation tools make you choose between ease and performance. CPU-b
 | Write in Python | ✓ | ✓ | ✗ (own lang) | ✓ (decorators) |
 | No shader code | ✓ | ✓ | ✓ | ✓ |
 | Real-time visualization | ✓ built-in | ✗ | partial | ✗ |
-| Per-pixel paint shader | ✓ | ✗ | ✓ | ✗ |
+| Per-pixel paint shader | ✓ | ✗ | ✗ | ✗ |
 | Visual editor app | ✓ (beta) | ✗ | ✗ | ✗ |
 | Collision system | ✓ | ✗ | ✗ | partial |
 | pip install | ✓ | ✓ | ✓ | ✓ |
@@ -81,267 +81,65 @@ while not sim.should_close():
     sim.process_input()
 ```
 
-### Ball pit demo
+### Bouncing ball
 
 ```python
-"""
-============================================================================
-BALL PIT DEMO – Hyperstellar Engine
-============================================================================
-This demo simulates hundreds of falling balls that pile up, bounce, and
-settle – demonstrating the engine's collision system, constraints, and
-real‑time performance.
-============================================================================
-"""
-
 import hyperstellar as se
-import random
 
-# --------------------------------------------------------------------------
-# Simulation setup
-# --------------------------------------------------------------------------
-sim = se.Simulation(
-    headless=False,
-    enable_grid=False,
-    width=1400,
-    height=1000,
-    title="Ball Pit – Collision Test"
-)
-
-# Wait for shaders to load
+sim = se.Simulation(headless=False, enable_grid=False, width=1400, height=1000)
 while not sim.are_all_shaders_ready():
     sim.update_shader_loading()
-
-# Clear default objects
 while sim.object_count() > 0:
     sim.remove_object(0)
 
-# Enable warm starting for better collision stability
-sim.set_collision_parameters(True, 20)
+ball = sim.add_object(x=0, y=20, mass=0.1, skin=se.SkinType.CIRCLE, size=0.8)
+platform = sim.add_object(x=0, y=-1, mass=1e12, skin=se.SkinType.RECTANGLE,
+                          height=3.0, width=10.0)
 
-# --------------------------------------------------------------------------
-# Generate falling balls
-# --------------------------------------------------------------------------
-NUM_BALLS = 500           # depending on performance and your computer, can increase for more stress test
-COLS = 25                 # Number of columns in the initial grid
-SPACING = 1.2             # Gap between balls
-X_OFFSET = -15            # Center the grid
+sim.set_collision_properties(ball, restitution=0.8, friction=0.5)
+sim.set_collision_properties(platform, restitution=0.7, friction=0.5)
+sim.set_collision_shape(ball, se.CollisionShape.CIRCLE)
+sim.set_collision_shape(platform, se.CollisionShape.AABB)
 
-for i in range(NUM_BALLS):
-    col = i % COLS
-    row = i // COLS
-
-    # Slight random jitter for natural look
-    jitter_x = random.uniform(-0.1, 0.1)
-    jitter_y = random.uniform(-0.1, 0.1)
-
-    x = X_OFFSET + (col * SPACING) + jitter_x
-    y = 40 + (row * SPACING) + jitter_y  # Spawn high up, fall into frame
-
-    # Random colour and size
-    r, g, b = random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)
-    radius = random.uniform(1.0, 3.0)
-
-    ball = sim.add_object(x=x, y=y, vy=0,mass=0.1,skin=se.SkinType.CIRCLE,size=radius,r=r, g=g, b=b, a=1.0)
-
-    # Perfect elasticity, zero friction for pure bouncing
-    sim.set_collision_properties(ball, restitution=1.0, friction=0.0)
-    sim.set_collision_shape(ball, se.CollisionShape.CIRCLE)
-
-    # Gravity only (no horizontal forces)
-    sim.set_equation(ball, "ax = 0; ay = -9.8;")
-
-# Boundaries (floor, left wall, right wall)
-# Floor
-floor = sim.add_object(
-    x=0, y=0,
-    mass=1e12, skin=se.SkinType.RECTANGLE,
-    height=4.0, width=70, rotation=0.0,
-    r=1.0, g=1.0, b=1.0, a=1.0
-)
-sim.set_collision_properties(floor, restitution=0.7, friction=0.5)
-sim.set_collision_shape(floor, se.CollisionShape.AABB)
-sim.set_equation(floor, "ax = 0; ay = 0;")  # Static
-
-# Left wall
-left_wall = sim.add_object(
-    x=-25, y=24,
-    mass=1e12, skin=se.SkinType.RECTANGLE,
-    height=70, width=4.0,
-    r=0.3, g=1.0, b=1.0, a=1.0
-)
-sim.set_collision_properties(left_wall, restitution=0.7, friction=0.5)
-sim.set_collision_shape(left_wall, se.CollisionShape.AABB)
-sim.set_equation(left_wall, "ax = 0; ay = 0;")
-
-# Right wall
-right_wall = sim.add_object(
-    x=25, y=24,
-    mass=1e12, skin=se.SkinType.RECTANGLE,
-    height=70, width=4.0,
-    r=0.3, g=1.0, b=1.0, a=1.0
-)
-sim.set_collision_properties(right_wall, restitution=0.7, friction=0.5)
-sim.set_collision_shape(right_wall, se.CollisionShape.AABB)
-sim.set_equation(right_wall, "ax = 0; ay = 0;")
-
-sim.set_camera_zoom(100)
-
-print("Running ball pit demo. Close the window to exit.")
-print("Controls: WASD to pan, scroll to zoom.")
+sim.set_equation(ball, "0, -9.8, 0, 1.0, 0.3, 0.3, 1.0")
+sim.set_equation(platform, "0, 0, 0, 0.3, 1.0, 1.0, 1.0")
 
 while not sim.should_close():
-    sim.update(0.016)      # ~60 FPS physics step
+    sim.update(0.067)
     sim.render()
     sim.process_input()
-
-sim.cleanup()
 ```
-### 3 body system
-```python 
-"""
-============================================================================
-THREE‑BODY FIGURE‑EIGHT DEMO – Stellar Engine
-============================================================================
-This demo simulates the famous Chenciner–Montgomery figure‑eight solution
-to the three‑body problem. Three equal‑mass bodies chase each other in a
-stable, repeating figure‑eight orbit.
 
-The paint shader creates a dynamic background that visualises the
-gravitational potential field of the three bodies, giving a smooth
-glow effect around each object.
+### 50,000 particle ring (GPU benchmark)
 
-Controls:
-  • WASD – pan the camera
-  • Scroll or QE – zoom in/out
-  • ESC – close the window
-
-Performance note: paint resolution is set to 80×60 for smooth
-performance on integrated graphics.
-============================================================================
-"""
-
+```python
 import hyperstellar as se
+import math
 
-# --------------------------------------------------------------------------
-# Simulation setup
-# --------------------------------------------------------------------------
-sim = se.Simulation(
-    headless=False,
-    width=1024,
-    height=768,
-    title="Three‑Body Figure‑Eight – Stellar Engine",
-    enable_grid=False       # Grid disabled for a cleaner visual
-)
-
-# Wait for shaders to compile (async loading)
-print("Loading shaders...")
+N, dt = 50000, 0.0006
+sim = se.Simulation(headless=False)
 while not sim.are_all_shaders_ready():
     sim.update_shader_loading()
-print("Shaders ready.")
-
-# Remove any default objects
 while sim.object_count() > 0:
     sim.remove_object(0)
 
-# Optimisation: paint shader runs at a lower resolution for performance
-# This creates a 80×60 pixel texture that is upscaled to the window
-sim.set_paint_resolution(80, 60)
+R = (N * 0.4) / (2 * math.pi)
+K, V = 1.5, math.sqrt(1.5 * R)
 
-# --------------------------------------------------------------------------
-# Three‑body initial conditions (figure‑eight orbit)
-# from Chenciner & Montgomery (2000)
-# --------------------------------------------------------------------------
-G, M = 1.0, 1.0  # Gravitational constant and mass (scaled for nice orbits)
-
-# Each body: x, y, vx, vy, r, g, b (position, velocity, colour)
-# The colours are static and define each planet's appearance.
-bodies = [
-    (-0.97000436, 0.24308753,  0.46620368,  0.43236573,  1.0, 0.3, 0.3),  # Red
-    ( 0.97000436,-0.24308753,  0.46620368,  0.43236573,  0.3, 1.0, 0.3),  # Green
-    ( 0.0,        0.0,        -0.93240737, -0.86473146,  0.3, 0.6, 1.0),  # Blue
-]
-
-# Create the three objects
-ids = []
-for x, y, vx, vy, r, g, b in bodies:
-    obj = sim.add_object(
-        x=x, y=y, vx=vx, vy=vy,
-        mass=M,
-        skin=se.SkinType.CIRCLE,
-        size=0.3,              # Visual radius
-        r=r, g=g, b=b, a=1.0   # Static colour (opaque)
-    )
-    ids.append(obj)
-
-# --------------------------------------------------------------------------
-# Gravity equations (N‑body with mutual attraction)
-# --------------------------------------------------------------------------
-# Each object feels the combined gravitational pull of the other two.
-# The equation uses `let` bindings for readability and performance.
-for idx, (a, b) in enumerate([(1,2), (0,2), (0,1)]):
-    sim.set_equation(ids[idx], f"""
-        let dx_a = p[{a}].x - x;
-        let dy_a = p[{a}].y - y;
-        let dx_b = p[{b}].x - x;
-        let dy_b = p[{b}].y - y;
-        let r2_a = dx_a*dx_a + dy_a*dy_a;
-        let r2_b = dx_b*dx_b + dy_b*dy_b;
-        ax = {G}*{M}*dx_a / (r2_a ^ 1.5) + {G}*{M}*dx_b / (r2_b ^ 1.5);
-        ay = {G}*{M}*dy_a / (r2_a ^ 1.5) + {G}*{M}*dy_b / (r2_b ^ 1.5);
-        angular = 0;  // No rotation for point masses
-    """)
-
-# --------------------------------------------------------------------------
-# Paint shader – dynamic background (gravitational potential field)
-# --------------------------------------------------------------------------
-# The paint shader runs every frame and creates a visual glow around each body.
-# It computes the distance from each pixel to each body and sums their
-# contributions to create a smooth field effect.
-#
-# Variables:
-#   px, py     – world‑space pixel coordinates (camera‑aligned)
-#   p[0].x, etc – positions of the three bodies
-#   t          – simulation time (unused here, but available)
-# --------------------------------------------------------------------------
-sim.paint("""
-    // Distance from current pixel to each body
-    let dx0 = p[0].x - px;
-    let dy0 = p[0].y - py;
-    let dx1 = p[1].x - px;
-    let dy1 = p[1].y - py;
-    let dx2 = p[2].x - px;
-    let dy2 = p[2].y - py;
-
-    // Softened distances (avoid singularities near the bodies)
-    let d0 = sqrt(dx0*dx0 + dy0*dy0 + 0.01);
-    let d1 = sqrt(dx1*dx1 + dy1*dy1 + 0.01);
-    let d2 = sqrt(dx2*dx2 + dy2*dy2 + 0.01);
-
-    // Total gravitational potential field
-    let field = 0.4 / d0 + 0.4 / d1 + 0.4 / d2;
-
-    // Map field strength to colour (red‑green‑blue glow)
-    color.r = field * 0.6;
-    color.g = field * 1.2;   // Green is dominant for a warm glow
-    color.b = field * 0.3;
-""")
-
-# --------------------------------------------------------------------------
-# Main loop
-# --------------------------------------------------------------------------
-print("Running three‑body demo. Close the window to exit.")
-print("Controls: WASD to pan, scroll to zoom.")
+for i in range(N):
+    angle = (i / N) * 2 * math.pi
+    x, y = math.cos(angle) * R + R, math.sin(angle) * R
+    vx, vy = -math.sin(angle) * V, math.cos(angle) * V
+    obj = sim.add_object(x=x, y=y, vx=vx, vy=vy, size=0.15)
+    sim.set_collision_enabled(obj, False)
+    sim.set_equation(obj, f"-(x-{R})*{K/R}, -y*{K/R}, 0, 0.5, 0.2, 1.0, 1.0")
 
 while not sim.should_close():
-    sim.update(1.0 / 60.0)   # Fixed timestep for stability
+    sim.update(dt)
     sim.render()
-    sim.process_input()      # Handle keyboard/mouse input
-
-sim.cleanup()
-
-
+    sim.process_input()
 ```
+
 ---
 
 ## Core Concepts

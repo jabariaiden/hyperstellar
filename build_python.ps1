@@ -103,6 +103,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
+$newName = $wheel.Name -replace "py3-none-any", "cp313-cp313-win_amd64"
+Rename-Item $wheel.FullName $newName
+Write-Host "   ✓ Renamed to $newName" -ForegroundColor Green
+
+$wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
 Write-Host "   ✓ Built: $($wheel.Name)" -ForegroundColor Green
 
 Write-Host "`n=== Done ===" -ForegroundColor Cyan
