@@ -25,6 +25,9 @@
     <ClCompile Include="C:\Users\user\hyperstellar-public\src\vectorfield.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\user\hyperstellar-public\src\script_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="C:\Users\user\hyperstellar-public\python_module\bindings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

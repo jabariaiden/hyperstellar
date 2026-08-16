@@ -108,13 +108,50 @@ static bool isRightAssoc(TokenType t) { return t == TOKEN_POW; }
 // ============================================================================
 
 static const std::unordered_map<TokenType, int> s_precedence = {
-    {TOKEN_ADD, 2}, {TOKEN_SUB, 2}, {TOKEN_LT, 2}, {TOKEN_LE, 2}, {TOKEN_GT, 2}, {TOKEN_GE, 2}, {TOKEN_EQ, 2}, {TOKEN_NE, 2}, {TOKEN_MUL, 3}, {TOKEN_DIV, 3}, {TOKEN_POW, 5}};
+    {TOKEN_ADD, 2}, {TOKEN_SUB, 2}, 
+    {TOKEN_LT, 2}, {TOKEN_LE, 2}, 
+    {TOKEN_GT, 2}, {TOKEN_GE, 2}, 
+    {TOKEN_EQ, 2}, {TOKEN_NE, 2}, 
+    {TOKEN_MUL, 3}, {TOKEN_DIV, 3}, 
+    {TOKEN_POW, 5}};
 
 static const std::unordered_map<TokenType, int> s_arity = {
-    {TOKEN_NEG, 1}, {TOKEN_SIN, 1}, {TOKEN_COS, 1}, {TOKEN_TAN, 1}, {TOKEN_SQRT, 1}, {TOKEN_LOG, 1}, {TOKEN_EXP, 1}, {TOKEN_ABS, 1}, {TOKEN_FLOOR, 1}, {TOKEN_CEIL, 1}, {TOKEN_FRAC, 1}, {TOKEN_SIGN, 1}, {TOKEN_STEP, 1}, {TOKEN_REAL, 1}, {TOKEN_IMAG, 1}, {TOKEN_CONJ, 1}, {TOKEN_ARG, 1}, {TOKEN_MIN, 2}, {TOKEN_MAX, 2}, {TOKEN_MOD, 2}, {TOKEN_ATAN2, 2}, {TOKEN_CLAMP, 3}, {TOKEN_DOT, 2}, {TOKEN_CROSS, 2}, {TOKEN_NORM, 1}, {TOKEN_SELECT, 3}, {TOKEN_NOISE, 2}, {TOKEN_RAND, 0}, {TOKEN_SUM_NEIGHBORS, 2}, {TOKEN_COMP, -1}}; // -1 means variable arity
+    {TOKEN_NEG, 1}, {TOKEN_SIN, 1}, 
+    {TOKEN_COS, 1}, {TOKEN_TAN, 1}, 
+    {TOKEN_SQRT, 1}, {TOKEN_LOG, 1}, 
+    {TOKEN_EXP, 1}, {TOKEN_ABS, 1}, 
+    {TOKEN_FLOOR, 1}, {TOKEN_CEIL, 1}, 
+    {TOKEN_FRAC, 1}, {TOKEN_SIGN, 1}, 
+    {TOKEN_STEP, 1}, {TOKEN_REAL, 1}, 
+    {TOKEN_IMAG, 1}, {TOKEN_CONJ, 1}, 
+    {TOKEN_ARG, 1}, {TOKEN_MIN, 2}, 
+    {TOKEN_MAX, 2}, {TOKEN_MOD, 2}, 
+    {TOKEN_ATAN2, 2}, {TOKEN_CLAMP, 3}, 
+    {TOKEN_DOT, 2}, {TOKEN_CROSS, 2}, 
+    {TOKEN_NORM, 1}, {TOKEN_SELECT, 3}, 
+    {TOKEN_NOISE, 2}, {TOKEN_RAND, 0}, 
+    {TOKEN_SUM_NEIGHBORS, 2}, {TOKEN_COMP, -1}}; // -1 means variable arity
 
 static const std::unordered_map<std::string, TokenType> s_funcMap = {
-    {"sin", TOKEN_SIN}, {"cos", TOKEN_COS}, {"tan", TOKEN_TAN}, {"sqrt", TOKEN_SQRT}, {"log", TOKEN_LOG}, {"exp", TOKEN_EXP}, {"abs", TOKEN_ABS}, {"min", TOKEN_MIN}, {"max", TOKEN_MAX}, {"clamp", TOKEN_CLAMP}, {"floor", TOKEN_FLOOR}, {"ceil", TOKEN_CEIL}, {"frac", TOKEN_FRAC}, {"mod", TOKEN_MOD}, {"atan2", TOKEN_ATAN2}, {"real", TOKEN_REAL}, {"imag", TOKEN_IMAG}, {"conj", TOKEN_CONJ}, {"arg", TOKEN_ARG}, {"sign", TOKEN_SIGN}, {"step", TOKEN_STEP}, {"dot", TOKEN_DOT}, {"cross", TOKEN_CROSS}, {"norm", TOKEN_NORM}, {"length", TOKEN_NORM}, {"select", TOKEN_SELECT}, {"noise", TOKEN_NOISE}, {"rand", TOKEN_RAND}, {"sum_neighbors", TOKEN_SUM_NEIGHBORS}, {"comp", TOKEN_COMP}};
+    {"sin", TOKEN_SIN}, {"cos", TOKEN_COS}, 
+    {"tan", TOKEN_TAN}, {"sqrt", TOKEN_SQRT}, 
+    {"log", TOKEN_LOG}, {"exp", TOKEN_EXP}, 
+    {"abs", TOKEN_ABS}, {"min", TOKEN_MIN}, 
+    {"max", TOKEN_MAX}, {"clamp", TOKEN_CLAMP}, 
+    {"floor", TOKEN_FLOOR}, {"ceil", TOKEN_CEIL}, 
+    {"frac", TOKEN_FRAC}, {"mod", TOKEN_MOD}, 
+    {"atan2", TOKEN_ATAN2}, {"real", TOKEN_REAL}, 
+    {"imag", TOKEN_IMAG}, {"conj", TOKEN_CONJ}, 
+    {"arg", TOKEN_ARG}, {"sign", TOKEN_SIGN}, 
+    {"step", TOKEN_STEP}, {"dot", TOKEN_DOT}, 
+    {"cross", TOKEN_CROSS}, {"norm", TOKEN_NORM}, 
+    {"length", TOKEN_NORM}, {"select", TOKEN_SELECT}, 
+    {"noise", TOKEN_NOISE}, {"rand", TOKEN_RAND}, 
+    {"sample_prev_r", TOKEN_SAMPLE_PREV_R},{"sample_prev_g", TOKEN_SAMPLE_PREV_G},
+    {"sample_prev_b", TOKEN_SAMPLE_PREV_B},{"sample_prev_a", TOKEN_SAMPLE_PREV_A},
+    {"avg_prev_r", TOKEN_AVG_PREV_R},{"avg_prev_g", TOKEN_AVG_PREV_G},
+    {"avg_prev_b", TOKEN_AVG_PREV_B},{"avg_prev_a", TOKEN_AVG_PREV_A},
+    {"sum_neighbors", TOKEN_SUM_NEIGHBORS}, {"comp", TOKEN_COMP}};
 
 // ============================================================================
 // DERIVATIVE PARSER
@@ -828,7 +865,7 @@ static std::vector<Token> substituteTokens(const std::vector<Token> &tokens,
             Token newTok = tok;
             // Substitute inside the tensor argument (first sub‑block)
             newTok.comp_tensor_tokens = substituteTokens(tok.comp_tensor_tokens, symtab);
-            // Indices remain unchanged (they are literals)
+
             newTok.comp_indices = tok.comp_indices;
             result.push_back(newTok);
         }

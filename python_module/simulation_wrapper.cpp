@@ -7,6 +7,7 @@
 #include "../include/axis.h"
 #include "../include/camera.h"
 #include "../include/globals.h"
+#include "script_manager.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -106,6 +107,12 @@ GLuint CreateAxisShader()
     return shaderProgram;
 }
 
+void SimulationWrapper::set_paint_script(int script_id)
+{
+    ensure_initialized();
+    Objects::SetPaintScript(script_id);
+}
+
 static int key_name_to_code(const std::string &name)
 {
     // Single letters A-Z
@@ -165,6 +172,106 @@ static int key_name_to_code(const std::string &name)
             return GLFW_KEY_F1 + (num - 1);
     }
     return -1; // unknown
+}
+
+// ============================================================================
+// Scratchpad
+// ============================================================================
+
+int SimulationWrapper::create_scratchpad(size_t size) {
+    ensure_initialized();
+    return Objects::CreateScratchpad(size);
+}
+
+void SimulationWrapper::destroy_scratchpad(int id) {
+    ensure_initialized();
+    Objects::DestroyScratchpad(id);
+}
+
+void SimulationWrapper::upload_scratchpad(int id, const std::vector<float>& data) {
+    ensure_initialized();
+    Objects::UploadScratchpadData(id, data.data(), data.size());
+}
+
+std::vector<float> SimulationWrapper::map_scratchpad(int id) {
+    ensure_initialized();
+    if (!Objects::IsValidScratchpad(id)) return {};
+    float* ptr = (float*)Objects::MapScratchpad(id, GL_READ_ONLY);
+    if (!ptr) return {};
+    size_t count = Objects::GetScratchpadSize(id);
+    std::vector<float> result(ptr, ptr + count);
+    Objects::UnmapScratchpad(id);
+    return result;
+}
+
+size_t SimulationWrapper::scratchpad_size(int id) {
+    ensure_initialized();
+    return Objects::GetScratchpadSize(id);
+}
+
+bool SimulationWrapper::is_valid_scratchpad(int id) {
+    ensure_initialized();
+    return Objects::IsValidScratchpad(id);
+}
+
+// ============================================================================
+// Signal Queue
+// ============================================================================
+
+void SimulationWrapper::set_signal_queue_capacity(size_t capacity) {
+    ensure_initialized();
+    Objects::SetSignalQueueCapacity(capacity);
+}
+
+void SimulationWrapper::set_signal_queue_overflow_policy(int policy) {
+    ensure_initialized();
+    Objects::SetSignalQueueOverflowPolicy(policy);
+}
+
+void SimulationWrapper::clear_signal_queue() {
+    ensure_initialized();
+    Objects::ClearSignalQueue();
+}
+
+size_t SimulationWrapper::get_signal_queue_count() {
+    ensure_initialized();
+    return Objects::GetSignalQueueCount();
+}
+
+// ============================================================================
+// Agent Dispatch
+// ============================================================================
+
+void SimulationWrapper::dispatch_agent(int agent_id, bool clear_after) {
+    ensure_initialized();
+    Objects::DispatchAgent(agent_id, clear_after);
+}
+
+void SimulationWrapper::dispatch_all_agents(bool clear_after) {
+    ensure_initialized();
+    auto agent_ids = scriptManager.getAgentIDs();
+    for (int id : agent_ids) {
+        Objects::DispatchAgent(id, false); // don't clear per agent
+    }
+    if (clear_after) {
+        Objects::ClearSignalQueue();
+    }
+}
+
+// ============================================================================
+// Agent Registration
+// ============================================================================
+
+int SimulationWrapper::register_agent(const std::string& source) {
+    ensure_initialized();
+    int id = scriptManager.registerScript(source);
+    scriptManager.markAsAgent(id);
+    return id;
+}
+
+std::vector<int> SimulationWrapper::get_agent_ids() {
+    ensure_initialized();
+    return scriptManager.getAgentIDs();
 }
 
 // Constructor: Initialize simulation with optional graphics
@@ -266,6 +373,8 @@ bool SimulationWrapper::init_headless()
         std::cerr << "Failed to initialize object system" << std::endl;
         return false;
     }
+    Objects::SetScriptManager(&scriptManager);
+    scriptManager.setAsGlobal();
 
     m_initialized = true;
     return true;
@@ -411,6 +520,8 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
         std::cerr << "Failed to initialize object system" << std::endl;
         return false;
     }
+    Objects::SetScriptManager(&scriptManager);
+    scriptManager.setAsGlobal();
 
     m_initialized = true;
     return true;
@@ -555,7 +666,8 @@ void SimulationWrapper::update(float dt)
 
     const float FIXED_STEP = 0.001f;
     static float accumulator = 0.0f;
-    accumulator += dt;
+    float scaled_dt = dt * m_speed;
+    accumulator += scaled_dt; // accumulator accumulates scaled time
 
     int stepCount = 0;
     const int MAX_STEPS_PER_FRAME = 20;
@@ -628,7 +740,7 @@ void SimulationWrapper::update(float dt)
                 glUniform1i(maxContactIterationsLoc, collision_params.second);
 
             // Run Compute Shader
-            Objects::Update(m_currentBuffer, 1 - m_currentBuffer);
+            Objects::Update(m_currentBuffer, 1 - m_currentBuffer, FIXED_STEP);
             m_currentBuffer = 1 - m_currentBuffer;
 
             glUseProgram(0);
@@ -654,15 +766,13 @@ void SimulationWrapper::paint(const std::string &equation)
     ctx.registerVariable("py", ParserContext::DOMAIN_SPATIAL, false);
 
     ParsedEquation parsed = ParseEquation(equation, ctx);
-
-    // Serialise only the R, G, B components
-    std::unordered_map<float, int> cm;
     GPUSerializedEquation gpu = serializeEquationForGPU(parsed);
 
     Objects::SetPaintEquation(
         gpu.tokenBuffer_r, gpu.constantBuffer_r,
         gpu.tokenBuffer_g, gpu.constantBuffer_g,
-        gpu.tokenBuffer_b, gpu.constantBuffer_b);
+        gpu.tokenBuffer_b, gpu.constantBuffer_b,
+        gpu.tokenBuffer_a, gpu.constantBuffer_a);
 }
 
 // ============================================================================
@@ -897,9 +1007,9 @@ int SimulationWrapper::add_object(
     newObject.visualSkinType = static_cast<int>(skin);
     newObject.collisionShapeType = 0; // COLLISION_NONE (will be auto-assigned)
     newObject.equationID = 0;         // Default equation
-    newObject._pad1 = 0;
     newObject.color = glm::vec4(r, g, b, a);
     newObject.collisionData = glm::vec4(0.0f);
+    newObject.scriptID = -1;
 
     // Set visualData based on skin type - WITH INTELLIGENT DEFAULTS
     switch (skin)
@@ -968,8 +1078,10 @@ void SimulationWrapper::update_object(
     float vx, float vy,
     float mass, float charge,
     float rotation, float angular_velocity,
+    float size,
     float width, float height,
-    float r, float g, float b, float a)
+    float r, float g, float b, float a,
+    int polygon_sides)
 {
     ensure_initialized();
 
@@ -994,8 +1106,8 @@ void SimulationWrapper::update_object(
         // Update visualData based on current skin type
         if (skinType == 0) // CIRCLE
         {
-            // For circles: width parameter is radius
-            p.visualData.x = width; // radius
+            p.visualData.x = size; // radius
+            p.visualData.y = 0.0f;
             p.visualData.z = rotation;
             p.visualData.w = angular_velocity;
         }
@@ -1008,9 +1120,10 @@ void SimulationWrapper::update_object(
         }
         else if (skinType == 2) // POLYGON
         {
-            // For polygons: width parameter is radius, preserve sides
-            p.visualData.x = width; // radius
-            // Keep existing polygon sides (visualData.y)
+            p.visualData.x = size; // circumradius
+            if (polygon_sides > 0)
+                p.visualData.y = static_cast<float>(polygon_sides);
+            // else keep existing sides
             p.visualData.z = rotation;
             p.visualData.w = angular_velocity;
         }
@@ -1223,24 +1336,26 @@ void SimulationWrapper::batch_update(const std::vector<BatchUpdateData> &updates
         p.charge = update.charge;
         p.color = glm::vec4(update.r, update.g, update.b, update.a);
 
-        // Update visualData based on current skin type
-        if (skinType == 0)
-        {                                  // CIRCLE
-            p.visualData.x = update.width; // radius
+        if (skinType == 0) // CIRCLE
+        {
+            p.visualData.x = update.size;
+            p.visualData.y = 0.0f;
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
         }
-        else if (skinType == 1)
-        { // RECTANGLE
+        else if (skinType == 1) // RECTANGLE
+        {
             p.visualData.x = update.width;
             p.visualData.y = update.height;
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
         }
-        else if (skinType == 2)
-        {                                  // POLYGON
-            p.visualData.x = update.width; // radius
-            // Keep existing polygon sides (don't update from BatchUpdateData)
+        else if (skinType == 2) // POLYGON
+        {
+            p.visualData.x = update.size;
+            if (update.polygon_sides > 0)
+                p.visualData.y = static_cast<float>(update.polygon_sides);
+            // else keep existing
             p.visualData.z = update.rotation;
             p.visualData.w = update.angular_velocity;
         }
@@ -1375,6 +1490,22 @@ float SimulationWrapper::get_angular_velocity(int index) const
         return objects[index].visualData.w;
 
     return 0.0f;
+}
+
+// script JIT system
+int SimulationWrapper::register_script(const std::string &source)
+{
+    return scriptManager.registerScript(source);
+}
+
+void SimulationWrapper::set_script(int objectIndex, int scriptId)
+{
+    ensure_initialized();
+    if (objectIndex < 0 || objectIndex >= Objects::GetNumObjects())
+    {
+        throw std::runtime_error("Invalid object index");
+    }
+    Objects::SetScriptID(objectIndex, scriptId);
 }
 
 // ============================================================================

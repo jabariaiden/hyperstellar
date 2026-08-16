@@ -1,10 +1,14 @@
 # hyperstellar/src/hyperstellar/__init__.py
 import os
 import sys
+import time
 import platform
 from pathlib import Path
 
-__version__ = "1.0.0"
+# Import the decorator function from jit.py (module-level)
+from .jit import script as _script_func
+
+__version__ = "1.5.0"
 
 # Platform detection
 system = platform.system().lower()
@@ -42,21 +46,68 @@ if system == "windows":
     except Exception:
         pass
 
-# Import native module
+# ----------------------------------------------------------------------
+# Determine if shader cache already exists (to decide whether to print warning)
+# ----------------------------------------------------------------------
+cache_dir = None
+if system == "windows":
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        cache_dir = Path(local_appdata) / "hyperstellar" / "cache"
+else:  # Linux/macOS
+    home = os.environ.get("HOME")
+    if home:
+        cache_dir = Path(home) / ".cache" / "hyperstellar"
+
+has_cache = False
+if cache_dir and cache_dir.exists():
+    # Check if there's any .bin file (indicating a previous compilation)
+    has_cache = any(cache_dir.glob("*.bin"))
+
+# Print a warning only if no cache exists (first-time compilation)
+if not has_cache:
+    sys.stderr.write(
+        f"hyperstellar {__version__}: First-time shader compilation may take 30-60 seconds on older GPUs.\n"
+        f"         Subsequent runs will be instant (binary cache).\n"
+        f"Compiling... "
+    )
+    sys.stderr.flush()
+else:
+    sys.stderr.write(f"hyperstellar {__version__}: Loading cached shaders... ")
+    sys.stderr.flush()
+
+start_time = time.perf_counter()
+
+# Import native module (this triggers shader compilation if cache missing)
 try:
     sys.modules.pop('stellar', None)
     sys.path.insert(0, str(module_dir))
     import stellar as _stellar_module
     sys.path.pop(0)
 
+    # Expose everything from the native module
     for attr_name in dir(_stellar_module):
         if not attr_name.startswith('__'):
             globals()[attr_name] = getattr(_stellar_module, attr_name)
 
+    # Define __all__ (include script at module level)
     if hasattr(_stellar_module, '__all__'):
-        __all__ = _stellar_module.__all__
+        __all__ = _stellar_module.__all__ + ['script']
+    else:
+        __all__ = ['script']
 
-    print(f"✓ hyperstellar {__version__} loaded ({system} {arch})")
+    # Attach @sim.script decorator to the Simulation class
+    def _script_method(self, mode='object', debug=False):
+        """
+        Decorator that compiles a Python function into a GPU compute shader.
+
+        Use as: @sim.script(mode='paint')
+        """
+        def decorator(func):
+            return _script_func(self, debug=debug, mode=mode)(func)
+        return decorator
+
+    Simulation.script = _script_method
 
 except ImportError as e:
     raise ImportError(
@@ -66,3 +117,8 @@ except ImportError as e:
     )
 except Exception as e:
     raise ImportError(f"Unexpected error loading hyperstellar: {e}")
+
+# Print completion time
+elapsed = time.perf_counter() - start_time
+sys.stderr.write(f" done in {elapsed:.1f}s.\n")
+sys.stderr.flush()

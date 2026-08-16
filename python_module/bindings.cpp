@@ -222,12 +222,14 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("charge", &BatchUpdateData::charge)
         .def_readwrite("rotation", &BatchUpdateData::rotation)
         .def_readwrite("angular_velocity", &BatchUpdateData::angular_velocity)
+        .def_readwrite("size", &BatchUpdateData::size) // radius for circle/polygon
         .def_readwrite("width", &BatchUpdateData::width)
         .def_readwrite("height", &BatchUpdateData::height)
         .def_readwrite("r", &BatchUpdateData::r)
         .def_readwrite("g", &BatchUpdateData::g)
         .def_readwrite("b", &BatchUpdateData::b)
-        .def_readwrite("a", &BatchUpdateData::a);
+        .def_readwrite("a", &BatchUpdateData::a)
+        .def_readwrite("polygon_sides", &BatchUpdateData::polygon_sides);
 
     // =========================================================================
     // CONSTRAINT TYPES
@@ -417,6 +419,11 @@ PYBIND11_MODULE(stellar, m)
                  >>> sim.update(dt=0.01)  # Update with 10ms time step
              )pbdoc")
 
+        .def("set_speed", &SimulationWrapper::set_speed, py::arg("speed"),
+             "Set speed multiplier (1.0 = normal). Higher values make simulation faster without affecting stability.")
+        .def("get_speed", &SimulationWrapper::get_speed,
+             "Get current speed multiplier.")
+
         // Object management
         .def("add_object", &SimulationWrapper::add_object,
              py::arg("x") = 0.0f, py::arg("y") = 0.0f,
@@ -452,27 +459,89 @@ PYBIND11_MODULE(stellar, m)
                  >>> obj_id = sim.add_object(x=10, y=5, mass=50, skin=SkinType.CIRCLE)
              )pbdoc")
 
+        // Full update with positional args (complete update)
         .def("update_object", &SimulationWrapper::update_object,
              py::arg("index"),
              py::arg("x"), py::arg("y"),
              py::arg("vx"), py::arg("vy"),
              py::arg("mass"), py::arg("charge"),
              py::arg("rotation"), py::arg("angular_velocity"),
+             py::arg("size"),
              py::arg("width"), py::arg("height"),
              py::arg("r"), py::arg("g"), py::arg("b"), py::arg("a"),
+             py::arg("polygon_sides") = 0,
              R"pbdoc(
-             Update all properties of an existing object.
-             
-             Args:
-                 index (int): Object ID
-                 x,y,vx,vy,mass,charge,rotation,angular_velocity: Updated properties
-                 width,height: Updated dimensions
-                 r,g,b,a: Updated color
-             )pbdoc")
+                Update all properties of an existing object.
+
+                Args:
+                    index (int): Object ID
+                    x, y, vx, vy, mass, charge, rotation, angular_velocity: Updated properties
+                    size (float): Radius for circles/polygons (ignored for rectangles)
+                    width, height (float): Dimensions for rectangles (ignored otherwise)
+                    r, g, b, a (float): Updated color
+                    polygon_sides (int): Number of sides for polygons (0 = keep existing)
+                )pbdoc")
+
+        // Partial update with kwargs (only specified properties change)
+        .def("update_object", [](SimulationWrapper &self, int index, const py::kwargs &kwargs)
+             {
+            // Fetch current state
+            ObjectState state = self.get_object(index);
+
+            // Convert kwargs to dict for easier access
+            py::dict kwargs_dict = kwargs;
+
+            // Helper to get float with default
+            auto get_float = [&](const char* key, float default_val) -> float {
+                if (kwargs_dict.contains(key)) {
+                    return py::cast<float>(kwargs_dict[key]);
+                }
+                return default_val;
+            };
+
+            auto get_int = [&](const char* key, int default_val) -> int {
+                if (kwargs_dict.contains(key)) {
+                    return py::cast<int>(kwargs_dict[key]);
+                }
+                return default_val;
+            };
+
+            float x = get_float("x", state.x);
+            float y = get_float("y", state.y);
+            float vx = get_float("vx", state.vx);
+            float vy = get_float("vy", state.vy);
+            float mass = get_float("mass", state.mass);
+            float charge = get_float("charge", state.charge);
+            float rotation = get_float("rotation", state.rotation);
+            float angular_velocity = get_float("angular_velocity", state.angular_velocity);
+            float size = get_float("size", state.radius);
+            float width = get_float("width", state.width);
+            float height = get_float("height", state.height);
+            float r = get_float("r", state.r);
+            float g = get_float("g", state.g);
+            float b = get_float("b", state.b);
+            float a = get_float("a", state.a);
+            int polygon_sides = get_int("polygon_sides", state.polygon_sides);
+
+            // Call the full update
+            self.update_object(index,
+                               x, y,
+                               vx, vy,
+                               mass, charge,
+                               rotation, angular_velocity,
+                               size,
+                               width, height,
+                               r, g, b, a,
+                               polygon_sides); }, py::arg("index"), R"pbdoc(
+            Update only specified properties. Properties not provided keep their current values.
+
+            Example:
+                >>> sim.update_object(0, x=1.0, r=0.5)  # only change x and red component
+                >>> sim.update_object(1, size=0.8)      # change radius of a circle
+            )pbdoc")
 
         // Batch operations
-        .def("batch_get", &SimulationWrapper::batch_get,
-             py::arg("indices"),
+        .def("batch_get", &SimulationWrapper::batch_get, py::arg("indices"),
              R"pbdoc(
              Get properties for multiple objects at once.
              
@@ -488,8 +557,7 @@ PYBIND11_MODULE(stellar, m)
                  >>>     print(f"x={state.x}, y={state.y}")
              )pbdoc")
 
-        .def("batch_update", &SimulationWrapper::batch_update,
-             py::arg("updates"),
+        .def("batch_update", &SimulationWrapper::batch_update, py::arg("updates"),
              R"pbdoc(
              Update multiple objects at once.
              
@@ -504,15 +572,11 @@ PYBIND11_MODULE(stellar, m)
                  >>> sim.batch_update(updates)
              )pbdoc")
 
-        .def("remove_object", &SimulationWrapper::remove_object,
-             py::arg("index"),
-             "Remove an object by ID")
+        .def("remove_object", &SimulationWrapper::remove_object, py::arg("index"), "Remove an object by ID")
 
-        .def("object_count", &SimulationWrapper::object_count,
-             "Get number of objects in simulation")
+        .def("object_count", &SimulationWrapper::object_count, "Get number of objects in simulation")
 
-        .def("get_object", &SimulationWrapper::get_object,
-             py::arg("index"),
+        .def("get_object", &SimulationWrapper::get_object, py::arg("index"),
              R"pbdoc(
              Get complete object state.
              
@@ -524,33 +588,20 @@ PYBIND11_MODULE(stellar, m)
              )pbdoc")
 
         // Convenience methods
-        .def("set_rotation", &SimulationWrapper::set_rotation,
-             py::arg("index"), py::arg("rotation"),
-             "Set rotation angle in radians")
+        .def("set_rotation", &SimulationWrapper::set_rotation, py::arg("index"), py::arg("rotation"), "Set rotation angle in radians")
 
-        .def("set_angular_velocity", &SimulationWrapper::set_angular_velocity,
-             py::arg("index"), py::arg("angular_velocity"),
-             "Set angular velocity in rad/s")
+        .def("set_angular_velocity", &SimulationWrapper::set_angular_velocity, py::arg("index"), py::arg("angular_velocity"), "Set angular velocity in rad/s")
 
-        .def("set_dimensions", &SimulationWrapper::set_dimensions,
-             py::arg("index"), py::arg("width"), py::arg("height"),
-             "Set width and height for rectangle objects")
+        .def("set_dimensions", &SimulationWrapper::set_dimensions, py::arg("index"), py::arg("width"), py::arg("height"), "Set width and height for rectangle objects")
 
-        .def("set_radius", &SimulationWrapper::set_radius,
-             py::arg("index"), py::arg("radius"),
-             "Set radius for circle/polygon objects")
+        .def("set_radius", &SimulationWrapper::set_radius, py::arg("index"), py::arg("radius"), "Set radius for circle/polygon objects")
 
-        .def("get_rotation", &SimulationWrapper::get_rotation,
-             py::arg("index"),
-             "Get rotation angle in radians")
+        .def("get_rotation", &SimulationWrapper::get_rotation, py::arg("index"), "Get rotation angle in radians")
 
-        .def("get_angular_velocity", &SimulationWrapper::get_angular_velocity,
-             py::arg("index"),
-             "Get angular velocity in rad/s")
+        .def("get_angular_velocity", &SimulationWrapper::get_angular_velocity, py::arg("index"), "Get angular velocity in rad/s")
 
         // Equations
-        .def("set_equation", &SimulationWrapper::set_equation,
-             py::arg("object_index"), py::arg("equation_string"),
+        .def("set_equation", &SimulationWrapper::set_equation, py::arg("object_index"), py::arg("equation_string"),
              R"pbdoc(
              Set physics equation for object.
              
@@ -568,25 +619,22 @@ PYBIND11_MODULE(stellar, m)
                  >>> sim.set_equation(0, "0.1*mass*(p[1].x - x)/distance^3")
              )pbdoc")
 
+        // Scripting JIT
+        .def("register_script", &SimulationWrapper::register_script, py::arg("source"), "Compile a Python script (source) and return script ID")
+        .def("set_script", &SimulationWrapper::set_script, py::arg("object_index"), py::arg("script_id"), "Assign a JIT script to an object (use -1 to revert to default DSL)")
+        .def("set_paint_script", &SimulationWrapper::set_paint_script, py::arg("script_id"), "Set a JIT script to run on the paint grid instead of the default paint equation.")
+
         // Constraints
-        .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint,
-             py::arg("object_index"), py::arg("constraint"),
-             "Add distance constraint between objects")
+        .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint, py::arg("object_index"), py::arg("constraint"), "Add distance constraint between objects")
 
-        .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint,
-             py::arg("object_index"), py::arg("constraint"),
-             "Add boundary constraint to object")
+        .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint, py::arg("object_index"), py::arg("constraint"), "Add boundary constraint to object")
 
-        .def("clear_constraints", &SimulationWrapper::clear_constraints,
-             py::arg("object_index"),
-             "Clear all constraints from object")
+        .def("clear_constraints", &SimulationWrapper::clear_constraints, py::arg("object_index"), "Clear all constraints from object")
 
-        .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints,
-             "Clear all constraints from all objects")
+        .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints, "Clear all constraints from all objects")
 
-        // Collision management
-        .def("set_collision_enabled", &SimulationWrapper::set_collision_enabled,
-             py::arg("index"), py::arg("enabled"),
+        // Collision management (individual setters for compatibility)
+        .def("set_collision_enabled", &SimulationWrapper::set_collision_enabled, py::arg("index"), py::arg("enabled"),
              R"pbdoc(
              Enable or disable collision detection for an object.
              
@@ -598,8 +646,7 @@ PYBIND11_MODULE(stellar, m)
                  >>> sim.set_collision_enabled(0, False)  # Disable collisions for object 0
              )pbdoc")
 
-        .def("set_collision_shape", &SimulationWrapper::set_collision_shape,
-             py::arg("index"), py::arg("shape"),
+        .def("set_collision_shape", &SimulationWrapper::set_collision_shape, py::arg("index"), py::arg("shape"),
              R"pbdoc(
              Set collision shape for an object.
              
@@ -613,8 +660,7 @@ PYBIND11_MODULE(stellar, m)
                  >>> sim.set_collision_shape(0, CollisionShape.CIRCLE)
              )pbdoc")
 
-        .def("set_collision_properties", &SimulationWrapper::set_collision_properties,
-             py::arg("index"), py::arg("restitution"), py::arg("friction"),
+        .def("set_collision_properties", &SimulationWrapper::set_collision_properties, py::arg("index"), py::arg("restitution"), py::arg("friction"),
              R"pbdoc(
              Set collision physical properties.
              
@@ -632,6 +678,49 @@ PYBIND11_MODULE(stellar, m)
                  >>> # Makes object 0 very bouncy with low friction
              )pbdoc")
 
+        // New unified collision setter
+        .def("set_collision", [](SimulationWrapper &self, int index, const py::kwargs &kwargs)
+             {
+            // Optional: set enabled
+            if (kwargs.contains("enabled")) {
+                bool enabled = py::cast<bool>(kwargs["enabled"]);
+                self.set_collision_enabled(index, enabled);
+            }
+            // Optional: set shape
+            if (kwargs.contains("shape")) {
+                PyCollisionShape shape = py::cast<PyCollisionShape>(kwargs["shape"]);
+                self.set_collision_shape(index, shape);
+            }
+            // Optional: set restitution and friction
+            if (kwargs.contains("restitution") && kwargs.contains("friction")) {
+                float restitution = py::cast<float>(kwargs["restitution"]);
+                float friction = py::cast<float>(kwargs["friction"]);
+                self.set_collision_properties(index, restitution, friction);
+            } else if (kwargs.contains("restitution")) {
+                // If only restitution given, keep current friction
+                float restitution = py::cast<float>(kwargs["restitution"]);
+                CollisionConfig config = self.get_collision_config(index);
+                self.set_collision_properties(index, restitution, config.friction);
+            } else if (kwargs.contains("friction")) {
+                // If only friction given, keep current restitution
+                float friction = py::cast<float>(kwargs["friction"]);
+                CollisionConfig config = self.get_collision_config(index);
+                self.set_collision_properties(index, config.restitution, friction);
+            } }, py::arg("index"), R"pbdoc(
+            Set collision properties for an object in a single call.
+            
+            Args:
+                index (int): Object ID
+                enabled (bool, optional): Enable/disable collisions
+                shape (CollisionShape, optional): Collision shape type
+                restitution (float, optional): Bounciness (0.0-1.0)
+                friction (float, optional): Friction (0.0-1.0)
+            
+            Example:
+                >>> sim.set_collision(0, shape=CollisionShape.CIRCLE, restitution=0.9, friction=0.1)
+                >>> sim.set_collision(1, enabled=False)
+        )")
+
         .def("get_collision_config", &SimulationWrapper::get_collision_config,
              py::arg("index"),
              R"pbdoc(
@@ -648,8 +737,7 @@ PYBIND11_MODULE(stellar, m)
                  >>> print(f"Restitution: {config.restitution}")
              )pbdoc")
 
-        .def("enable_collision_between", &SimulationWrapper::enable_collision_between,
-             py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
+        .def("enable_collision_between", &SimulationWrapper::enable_collision_between, py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
              R"pbdoc(
              Enable or disable collision detection between two specific objects.
              
@@ -665,8 +753,7 @@ PYBIND11_MODULE(stellar, m)
                  >>> # Objects 0 and 1 will pass through each other
              )pbdoc")
 
-        .def("is_collision_enabled", &SimulationWrapper::is_collision_enabled,
-             py::arg("index"),
+        .def("is_collision_enabled", &SimulationWrapper::is_collision_enabled, py::arg("index"),
              R"pbdoc(
              Check if collision detection is enabled for an object.
              
@@ -677,35 +764,31 @@ PYBIND11_MODULE(stellar, m)
                  bool: True if collisions are enabled
              )pbdoc")
 
-        // For set_collision_parameters (void return)
-        .def("set_collision_parameters", &SimulationWrapper::set_collision_parameters,
-             py::arg("enable_warm_start"), py::arg("max_contact_iterations"),
+        // Warm start and contact iterations (kept separate)
+        .def("set_collision_parameters", &SimulationWrapper::set_collision_parameters, py::arg("enable_warm_start"), py::arg("max_contact_iterations"),
              R"pbdoc(
-     Set global collision parameters.
-     
-     Args:
-         enable_warm_start (bool): Enable warm starting for contacts
-         max_contact_iterations (int): Maximum iterations for contact resolution (1-20)
-     )pbdoc")
+             Set global collision parameters (warm start and iteration count).
+             
+             Args:
+                 enable_warm_start (bool): Enable warm starting for contacts
+                 max_contact_iterations (int): Maximum iterations for contact resolution (1-20)
+             )pbdoc")
 
-        // For get_collision_parameters
         .def("get_collision_parameters", &SimulationWrapper::get_collision_parameters,
              R"pbdoc(
-     Get global collision parameters.
-     
-     Returns:
-         tuple: (enable_warm_start, max_contact_iterations)
-     )pbdoc")
+             Get global collision parameters.
+             
+             Returns:
+                 tuple: (enable_warm_start, max_contact_iterations)
+             )pbdoc")
 
         // Batch processing
         .def("run_batch", [](SimulationWrapper &self, const std::vector<BatchConfig> &configs, py::object callback)
              {
                 py::gil_scoped_release release;
-
                 if (callback.is_none()) {
                     self.run_batch(configs, nullptr);
-                }
-                else {
+                } else {
                     self.run_batch(configs,
                         [callback](int batch_idx, const std::vector<ObjectState>& results) {
                             py::gil_scoped_acquire acquire;
@@ -789,11 +872,11 @@ PYBIND11_MODULE(stellar, m)
                  filename (str): Input file path
              )pbdoc")
 
-        // Keyboard property (added)
+        // Keyboard property
         .def_property_readonly("keyboard", [](SimulationWrapper &self)
                                { return KeyboardMonitor(&self); }, "Keyboard state monitor (e.g., sim.keyboard.Z.pressed, sim.keyboard.Space.released)")
 
-        // Camera controls (added)
+        // Camera controls
         .def("set_camera_position", &SimulationWrapper::set_camera_position, py::arg("x"), py::arg("y"), "Set the camera position in world coordinates.")
         .def("get_camera_position", &SimulationWrapper::get_camera_position, "Return the current camera position as a tuple (x, y).")
         .def("set_camera_zoom", &SimulationWrapper::set_camera_zoom, py::arg("zoom"), "Set the camera zoom level (1.0 = default).")
@@ -801,5 +884,43 @@ PYBIND11_MODULE(stellar, m)
 
         // Properties
         .def_property_readonly("is_headless", &SimulationWrapper::is_headless, "Check if simulation is running in headless mode")
-        .def_property_readonly("is_initialized", &SimulationWrapper::is_initialized, "Check if simulation is fully initialized");
+        .def_property_readonly("is_initialized", &SimulationWrapper::is_initialized, "Check if simulation is fully initialized")
+
+        // Scratchpad
+        .def("create_scratchpad", &SimulationWrapper::create_scratchpad,
+         py::arg("size"), "Create a scratchpad buffer with given number of floats.")
+        .def("destroy_scratchpad", &SimulationWrapper::destroy_scratchpad,
+             py::arg("id"), "Destroy a scratchpad.")
+        .def("upload_scratchpad", &SimulationWrapper::upload_scratchpad,
+             py::arg("id"), py::arg("data"), "Upload a list of floats to scratchpad.")
+        .def("map_scratchpad", &SimulationWrapper::map_scratchpad,
+             py::arg("id"), "Return a list of floats from scratchpad (CPU copy).")
+        .def("scratchpad_size", &SimulationWrapper::scratchpad_size,
+             py::arg("id"), "Get number of elements in scratchpad.")
+        .def("is_valid_scratchpad", &SimulationWrapper::is_valid_scratchpad,
+             py::arg("id"), "Check if scratchpad ID is valid.")
+
+        // Signal queue
+        .def("set_signal_queue_capacity", &SimulationWrapper::set_signal_queue_capacity,
+             py::arg("capacity"), "Set the maximum number of pending signals.")
+        .def("set_signal_queue_overflow_policy", &SimulationWrapper::set_signal_queue_overflow_policy,
+             py::arg("policy"), "Set overflow policy: 0=drop, 1=block.")
+        .def("clear_signal_queue", &SimulationWrapper::clear_signal_queue,
+             "Clear all pending signals.")
+        .def("get_signal_queue_count", &SimulationWrapper::get_signal_queue_count,
+             "Get the number of pending signals.")
+
+        // Agent dispatch
+        .def("dispatch_agent", &SimulationWrapper::dispatch_agent,
+             py::arg("agent_id"), py::arg("clear_after") = true,
+             "Dispatch a specific agent over all pending signals for that agent.")
+        .def("dispatch_all_agents", &SimulationWrapper::dispatch_all_agents,
+             py::arg("clear_after") = true,
+             "Dispatch all registered agents over pending signals (each agent processes its own).")
+
+        // Agent registration
+        .def("register_agent", &SimulationWrapper::register_agent,
+             py::arg("source"), "Compile an agent shader and return its ID.")
+        .def("get_agent_ids", &SimulationWrapper::get_agent_ids,
+             "Return a list of all registered agent IDs.");
 }

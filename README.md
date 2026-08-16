@@ -260,7 +260,7 @@ sim.set_equation(obj, "real(conj(x + y*i) * (vx + vy*i)), imag(conj(x + y*i) * (
 
 **Operators:** `+`, `-`, `*`, `/`, `^` (power, right-associative)
 
-**Advanced:** 
+**Advanced:**
 
 | Function | Description |
 |---|---|
