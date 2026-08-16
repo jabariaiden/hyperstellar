@@ -8,7 +8,7 @@ from pathlib import Path
 # Import the decorator function from jit.py (module-level)
 from .jit import script as _script_func
 
-__version__ = "1.0.0"
+__version__ = "1.5.0"
 
 # Platform detection
 system = platform.system().lower()
