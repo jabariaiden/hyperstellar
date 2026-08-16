@@ -6,6 +6,7 @@ C:\Users\user\hyperstellar-public\src\parser.cpp;C:\Users\user\hyperstellar-publ
 C:\Users\user\hyperstellar-public\src\physics_system.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\physics_system.obj
 C:\Users\user\hyperstellar-public\src\utils.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\utils.obj
 C:\Users\user\hyperstellar-public\src\vectorfield.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\vectorfield.obj
+C:\Users\user\hyperstellar-public\src\script_manager.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\script_manager.obj
 C:\Users\user\hyperstellar-public\python_module\bindings.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\bindings.obj
 C:\Users\user\hyperstellar-public\python_module\simulation_wrapper.cpp;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\simulation_wrapper.obj
 C:\Users\user\hyperstellar-public\src\glad.c;C:\Users\user\hyperstellar-public\_build\stellar.dir\Release\glad.obj

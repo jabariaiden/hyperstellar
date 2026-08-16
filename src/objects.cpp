@@ -6,6 +6,7 @@
 #include "gpu_serializer.h"
 #include "constraints.h"
 #include "async_shader_loader.h"
+#include "script_manager.h"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
@@ -14,12 +15,57 @@
 #include <unordered_map>
 #include <map>
 #include <atomic>
+#include <cstdint>   // for uint32_t
+
+// ============================================================================
+// SCRATCHPAD AND SIGNAL QUEUE – new architecture
+// ============================================================================
+
+// Scratchpad storage
+struct Scratchpad {
+    GLuint buffer = 0;
+    size_t numElements = 0;
+    size_t offsetInPool = 0; // offset within the big pool (in floats)
+    bool valid = false;
+};
+
+static std::unordered_map<int, Scratchpad> g_scratchpads;
+static int g_nextScratchpadId = 0;
+static GLuint g_scratchpadPool = 0;      // single large SSBO
+static size_t g_scratchpadPoolSize = 0;  // total allocated size (in bytes)
+static bool g_scratchpadPoolDirty = false;
+
+// Maximum size of the scratchpad pool (64 MB)
+static const size_t MAX_SCRATCHPAD_POOL_SIZE = 64 * 1024 * 1024;
+
+// Signal queue
+static GLuint g_signalQueueBuffer = 0;
+static size_t g_signalQueueCapacity = 1024;
+static int g_signalQueueOverflowPolicy = 0; // 0=drop, 1=block
+static size_t g_signalQueueCount = 0; // read from GPU
+
+// Scratchpad binding point (consistent with shader)
+static const GLuint SCRATCHPAD_BINDING = 10;
+static const GLuint SIGNAL_QUEUE_BINDING = 11;
+
+// ============================================================================
+// EXISTING STATIC VARIABLES (unchanged)
+// ============================================================================
 
 // Static buffer IDs for double-buffered object data
 static GLuint g_objectSSBO[2] = {0, 0};
 static GLuint g_renderVAO[2] = {0, 0};
 static GLuint g_programCompute = 0;
 static GLuint g_programQuad = 0;
+
+// Paint double‑buffering (replaces single texture)
+static GLuint g_paintTexture[2] = {0, 0}; // two textures for double‑buffering
+static int g_paintWriteIdx = 0;           // currently writing to this texture index
+static int g_paintReadIdx = 1;            // currently reading from this texture index
+static int g_paintScriptID = -1;
+
+// Uniform location for the previous frame sampler
+static GLuint uPrevFrameLoc = 0;
 
 // Paint shader resources
 static int g_paintWidth = 0;
@@ -78,15 +124,34 @@ static bool g_computeShaderReady = false;
 static bool g_quadShaderReady = false;
 
 static GLuint g_paintShaderProgram = 0;
-static GLuint g_paintTexture = 0;
 static GLuint g_paintTokenSSBO = 0;
 static GLuint g_paintConstSSBO = 0;
 static GLuint g_paintQuadVAO = 0;
 static GLuint g_paintQuadVBO = 0;
 static GLuint g_paintQuadProgram = 0;
 static bool g_hasPaintEquation = false;
-static std::vector<int> g_paintTokens_r, g_paintTokens_g, g_paintTokens_b;
-static std::vector<float> g_paintConsts_r, g_paintConsts_g, g_paintConsts_b;
+static std::vector<int> g_paintTokens_r, g_paintTokens_g, g_paintTokens_b, g_paintTokens_a;
+static std::vector<float> g_paintConsts_r, g_paintConsts_g, g_paintConsts_b, g_paintConsts_a;
+
+static std::vector<int> g_scriptIDs(Objects::MAX_OBJECTS, -1);
+static std::unordered_map<int, std::vector<int>> g_scriptGroups;
+static bool g_groupsDirty = true;
+static ScriptManager *g_scriptManager = nullptr;
+
+// Static index SSBO for group dispatch (reused each frame)
+static GLuint g_indexSSBO = 0;
+
+// Paint camera tracking for pan/zoom compensation
+static glm::vec2 g_prevCamPos(0.0f, 0.0f);
+static float    g_prevZoom = 10.0f;   // default half‑height
+static bool     g_firstPaintFrame = true;
+
+// NEW: current read buffer index for agent dispatch
+static int g_currentReadBufferIndex = 0;
+
+// ============================================================================
+// HELPER FUNCTIONS (existing, unchanged)
+// ============================================================================
 
 // Helper function to safely delete buffers
 static void SafeDeleteBuffers(GLuint *buf, GLsizei n)
@@ -137,7 +202,6 @@ static Object CreateDefaultObjectInternal(int skinType, int objectIndex, int equ
     p.visualSkinType = skinType;
     p.collisionShapeType = COLLISION_NONE;
     p.equationID = equationID;
-    p._pad1 = 0;
 
     // Initialize with zeros - wrapper will set actual values
     p.position = glm::vec2(0.0f, 0.0f);
@@ -163,6 +227,7 @@ static Object CreateDefaultObjectInternal(int skinType, int objectIndex, int equ
     }
 
     p.collisionData = glm::vec4(0.0f);
+    p.scriptID = -1;
     return p;
 }
 
@@ -321,6 +386,47 @@ static void ClearContactBuffer()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
+static void rebuildScriptGroups()
+{
+    if (!g_groupsDirty)
+        return;
+    g_scriptGroups.clear();
+    for (int i = 0; i < g_numObjects; ++i)
+    {
+        int sid = g_scriptIDs[i];
+        g_scriptGroups[sid].push_back(i);
+    }
+    g_groupsDirty = false;
+}
+
+// ============================================================================
+// EXISTING OBJECTS METHODS (unchanged, except where noted)
+// ============================================================================
+
+void Objects::SetScriptID(int objectIndex, int scriptID)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
+    g_scriptIDs[objectIndex] = scriptID;
+    g_groupsDirty = true;
+}
+
+int Objects::GetScriptID(int objectIndex)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return -1;
+    return g_scriptIDs[objectIndex];
+}
+
+void Objects::SetScriptManager(ScriptManager *mgr)
+{
+    g_scriptManager = mgr;
+}
+
+void Objects::SetPaintScript(int scriptID)
+{
+    g_paintScriptID = scriptID;
+}
 // Compact constraint array by removing invalid constraints
 void Objects::CompactConstraintArray()
 {
@@ -340,7 +446,7 @@ void Objects::CompactConstraintArray()
     }
 
     // Update constraint offsets in object mappings
-    for (int i = 0; i < MAX_OBJECTS; i++)
+    for (int i = 0; i < Objects::MAX_OBJECTS; i++)
     {
         ObjectConstraints &mapping = g_objectConstraintMappings[i];
         if (mapping.numConstraints > 0)
@@ -520,7 +626,7 @@ void Objects::ClearConstraints(int objectIndex)
 // Clear all constraints from all objects
 void Objects::ClearAllConstraints()
 {
-    for (int i = 0; i < MAX_OBJECTS; i++)
+    for (int i = 0; i < Objects::MAX_OBJECTS; i++)
         g_objectConstraintMappings[i] = ObjectConstraints();
     g_allConstraints.clear();
     UploadConstraintsToGPU();
@@ -612,6 +718,111 @@ void Objects::GetCollisionParameters(bool &enableWarmStart, int &maxContactItera
     enableWarmStart = g_enableWarmStart;
     maxContactIterations = g_maxContactIterations;
 }
+// Set common uniforms for JIT shaders (bindings 0,1,9; uDt, uTime, uGroupCount, etc.)
+static void setCommonUniforms(GLuint program, float dt, int groupSize, int totalObjects)
+{
+    if (!program)
+        return;
+    glUniform1f(glGetUniformLocation(program, "uTime"), g_simulationTime);
+    glUniform1f(glGetUniformLocation(program, "uDt"), dt);
+    glUniform1i(glGetUniformLocation(program, "uNumObjects"), totalObjects);
+    glUniform1i(glGetUniformLocation(program, "uGroupCount"), groupSize);
+    glUniform1f(glGetUniformLocation(program, "k"), 1.0f);
+    glUniform1f(glGetUniformLocation(program, "b"), 0.1f);
+    glUniform1f(glGetUniformLocation(program, "g"), 9.81f);
+    glUniform2f(glGetUniformLocation(program, "uGravityDir"), 0.0f, -1.0f);
+    glUniform1f(glGetUniformLocation(program, "uRestitution"), 0.7f);
+    glUniform1f(glGetUniformLocation(program, "uCoupling"), 1.0f);
+    glUniform2f(glGetUniformLocation(program, "uExternalForce"), 0.0f, 0.0f);
+    glUniform1f(glGetUniformLocation(program, "uDriveFreq"), 1.0f);
+    glUniform1f(glGetUniformLocation(program, "uDriveAmp"), 0.0f);
+    glUniform1f(glGetUniformLocation(program, "uDerivativeEpsilon"), 1e-4f);
+}
+
+// Dispatch a group of objects with a specific compute program (JIT)
+static void dispatchGroupWithProgram(GLuint program,
+                                     const std::vector<int> &indices,
+                                     int inputIndex, int outputIndex,
+                                     float dt)
+{
+    if (program == 0 || indices.empty())
+        return;
+
+    glUseProgram(program);
+
+    // Bind object SSBOs (binding 0 and 1)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_objectSSBO[outputIndex]);
+
+    // Index SSBO (binding 9)
+    if (g_indexSSBO == 0)
+        glGenBuffers(1, &g_indexSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_indexSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+                 indices.size() * sizeof(int),
+                 indices.data(),
+                 GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, g_indexSSBO);
+
+    // ---- ADDED: Bind constraint and collision SSBOs ----
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, g_constraintsSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
+    if (g_contactBufferSSBO)  // only if warm starting is enabled
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, g_contactBufferSSBO);
+    // ----------------------------------------------------
+
+    // ---- NEW: Bind scratchpad pool (binding 10) and signal queue (binding 11) ----
+    if (g_scratchpadPool != 0)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+    if (g_signalQueueBuffer != 0)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
+    // ---------------------------------------------------------------------------
+
+    // Set group count and common uniforms
+    GLint countLoc = glGetUniformLocation(program, "uGroupCount");
+    if (countLoc != -1)
+        glUniform1i(countLoc, (int)indices.size());
+    setCommonUniforms(program, dt, (int)indices.size(), g_numObjects);
+
+    // ---- ADDED: Set collision‑related uniforms ----
+    GLint enableWarmStartLoc = glGetUniformLocation(program, "uEnableWarmStart");
+    if (enableWarmStartLoc != -1)
+        glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
+    GLint maxContactIterationsLoc = glGetUniformLocation(program, "uMaxContactIterations");
+    if (maxContactIterationsLoc != -1)
+        glUniform1i(maxContactIterationsLoc, g_maxContactIterations);
+    // -------------------------------------------------
+
+    // ---- NEW: Set signal‑queue uniforms for JIT object scripts ----
+    GLint capLoc = glGetUniformLocation(program, "uSignalQueueCapacity");
+    if (capLoc != -1)
+        glUniform1ui(capLoc, (GLuint)g_signalQueueCapacity);
+    GLint policyLoc = glGetUniformLocation(program, "uSignalQueueOverflowPolicy");
+    if (policyLoc != -1)
+        glUniform1i(policyLoc, g_signalQueueOverflowPolicy);
+    // -----------------------------------------------------------------
+
+    // ---- NEW: Set scratchpad offsets for JIT object scripts ----
+    GLint offsetLoc = glGetUniformLocation(program, "uScratchpadOffsets");
+    if (offsetLoc != -1) {
+        int offsets[16] = {0};
+        for (auto& pair : g_scratchpads) {
+            if (pair.first < 16)
+                offsets[pair.first] = (int)(pair.second.offsetInPool); // offset is already in floats
+        }
+        glUniform1iv(offsetLoc, 16, offsets);
+    }
+    // -------------------------------------------------------------
+
+    // Dispatch
+    int workGroupSize = 64;
+    int numWorkGroups = (indices.size() + workGroupSize - 1) / workGroupSize;
+    glDispatchCompute(numWorkGroups, 1, 1);
+
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+    glUseProgram(0);
+}
 
 // ============================================================================
 // Initialize the objects system
@@ -631,8 +842,8 @@ bool Objects::Init(void *glfwWindow)
     glDeleteBuffers(1, &testBuffer);
 
     // Initialize data structures
-    g_equationMappings.resize(MAX_EQUATIONS);
-    g_objectConstraintMappings.resize(MAX_OBJECTS);
+    g_equationMappings.resize(Objects::MAX_EQUATIONS);
+    g_objectConstraintMappings.resize(Objects::MAX_OBJECTS);
 
     for (auto &mapping : g_equationMappings)
         mapping = EquationMapping{};
@@ -644,7 +855,7 @@ bool Objects::Init(void *glfwWindow)
     ParserContext context;
     ParsedEquation defaultEq = ParseEquation("vx, vy, -k*x/mass, -k*y/mass, 0, 1, 0, 0, 1", context);
     int defaultEqID = AddOrGetEquation("default_zero", defaultEq);
-    g_numObjects = 1;
+    g_numObjects = 0;
 
     // Create double-buffered SSBOs for objects
     if (g_objectSSBO[0] == 0)
@@ -661,7 +872,7 @@ bool Objects::Init(void *glfwWindow)
         {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
             glBufferData(GL_SHADER_STORAGE_BUFFER,
-                         MAX_OBJECTS * sizeof(Object),
+                         Objects::MAX_OBJECTS * sizeof(Object),
                          nullptr,
                          GL_DYNAMIC_COPY);
             err = glGetError();
@@ -669,18 +880,6 @@ bool Objects::Init(void *glfwWindow)
                 return false;
         }
         g_useMapBuffer = false;
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-        // Initialize with default object
-        Object defaultObject = CreateDefaultObjectInternal(SKIN_CIRCLE, 0, defaultEqID);
-        for (int i = 0; i < 2; i++)
-        {
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_objectSSBO[i]);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Object), &defaultObject);
-            err = glGetError();
-            if (err != GL_NO_ERROR)
-                return false;
-        }
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
@@ -728,7 +927,7 @@ bool Objects::Init(void *glfwWindow)
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-                     MAX_OBJECTS * sizeof(CollisionProperties),
+                     Objects::MAX_OBJECTS * sizeof(CollisionProperties),
                      g_collisionProperties.data(),
                      GL_DYNAMIC_DRAW);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -748,7 +947,7 @@ bool Objects::Init(void *glfwWindow)
     // Upload equation mappings
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_mappingsSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-                 MAX_EQUATIONS * sizeof(EquationMapping),
+                 Objects::MAX_EQUATIONS * sizeof(EquationMapping),
                  g_equationMappings.data(),
                  GL_DYNAMIC_DRAW);
     err = glGetError();
@@ -808,91 +1007,120 @@ bool Objects::Init(void *glfwWindow)
             });
     }
     InitPaintShader(g_width, g_height);
+
+    // ---- NEW: initialise signal queue with default capacity ----
+    SetSignalQueueCapacity(1024); // default
+
+    // ---- NEW: allocate scratchpad pool with fixed maximum size ----
+    if (g_scratchpadPool == 0) {
+        glGenBuffers(1, &g_scratchpadPool);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_scratchpadPool);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SCRATCHPAD_POOL_SIZE, nullptr, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        // Bind the pool to binding point once (or each frame)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+    }
+
     return true;
 }
 
 // ============================================================================
 // Update object physics using compute shader
 // ============================================================================
-void Objects::Update(int inputIndex, int outputIndex)
+void Objects::Update(int inputIndex, int outputIndex, float dt)
 {
     UpdateShaderLoadingStatus();
+    rebuildScriptGroups();
 
-    if (g_programCompute == 0 || !g_computeShaderReady)
-        return;
-
-    // Clear OpenGL errors
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR)
-        ;
-
-    // Validate compute shader program
-    GLint isProgram = glIsProgram(g_programCompute);
-    if (!isProgram)
-        return;
-
-    GLint linkStatus;
-    glGetProgramiv(g_programCompute, GL_LINK_STATUS, &linkStatus);
-    if (!linkStatus)
-        return;
-
-    // Bind compute shader program
-    glUseProgram(g_programCompute);
-    err = glGetError();
-    if (err != GL_NO_ERROR)
-        return;
-
-    // Set uniforms
-    GLint equationModeLoc = glGetUniformLocation(g_programCompute, "uEquationMode");
-    if (equationModeLoc != -1)
-        glUniform1i(equationModeLoc, 0);
-
-    GLint numObjectsLoc = glGetUniformLocation(g_programCompute, "uNumObjects");
-    if (numObjectsLoc != -1)
-        glUniform1i(numObjectsLoc, g_numObjects);
-
-    //  Set collision system parameters
-    GLint enableWarmStartLoc = glGetUniformLocation(g_programCompute, "uEnableWarmStart");
-    if (enableWarmStartLoc != -1)
-        glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
-
-    GLint maxContactIterationsLoc = glGetUniformLocation(g_programCompute, "uMaxContactIterations");
-    if (maxContactIterationsLoc != -1)
-        glUniform1i(maxContactIterationsLoc, g_maxContactIterations);
-
-    // Bind SSBOs for compute shader
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_objectSSBO[outputIndex]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_allTokensSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_allConstantsSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, g_mappingsSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, g_constraintsSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
-
-    //  Bind contact buffer if warm starting is enabled
-    if (g_enableWarmStart)
+    // -------------------------------------------------------------
+    // 1 DSL dispatch
+    // -------------------------------------------------------------
+    if (g_programCompute && g_computeShaderReady)
     {
-        if (g_contactBufferSSBO == 0)
-        {
-            InitializeContactBuffer();
+        glUseProgram(g_programCompute);
+
+        // ---- Set all uniforms ----
+        glUniform1f(glGetUniformLocation(g_programCompute, "uDt"), dt);
+        glUniform1f(glGetUniformLocation(g_programCompute, "uTime"), g_simulationTime);
+        glUniform1f(glGetUniformLocation(g_programCompute, "k"), 1.0f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "b"), 0.1f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "g"), 9.81f);
+        glUniform2f(glGetUniformLocation(g_programCompute, "uGravityDir"), 0.0f, -1.0f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "uRestitution"), 0.7f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "uCoupling"), 1.0f);
+        glUniform2f(glGetUniformLocation(g_programCompute, "uExternalForce"), 0.0f, 0.0f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "uDriveFreq"), 1.0f);
+        glUniform1f(glGetUniformLocation(g_programCompute, "uDriveAmp"), 0.0f);
+        glUniform1i(glGetUniformLocation(g_programCompute, "uEquationMode"), 0);
+        glUniform1i(glGetUniformLocation(g_programCompute, "uNumObjects"), g_numObjects);
+        glUniform1i(glGetUniformLocation(g_programCompute, "uEnableWarmStart"), g_enableWarmStart ? 1 : 0);
+        glUniform1i(glGetUniformLocation(g_programCompute, "uMaxContactIterations"), g_maxContactIterations);
+
+        // ---- NEW: signal queue uniforms for object shaders ----
+        GLint capLoc = glGetUniformLocation(g_programCompute, "uSignalQueueCapacity");
+        if (capLoc != -1) glUniform1ui(capLoc, (GLuint)g_signalQueueCapacity);
+        GLint policyLoc = glGetUniformLocation(g_programCompute, "uSignalQueueOverflowPolicy");
+        if (policyLoc != -1) glUniform1i(policyLoc, g_signalQueueOverflowPolicy);
+
+        // ---- NEW: set scratchpad offsets ----
+        GLint offsetLoc = glGetUniformLocation(g_programCompute, "uScratchpadOffsets");
+        if (offsetLoc != -1) {
+            int offsets[16] = {0};
+            for (auto& pair : g_scratchpads) {
+                if (pair.first < 16)
+                    offsets[pair.first] = (int)(pair.second.offsetInPool); // offset already in floats
+            }
+            glUniform1iv(offsetLoc, 16, offsets);
         }
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, g_contactBufferSSBO);
+
+        // ---- Bind SSBOs (bindings 0–8) ----
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_objectSSBO[outputIndex]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_allTokensSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_allConstantsSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, g_mappingsSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, g_constraintsSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
+        if (g_enableWarmStart && g_contactBufferSSBO)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, g_contactBufferSSBO);
+
+        // ---- NEW: bind scratchpad pool (binding 10) and signal queue (binding 11) ----
+        if (g_scratchpadPool != 0)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+        if (g_signalQueueBuffer != 0)
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
+        // -------------------------------------------------------------
+
+        // ---- Dispatch over all objects ----
+        int workGroupSize = 64;
+        int numWorkGroups = (g_numObjects + workGroupSize - 1) / workGroupSize;
+        glDispatchCompute(numWorkGroups, 1, 1);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+        glUseProgram(0);
     }
 
-    // Dispatch compute shader
-    int workGroupSize = 64;
-    int numWorkGroups = (g_numObjects + workGroupSize - 1) / workGroupSize;
-    if (numWorkGroups < 1)
-        numWorkGroups = 1;
+    // -------------------------------------------------------------
+    // 2) JIT group overrides (overwrites results for JIT objects)
+    // -------------------------------------------------------------
+    if (g_scriptManager)
+    {
+        for (auto &pair : g_scriptGroups)
+        {
+            int sid = pair.first;
+            if (sid == -1)
+                continue; // skip DSL group
+            GLuint prog = g_scriptManager->getProgram(sid);
+            if (prog)
+            {
+                dispatchGroupWithProgram(prog, pair.second, inputIndex, outputIndex, dt);
+            }
+        }
+    }
 
-    glDispatchCompute(numWorkGroups, 1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-
-    // Clean up bindings
-    glUseProgram(0);
-    for (int i = 0; i < 8; i++)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, 0);
+    // ---- NEW: store the current read buffer for agents ----
+    g_currentReadBufferIndex = outputIndex;
 }
 
 // ============================================================================
@@ -911,7 +1139,7 @@ int Objects::AddOrGetEquation(const std::string &equationString, const ParsedEqu
 
     // Find available equation slot
     int newID = -1;
-    for (int i = 0; i < MAX_EQUATIONS; i++)
+    for (int i = 0; i < Objects::MAX_EQUATIONS; i++)
     {
         if (g_equationMappings[i].tokenCount_ax == 0 &&
             g_equationMappings[i].tokenCount_ay == 0 &&
@@ -994,7 +1222,7 @@ int Objects::AddOrGetEquation(const std::string &equationString, const ParsedEqu
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_mappingsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
-                    MAX_EQUATIONS * sizeof(EquationMapping),
+                    Objects::MAX_EQUATIONS * sizeof(EquationMapping),
                     g_equationMappings.data());
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -1077,7 +1305,7 @@ void Objects::Draw(int sourceIndex)
 // ============================================================================
 void Objects::AddObject()
 {
-    if (g_numObjects >= MAX_OBJECTS)
+    if (g_numObjects >= Objects::MAX_OBJECTS)
     {
         std::cerr << "[Objects::AddObject] Max objects reached!" << std::endl;
         return;
@@ -1088,6 +1316,8 @@ void Objects::AddObject()
         g_currentDefaultObjectType,
         g_numObjects,
         0);
+
+    newObject.scriptID = -1;
 
     // Store object data
     if (g_useMapBuffer && g_mappedSSBO[0])
@@ -1118,7 +1348,7 @@ void Objects::AddObject()
 // ============================================================================
 void Objects::UploadBulkObjects(const std::vector<Object> &objects, int startIndex)
 {
-    if (startIndex < 0 || startIndex + static_cast<int>(objects.size()) > MAX_OBJECTS)
+    if (startIndex < 0 || startIndex + static_cast<int>(objects.size()) > Objects::MAX_OBJECTS)
     {
         std::cerr << "[Objects::UploadBulkObjects] Invalid range!" << std::endl;
         return;
@@ -1264,6 +1494,13 @@ void Objects::RemoveObject(int index)
     // Clear last slot and decrement count
     g_objectConstraintMappings[lastObjectIdx] = ObjectConstraints();
     g_numObjects--;
+
+    g_scriptIDs[removeIdx] = -1; // the removed slot
+    if (removeIdx != lastObjectIdx)
+    {
+        g_scriptIDs[lastObjectIdx] = -1; // the slot that was moved
+    }
+    g_groupsDirty = true;
     UploadConstraintsToGPU();
 }
 
@@ -1316,6 +1553,7 @@ void Objects::ResetToInitialConditions()
 
     //  Clear contact buffer to remove stale warm start data
     ClearContactBuffer();
+    g_groupsDirty = true;
 }
 
 // ============================================================================
@@ -1407,6 +1645,13 @@ void Objects::Cleanup()
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
+    if (g_paintTexture[0] || g_paintTexture[1])
+    {
+        glDeleteTextures(2, g_paintTexture);
+        g_paintTexture[0] = 0;
+        g_paintTexture[1] = 0;
+    }
+
     // Delete shader programs
     glDeleteProgram(g_programCompute);
     glDeleteProgram(g_programQuad);
@@ -1428,6 +1673,14 @@ void Objects::Cleanup()
     SafeDeleteBuffers(&g_objectConstraintsSSBO, 1);
     SafeDeleteBuffers(&g_collisionPropsSSBO, 1);
     SafeDeleteBuffers(&g_contactBufferSSBO, 1); //  Delete contact buffer
+
+    // ---- NEW: clean up scratchpad and signal queue ----
+    if (g_scratchpadPool)
+        glDeleteBuffers(1, &g_scratchpadPool);
+    if (g_signalQueueBuffer)
+        glDeleteBuffers(1, &g_signalQueueBuffer);
+    g_scratchpads.clear();
+    // ----------------------------------------------------
 
     // Clear all data structures
     g_numObjects = 0;
@@ -1455,14 +1708,16 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
     int texW = (g_paintWidth > 0) ? g_paintWidth : screenWidth;
     int texH = (g_paintHeight > 0) ? g_paintHeight : screenHeight;
 
-    // Load paint.comp asynchronously
+    // Load paint.comp asynchronously (same as before)
     g_paintLoader.LoadComputeShaderAsync(
         "paint.comp",
         [](GLuint program)
         {
             g_paintShaderProgram = program;
             g_paintShaderReady = true;
-            std::cout << "[AsyncLoader] Paint shader ready (ID: " << program << ")" << std::endl;
+            // Get the uniform location for uPrevFrame after linking
+            uPrevFrameLoc = glGetUniformLocation(program, "uPrevFrame");
+            // Also store other uniform locations if needed (but we'll use glGetUniformLocation each time)
         },
         [](const std::string &error)
         {
@@ -1470,17 +1725,28 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
             g_paintShaderReady = false;
         });
 
-    // Create paint texture with chosen resolution
-    glGenTextures(1, &g_paintTexture);
-    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texW, texH);
+    // Create two textures for double‑buffering
+    glGenTextures(2, g_paintTexture);
+    for (int i = 0; i < 2; ++i)
+    {
+        glBindTexture(GL_TEXTURE_2D, g_paintTexture[i]);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texW, texH);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Initialize read/write indices
+    g_paintWriteIdx = 0;
+    g_paintReadIdx = 1;
 
     // Create SSBOs for paint tokens and constants
     glGenBuffers(1, &g_paintTokenSSBO);
     glGenBuffers(1, &g_paintConstSSBO);
 
-    // Create fullscreen quad VAO and VBO
+    // Create fullscreen quad VAO and VBO (unchanged)
     float verts[] = {
         -1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1,
         -1, -1, 0, 0, 1, 1, 1, 1, -1, 1, 0, 1};
@@ -1526,14 +1792,21 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
 
 void Objects::ResizePaintTexture(int width, int height)
 {
-    if (g_paintTexture)
+    for (int i = 0; i < 2; ++i)
     {
-        glDeleteTextures(1, &g_paintTexture);
-        g_paintTexture = 0;
+        if (g_paintTexture[i])
+        {
+            glDeleteTextures(1, &g_paintTexture[i]);
+            g_paintTexture[i] = 0;
+        }
+        glGenTextures(1, &g_paintTexture[i]);
+        glBindTexture(GL_TEXTURE_2D, g_paintTexture[i]);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
-    glGenTextures(1, &g_paintTexture);
-    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -1541,13 +1814,16 @@ void Objects::SetPaintResolution(int width, int height)
 {
     g_paintWidth = width;
     g_paintHeight = height;
-    if (g_paintTexture)
+    if (g_paintTexture[0])
+    {
         ResizePaintTexture(width, height);
+    }
 }
 
 void Objects::SetPaintEquation(const std::vector<int> &tokens_r, const std::vector<float> &consts_r,
                                const std::vector<int> &tokens_g, const std::vector<float> &consts_g,
-                               const std::vector<int> &tokens_b, const std::vector<float> &consts_b)
+                               const std::vector<int> &tokens_b, const std::vector<float> &consts_b,
+                               const std::vector<int> &tokens_a, const std::vector<float> &consts_a)
 {
     g_paintTokens_r = tokens_r;
     g_paintConsts_r = consts_r;
@@ -1555,130 +1831,231 @@ void Objects::SetPaintEquation(const std::vector<int> &tokens_r, const std::vect
     g_paintConsts_g = consts_g;
     g_paintTokens_b = tokens_b;
     g_paintConsts_b = consts_b;
+    g_paintTokens_a = tokens_a;
+    g_paintConsts_a = consts_a;
     g_hasPaintEquation = true;
 
-    // Combine all tokens/constants into one buffer
     std::vector<int> allTokens;
     std::vector<float> allConsts;
     allTokens.insert(allTokens.end(), tokens_r.begin(), tokens_r.end());
     allTokens.insert(allTokens.end(), tokens_g.begin(), tokens_g.end());
     allTokens.insert(allTokens.end(), tokens_b.begin(), tokens_b.end());
+    allTokens.insert(allTokens.end(), tokens_a.begin(), tokens_a.end());
     allConsts.insert(allConsts.end(), consts_r.begin(), consts_r.end());
     allConsts.insert(allConsts.end(), consts_g.begin(), consts_g.end());
     allConsts.insert(allConsts.end(), consts_b.begin(), consts_b.end());
+    allConsts.insert(allConsts.end(), consts_a.begin(), consts_a.end());
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_paintTokenSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, allTokens.size() * sizeof(int), allTokens.data(), GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_paintConstSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, allConsts.size() * sizeof(float), allConsts.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float camY, float zoom, int objectBufferIndex)
 {
-    // No paint equation set or shader not ready → nothing to draw
-    if (!g_hasPaintEquation || !g_paintShaderReady) return;
+    if (!g_paintShaderReady && g_paintScriptID < 0)
+        return; // nothing to render
 
-    // ------------------------------------------------------------------------
-    // Paint resolution (user‑set via set_paint_resolution)
-    // Fallback to window size if not set
-    // ------------------------------------------------------------------------
     int texW = (g_paintWidth > 0) ? g_paintWidth : screenWidth;
     int texH = (g_paintHeight > 0) ? g_paintHeight : screenHeight;
 
-    // ------------------------------------------------------------------------
-    // Token/constant offsets for R, G, B channels
-    // (these are the same for all paint equations)
-    // ------------------------------------------------------------------------
-    int rOff = 0;
-    int rCount = (int)g_paintTokens_r.size();
-    int gOff = rCount;
-    int gCount = (int)g_paintTokens_g.size();
-    int bOff = rCount + gCount;
-    int bCount = (int)g_paintTokens_b.size();
-
-    int rConOff = 0;
-    int gConOff = (int)g_paintConsts_r.size();
-    int bConOff = gConOff + (int)g_paintConsts_g.size();
-
-    // ------------------------------------------------------------------------
-    // Orthographic projection parameters (exactly as in Camera::GetProjectionMatrix)
-    // halfHeight = zoom, halfWidth = zoom * aspect
-    // ------------------------------------------------------------------------
     float aspect = (float)screenWidth / (float)screenHeight;
     float halfHeight = zoom;
-    float halfWidth  = halfHeight * aspect;
+    float halfWidth = halfHeight * aspect;
+
+    // ---- Track previous camera state for pan/zoom compensation ----
+    if (g_firstPaintFrame) {
+        g_prevCamPos = glm::vec2(camX, camY);
+        g_prevZoom = zoom;
+        g_firstPaintFrame = false;
+    }
+
+    // Compute pan delta in UV space (fraction of texture dimensions)
+    glm::vec2 panWorld = glm::vec2(camX, camY) - g_prevCamPos;
+    glm::vec2 panUV = panWorld / glm::vec2(2.0f * halfWidth, 2.0f * halfHeight);
+
+    // Zoom ratio: previous zoom / current zoom ( >1 when zooming in)
+    float zoomRatio = g_prevZoom / zoom;
+
+    // World‑space size of one pixel (for scaling sampling radii)
+    float scale = 2.0f * zoom / (float)screenHeight;
+
+    // Update previous values for next frame
+    g_prevCamPos = glm::vec2(camX, camY);
+    g_prevZoom = zoom;
+
+    // -------------------------------------------------------------
+    // 1. Check if we have a paint script (JIT) to run
+    // -------------------------------------------------------------
+    if (g_paintScriptID >= 0 && g_scriptManager)
+    {
+        GLuint program = g_scriptManager->getProgram(g_paintScriptID);
+        if (program)
+        {
+            glUseProgram(program);
+
+            // ---- Set all uniforms for the paint script ----
+            glUniform1f(glGetUniformLocation(program, "uCameraX"), camX);
+            glUniform1f(glGetUniformLocation(program, "uCameraY"), camY);
+            glUniform1f(glGetUniformLocation(program, "uHalfWidth"), halfWidth);
+            glUniform1f(glGetUniformLocation(program, "uHalfHeight"), halfHeight);
+            glUniform1i(glGetUniformLocation(program, "uScreenWidth"), screenWidth);
+            glUniform1i(glGetUniformLocation(program, "uScreenHeight"), screenHeight);
+            glUniform1i(glGetUniformLocation(program, "uTexWidth"), texW);
+            glUniform1i(glGetUniformLocation(program, "uTexHeight"), texH);
+            glUniform1f(glGetUniformLocation(program, "uTime"), g_simulationTime);
+            glUniform1f(glGetUniformLocation(program, "uDt"), 0.001f);
+            glUniform1i(glGetUniformLocation(program, "uNumObjects"), g_numObjects);
+
+            // ---- New uniforms for pan/zoom compensation ----
+            glUniform2f(glGetUniformLocation(program, "uTexSize"), (float)texW, (float)texH);
+            glUniform2f(glGetUniformLocation(program, "uPanDelta"), panUV.x, panUV.y);
+            glUniform1f(glGetUniformLocation(program, "uZoomRatio"), zoomRatio);
+            glUniform1f(glGetUniformLocation(program, "uScale"), scale);
+
+            // ---- NEW: set scratchpad offsets ----
+            GLint offsetLoc = glGetUniformLocation(program, "uScratchpadOffsets");
+            if (offsetLoc != -1) {
+                int offsets[16] = {0};
+                for (auto& pair : g_scratchpads) {
+                    if (pair.first < 16)
+                        offsets[pair.first] = (int)(pair.second.offsetInPool);
+                }
+                glUniform1iv(offsetLoc, 16, offsets);
+            }
+
+            // Bind textures
+            glBindImageTexture(0, g_paintTexture[g_paintWriteIdx], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, g_paintTexture[g_paintReadIdx]);
+            glUniform1i(glGetUniformLocation(program, "uPrevFrame"), 1);
+
+            // Bind object SSBO (binding 0) for p[index] access
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[objectBufferIndex]);
+
+            // ---- NEW: bind scratchpad pool (binding 10) for paint shader ----
+            if (g_scratchpadPool != 0)
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+
+            // Dispatch compute shader
+            glDispatchCompute((texW + 15) / 16, (texH + 15) / 16, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
+            // ---- Draw the quad using the texture we just wrote ----
+            glUseProgram(g_paintQuadProgram);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, g_paintTexture[g_paintWriteIdx]);
+            glUniform1i(glGetUniformLocation(g_paintQuadProgram, "uTex"), 0);
+            glBindVertexArray(g_paintQuadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+            glUseProgram(0);
+
+            // ---- Swap indices for next frame ----
+            int oldWrite = g_paintWriteIdx;
+            g_paintWriteIdx = g_paintReadIdx;
+            g_paintReadIdx = oldWrite;
+
+            return; // done with script path
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 2. Fallback to token‑based paint equation (original implementation)
+    // -------------------------------------------------------------
+    if (!g_hasPaintEquation || !g_paintShaderReady)
+        return;
 
     glUseProgram(g_paintShaderProgram);
 
-    // ------------------------------------------------------------------------
-    // Bind SSBOs
-    // binding 0 : object data (read‑only)
-    // binding 2 : paint tokens
-    // binding 3 : paint constants
-    // ------------------------------------------------------------------------
+    // Bind SSBOs (object data, token buffer, constant buffer)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[objectBufferIndex]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_paintTokenSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_paintConstSSBO);
 
-    // Output texture (image unit 0)
-    glBindImageTexture(0, g_paintTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    // ---- NEW: bind scratchpad pool (binding 10) for paint shader ----
+    if (g_scratchpadPool != 0)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
 
-    // ------------------------------------------------------------------------
-    // Camera and projection uniforms (analytical unproject)
-    // ------------------------------------------------------------------------
+    // ---- NEW: set scratchpad offsets ----
+    GLint offsetLoc = glGetUniformLocation(g_paintShaderProgram, "uScratchpadOffsets");
+    if (offsetLoc != -1) {
+        int offsets[16] = {0};
+        for (auto& pair : g_scratchpads) {
+            if (pair.first < 16)
+                offsets[pair.first] = (int)(pair.second.offsetInPool);
+        }
+        glUniform1iv(offsetLoc, 16, offsets);
+    }
+
+    // Double‑buffering: bind write texture as image, read texture as sampler
+    glBindImageTexture(0, g_paintTexture[g_paintWriteIdx], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, g_paintTexture[g_paintReadIdx]);
+    GLint uPrevFrameLoc = glGetUniformLocation(g_paintShaderProgram, "uPrevFrame");
+    if (uPrevFrameLoc != -1)
+        glUniform1i(uPrevFrameLoc, 1);
+
+    // Camera and projection uniforms
     glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uCameraX"), camX);
     glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uCameraY"), camY);
     glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uHalfWidth"), halfWidth);
     glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uHalfHeight"), halfHeight);
-
-    // Screen dimensions (actual framebuffer size, for NDC conversion)
     glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uScreenWidth"), screenWidth);
     glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uScreenHeight"), screenHeight);
-
-    // Paint texture dimensions (for dispatch and texel‑to‑screen stretching)
     glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTexWidth"), texW);
     glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTexHeight"), texH);
-
-    // Simulation globals
     glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uNumObjects"), g_numObjects);
     glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uTime"), g_simulationTime);
 
-    // Paint equation parameters
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uColorMode"), 0);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_r"), rOff);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_r"), rCount);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_r"), rConOff);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_g"), gOff);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_g"), gCount);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_g"), gConOff);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_b"), bOff);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_b"), bCount);
-    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_b"), bConOff);
+    // ---- New uniforms for pan/zoom compensation (token shader may ignore them, but we set them anyway) ----
+    glUniform2f(glGetUniformLocation(g_paintShaderProgram, "uTexSize"), (float)texW, (float)texH);
+    glUniform2f(glGetUniformLocation(g_paintShaderProgram, "uPanDelta"), panUV.x, panUV.y);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uZoomRatio"), zoomRatio);
+    glUniform1f(glGetUniformLocation(g_paintShaderProgram, "uScale"), scale);
 
-    std::cout << "[Paint] camX=" << camX << " camY=" << camY 
-          << " halfW=" << halfWidth << " halfH=" << halfHeight 
-          << " screenW=" << screenWidth << " screenH=" << screenHeight << std::endl;
+    // Paint equation parameters (R, G, B, A)
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_r"), 0);
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_r"), (int)g_paintTokens_r.size());
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_r"), 0);
 
-    // ------------------------------------------------------------------------
-    // Dispatch the compute shader
-    // Work group size = 16x16, so ((texW+15)/16) groups in X, ((texH+15)/16) in Y
-    // This uses the paint resolution (texW/texH) – lower resolution = fewer groups = faster
-    // ------------------------------------------------------------------------
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_g"), (int)g_paintTokens_r.size());
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_g"), (int)g_paintTokens_g.size());
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_g"), (int)g_paintConsts_r.size());
+
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_b"),
+                (int)(g_paintTokens_r.size() + g_paintTokens_g.size()));
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_b"), (int)g_paintTokens_b.size());
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_b"),
+                (int)(g_paintConsts_r.size() + g_paintConsts_g.size()));
+
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenOffset_a"),
+                (int)(g_paintTokens_r.size() + g_paintTokens_g.size() + g_paintTokens_b.size()));
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uTokenCount_a"), (int)g_paintTokens_a.size());
+    glUniform1i(glGetUniformLocation(g_paintShaderProgram, "uConstOffset_a"),
+                (int)(g_paintConsts_r.size() + g_paintConsts_g.size() + g_paintConsts_b.size()));
+
+    // Dispatch compute shader
     glDispatchCompute((texW + 15) / 16, (texH + 15) / 16, 1);
-
-    // Wait for compute writes to finish and ensure texture is ready for reading
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-    // ------------------------------------------------------------------------
-    // Draw the paint texture as a fullscreen quad
-    // ------------------------------------------------------------------------
+    // Draw the paint texture as a fullscreen quad (using the texture we just wrote)
     glUseProgram(g_paintQuadProgram);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, g_paintTexture);
+    glBindTexture(GL_TEXTURE_2D, g_paintTexture[g_paintWriteIdx]);
     glUniform1i(glGetUniformLocation(g_paintQuadProgram, "uTex"), 0);
     glBindVertexArray(g_paintQuadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+
+    // Swap indices for next frame
+    int oldWrite = g_paintWriteIdx;
+    g_paintWriteIdx = g_paintReadIdx;
+    g_paintReadIdx = oldWrite;
+
+    glUseProgram(0);
 }
 
 // ============================================================================
@@ -1806,7 +2183,7 @@ CollisionProperties Objects::GetCollisionProperties(int objectIndex)
 // Enable or disable collisions between two specific objects
 void Objects::EnableCollisionBetween(int obj1, int obj2, bool enable)
 {
-    if (obj1 < 0 || obj1 >= MAX_OBJECTS || obj2 < 0 || obj2 >= MAX_OBJECTS)
+    if (obj1 < 0 || obj1 >= Objects::MAX_OBJECTS || obj2 < 0 || obj2 >= Objects::MAX_OBJECTS)
         return;
 
     g_collisionMatrix[obj1][obj2] = enable;
@@ -1819,4 +2196,219 @@ bool Objects::IsCollisionEnabled(int objectIndex)
     if (objectIndex < 0 || objectIndex >= g_numObjects)
         return false;
     return g_collisionProperties[objectIndex].enabled == 1;
+}
+
+// ============================================================================
+// NEW SCRATCHPAD AND SIGNAL QUEUE METHODS
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Scratchpad implementation
+// ----------------------------------------------------------------------------
+
+int Objects::CreateScratchpad(size_t numElements) {
+    if (numElements == 0) return -1;
+
+    // Ensure the pool is allocated (it should be from Init, but just in case)
+    if (g_scratchpadPool == 0) {
+        glGenBuffers(1, &g_scratchpadPool);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_scratchpadPool);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SCRATCHPAD_POOL_SIZE, nullptr, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+    }
+
+    // Calculate size in bytes (align to 16 bytes for SSBO)
+    size_t sizeNeeded = numElements * sizeof(float);
+    size_t alignment = 16;
+    sizeNeeded = (sizeNeeded + alignment - 1) & ~(alignment - 1);
+
+    // Check if we have enough space
+    if (g_scratchpadPoolSize + sizeNeeded > MAX_SCRATCHPAD_POOL_SIZE) {
+        std::cerr << "[Objects] Scratchpad pool exhausted! Requested " << sizeNeeded
+                  << " bytes, available " << (MAX_SCRATCHPAD_POOL_SIZE - g_scratchpadPoolSize)
+                  << " bytes." << std::endl;
+        return -1;
+    }
+
+    // Assign offset for new scratchpad (offset in floats)
+    size_t offsetInFloats = g_scratchpadPoolSize / sizeof(float);
+    g_scratchpadPoolSize += sizeNeeded;
+
+    int id = g_nextScratchpadId++;
+    Scratchpad sp;
+    sp.buffer = g_scratchpadPool;
+    sp.numElements = numElements;
+    sp.offsetInPool = offsetInFloats;
+    sp.valid = true;
+    g_scratchpads[id] = sp;
+
+    // The pool is already bound; no need to re-bind each time.
+
+    return id;
+}
+
+void Objects::DestroyScratchpad(int id) {
+    auto it = g_scratchpads.find(id);
+    if (it == g_scratchpads.end()) return;
+    it->second.valid = false;
+    g_scratchpads.erase(it);
+    // We don't shrink the pool; we could defragment later if needed.
+}
+
+void Objects::UploadScratchpadData(int id, const void* data, size_t count) {
+    auto it = g_scratchpads.find(id);
+    if (it == g_scratchpads.end() || count > it->second.numElements) return;
+    Scratchpad& sp = it->second;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sp.buffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                    sp.offsetInPool * sizeof(float),
+                    count * sizeof(float),
+                    data);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void* Objects::MapScratchpad(int id, GLenum access) {
+    auto it = g_scratchpads.find(id);
+    if (it == g_scratchpads.end()) return nullptr;
+    Scratchpad& sp = it->second;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sp.buffer);
+    return glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
+                            sp.offsetInPool * sizeof(float),
+                            sp.numElements * sizeof(float),
+                            access);
+}
+
+void Objects::UnmapScratchpad(int id) {
+    auto it = g_scratchpads.find(id);
+    if (it == g_scratchpads.end()) return;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, it->second.buffer);
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+size_t Objects::GetScratchpadSize(int id) {
+    auto it = g_scratchpads.find(id);
+    if (it == g_scratchpads.end()) return 0;
+    return it->second.numElements;
+}
+
+bool Objects::IsValidScratchpad(int id) {
+    return g_scratchpads.find(id) != g_scratchpads.end();
+}
+
+// ----------------------------------------------------------------------------
+// Signal Queue
+// ----------------------------------------------------------------------------
+
+void Objects::SetSignalQueueCapacity(size_t capacity) {
+    if (capacity == g_signalQueueCapacity) return;
+    g_signalQueueCapacity = capacity;
+    // Recreate buffer
+    if (g_signalQueueBuffer != 0) {
+        glDeleteBuffers(1, &g_signalQueueBuffer);
+        g_signalQueueBuffer = 0;
+    }
+    glGenBuffers(1, &g_signalQueueBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
+    // Structure: uint count; then array of signals: struct { uint agentID; uint objectIdx; float payload; }
+    size_t bufferSize = sizeof(uint32_t) + capacity * (sizeof(uint32_t) + sizeof(uint32_t) + sizeof(float));
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSize, nullptr, GL_DYNAMIC_DRAW);
+    // Set count to 0
+    uint32_t zero = 0;
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &zero);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    // Bind to binding point
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
+}
+
+void Objects::SetSignalQueueOverflowPolicy(int policy) {
+    g_signalQueueOverflowPolicy = policy;
+}
+
+void Objects::ClearSignalQueue() {
+    if (g_signalQueueBuffer == 0) return;
+    uint32_t zero = 0;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &zero);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+size_t Objects::GetSignalQueueCount() {
+    if (g_signalQueueBuffer == 0) return 0;
+    uint32_t count;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &count);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    return count;
+}
+
+// ----------------------------------------------------------------------------
+// Agent Dispatch
+// ----------------------------------------------------------------------------
+
+void Objects::DispatchAgent(int agentID, bool clearAfter) {
+    if (g_signalQueueBuffer == 0) return;
+    GLuint prog = g_scriptManager ? g_scriptManager->getProgram(agentID) : 0;
+    if (prog == 0) return;
+
+    uint32_t count;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &count);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    if (count == 0) return;
+
+    glUseProgram(prog);
+    // Bind object SSBO (binding 0) as readonly – use the most recently updated buffer
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[g_currentReadBufferIndex]);
+    // Bind scratchpad pool (binding 10)
+    if (g_scratchpadPool != 0) {
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+    }
+    // Signal queue already bound at binding 11
+
+    // ---- NEW: set scratchpad offsets ----
+    GLint offsetLoc = glGetUniformLocation(prog, "uScratchpadOffsets");
+    if (offsetLoc != -1) {
+        int offsets[16] = {0};
+        for (auto& pair : g_scratchpads) {
+            if (pair.first < 16)
+                offsets[pair.first] = (int)(pair.second.offsetInPool);
+        }
+        glUniform1iv(offsetLoc, 16, offsets);
+    }
+
+    // Set uniforms
+    glUniform1i(glGetUniformLocation(prog, "uNumObjects"), g_numObjects);
+    glUniform1f(glGetUniformLocation(prog, "uTime"), g_simulationTime);
+    glUniform1f(glGetUniformLocation(prog, "uDt"), 0.0f); // not used in agent
+    glUniform1i(glGetUniformLocation(prog, "uAgentID"), agentID);
+    glUniform1i(glGetUniformLocation(prog, "uSignalCount"), count);
+
+    // Dispatch
+    int workGroupSize = 64;
+    int numWorkGroups = (count + workGroupSize - 1) / workGroupSize;
+    glDispatchCompute(numWorkGroups, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    glUseProgram(0);
+
+    if (clearAfter) {
+        ClearSignalQueue();
+    }
+}
+
+void Objects::DispatchAllAgents(bool clearAfter) {
+    if (!g_scriptManager) return;
+    // Get all agent IDs from the ScriptManager
+    auto agent_ids = g_scriptManager->getAgentIDs();
+    // Dispatch each agent without clearing the queue between them
+    for (int id : agent_ids) {
+        DispatchAgent(id, false);
+    }
+    // Clear the queue once at the end if requested
+    if (clearAfter) {
+        ClearSignalQueue();
+    }
 }

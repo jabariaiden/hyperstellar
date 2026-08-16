@@ -131,27 +131,19 @@ void main() {
     float angular_vel = vVisualData[0].w;   // ANGULAR_VEL NOW IN W
     
     vec4 color = vColor[0];
-    
-    // Fallback to charge-based color if white
-    if (length(color.rgb - vec3(1.0)) < 0.01) {
-        float charge = vCharge[0];
-        if (charge > 0.0) color = vec4(1.0, 0.2, 0.2, 1.0);
-        else if (charge < 0.0) color = vec4(0.2, 0.2, 1.0, 1.0);
-        else color = vec4(0.8, 0.4, 0.1, 1.0);
-    }
-    
+
     if (skinType == SKIN_CIRCLE) {
-        float radius = (param_x < 0.01) ? 0.3 : param_x;  //   x = radius
+        float radius = param_x; 
         emitCircle(pos, radius, color, speed);
     }
     else if (skinType == SKIN_RECTANGLE) {
-        float width = (param_x < 0.01) ? 0.5 : param_x;   //   x = width
-        float height = (param_y < 0.01) ? 0.3 : param_y;  //   y = height
+        float width = param_x;
+        float height = param_y;
         emitRectangle(pos, width, height, rotation, color, speed);
     }
     else if (skinType == SKIN_POLYGON) {
-        float radius = (param_x < 0.01) ? 0.3 : param_x;          //   x = radius
-        int numSides = (int(param_y) < 3) ? 6 : int(param_y);     //   y = numSides
+        float radius = param_x;
+        int numSides = int(param_y);
         emitPolygon(pos, radius, numSides, rotation, color, speed);
     }
 }

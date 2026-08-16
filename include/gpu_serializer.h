@@ -7,9 +7,9 @@
 #include <string>
 #include <stdexcept>
 
-// ----------------------------------------------------------------------------
+
 // GPU token constants (mirror TokenType but with integer codes)
-// ----------------------------------------------------------------------------
+
 namespace GPUTokens
 {
     const int TOKEN_NUMBER = 0;
@@ -62,11 +62,19 @@ namespace GPUTokens
     const int TOKEN_EQ = 47;
     const int TOKEN_NE = 48;
     const int TOKEN_COMP = 49;
+    const int TOKEN_SAMPLE_PREV_R = 50;
+    const int TOKEN_SAMPLE_PREV_G = 51;
+    const int TOKEN_SAMPLE_PREV_B = 52;
+    const int TOKEN_SAMPLE_PREV_A = 53;
+    const int TOKEN_AVG_PREV_R    = 54;
+    const int TOKEN_AVG_PREV_G    = 55;
+    const int TOKEN_AVG_PREV_B    = 56;
+    const int TOKEN_AVG_PREV_A    = 57;
 }
 
-// ----------------------------------------------------------------------------
+
 // Variable hashes – must match shader (math.comp / paint.comp)
-// ----------------------------------------------------------------------------
+
 namespace VariableHashes
 {
     const int VAR_HASH_X        = 1;
@@ -108,20 +116,24 @@ namespace VariableHashes
     // Paint shader
     const int VAR_HASH_PX       = 200;
     const int VAR_HASH_PY       = 201;
+    const int VAR_HASH_PREV_R   = 202;
+    const int VAR_HASH_PREV_G   = 203;
+    const int VAR_HASH_PREV_B   = 204;
+    const int VAR_HASH_PREV_A   = 205;
 }
 
-// ----------------------------------------------------------------------------
+
 // Derivative method constants
-// ----------------------------------------------------------------------------
+
 namespace DerivativeMethods
 {
     const int DERIV_METHOD_NUMERICAL = 0;
     const int DERIV_METHOD_SYMBOLIC  = 1;
 }
 
-// ----------------------------------------------------------------------------
+
 // Mapping from variable name to hash (used for normal variables)
-// ----------------------------------------------------------------------------
+
 static const std::unordered_map<std::string, int> s_variableHashMap = {
     {"x",        VariableHashes::VAR_HASH_X},
     {"y",        VariableHashes::VAR_HASH_Y},
@@ -152,12 +164,16 @@ static const std::unordered_map<std::string, int> s_variableHashMap = {
     {"freq",     VariableHashes::VAR_HASH_FREQ},
     {"amp",      VariableHashes::VAR_HASH_AMP},
     {"px",       VariableHashes::VAR_HASH_PX},
+    {"prev_r",   VariableHashes::VAR_HASH_PREV_R},
+    {"prev_g",   VariableHashes::VAR_HASH_PREV_G},
+    {"prev_b",   VariableHashes::VAR_HASH_PREV_B},
+    {"prev_a",   VariableHashes::VAR_HASH_PREV_A},
     {"py",       VariableHashes::VAR_HASH_PY},
 };
 
-// ----------------------------------------------------------------------------
+
 // Mapping from object property name to hash (must match shader's getObjectProperty)
-// ----------------------------------------------------------------------------
+
 static const std::unordered_map<std::string, int> s_propertyHashMap = {
     {"x",        VariableHashes::VAR_HASH_X},
     {"y",        VariableHashes::VAR_HASH_Y},
@@ -180,9 +196,9 @@ static const std::unordered_map<std::string, int> s_propertyHashMap = {
     {"color.a",  VariableHashes::VAR_HASH_A},
 };
 
-// ----------------------------------------------------------------------------
+
 // Mapping from TokenType to GPU token constant
-// ----------------------------------------------------------------------------
+
 static const std::unordered_map<TokenType, int> s_tokenTypeMap = {
     {TOKEN_ADD,            GPUTokens::TOKEN_ADD},
     {TOKEN_SUB,            GPUTokens::TOKEN_SUB},
@@ -221,6 +237,14 @@ static const std::unordered_map<TokenType, int> s_tokenTypeMap = {
     {TOKEN_SELECT,         GPUTokens::TOKEN_SELECT},
     {TOKEN_NOISE,          GPUTokens::TOKEN_NOISE},
     {TOKEN_RAND,           GPUTokens::TOKEN_RAND},
+    {TOKEN_SAMPLE_PREV_R,  GPUTokens::TOKEN_SAMPLE_PREV_R},
+    {TOKEN_SAMPLE_PREV_G,  GPUTokens::TOKEN_SAMPLE_PREV_G},
+    {TOKEN_SAMPLE_PREV_B,  GPUTokens::TOKEN_SAMPLE_PREV_B},
+    {TOKEN_SAMPLE_PREV_A,  GPUTokens::TOKEN_SAMPLE_PREV_A},
+    {TOKEN_AVG_PREV_R,     GPUTokens::TOKEN_AVG_PREV_R},
+    {TOKEN_AVG_PREV_G,     GPUTokens::TOKEN_AVG_PREV_G},
+    {TOKEN_AVG_PREV_B,     GPUTokens::TOKEN_AVG_PREV_B},
+    {TOKEN_AVG_PREV_A,     GPUTokens::TOKEN_AVG_PREV_A},
     {TOKEN_SUM_NEIGHBORS,  GPUTokens::TOKEN_SUM_NEIGHBORS},
     {TOKEN_NEIGHBOR_INDEX, GPUTokens::TOKEN_NEIGHBOR_INDEX},
     {TOKEN_TENSOR_LIT,     GPUTokens::TOKEN_TENSOR_LIT},
@@ -233,9 +257,9 @@ static const std::unordered_map<TokenType, int> s_tokenTypeMap = {
     {TOKEN_COMP,           GPUTokens::TOKEN_COMP},
 };
 
-// ----------------------------------------------------------------------------
+
 // Helper: hash a variable name (for normal variables like x, vx, etc.)
-// ----------------------------------------------------------------------------
+
 inline int hashVariableName(const std::string &name)
 {
     auto it = s_variableHashMap.find(name);
@@ -244,9 +268,9 @@ inline int hashVariableName(const std::string &name)
     throw std::runtime_error("Unknown variable name: " + name);
 }
 
-// ----------------------------------------------------------------------------
+
 // Helper: hash an object property name (for p[id].property)
-// ----------------------------------------------------------------------------
+
 inline int hashPropertyName(const std::string &name)
 {
     auto it = s_propertyHashMap.find(name);
@@ -255,9 +279,9 @@ inline int hashPropertyName(const std::string &name)
     throw std::runtime_error("Unknown property name: " + name);
 }
 
-// ----------------------------------------------------------------------------
+
 // Helper: get or add a constant to the constant buffer, return its index
-// ----------------------------------------------------------------------------
+
 inline int getOrAddConstant(float value,
                             std::unordered_map<float, int> &constantMap,
                             std::vector<float> &outBuffer)
@@ -271,9 +295,9 @@ inline int getOrAddConstant(float value,
     return idx;
 }
 
-// ----------------------------------------------------------------------------
+
 // GPU‑serialized equation structure (separate buffers per component)
-// ----------------------------------------------------------------------------
+
 struct GPUSerializedEquation
 {
     std::vector<int>   tokenBuffer_ax;
@@ -303,17 +327,17 @@ struct GPUSerializedEquation
     }
 };
 
-// ----------------------------------------------------------------------------
+
 // Forward declarations for recursive serialization
-// ----------------------------------------------------------------------------
+
 static void serializeTokensToGPU(const std::vector<Token> &tokens,
                                  std::vector<int> &outTokenBuffer,
                                  std::vector<float> &outConstantBuffer,
                                  std::unordered_map<float, int> &constantMap);
 
-// ----------------------------------------------------------------------------
+
 // Serialize a sub‑block (returns token count and merges constants)
-// ----------------------------------------------------------------------------
+
 static int serializeSubBlock(const std::vector<Token> &blockTokens,
                              std::vector<int> &outTokenBuffer,
                              std::vector<float> &outConstantBuffer,
@@ -351,9 +375,9 @@ static int serializeSubBlock(const std::vector<Token> &blockTokens,
     return tokenCount;
 }
 
-// ----------------------------------------------------------------------------
+
 // Core serialization function (recursive)
-// ----------------------------------------------------------------------------
+
 static void serializeTokensToGPU(const std::vector<Token> &tokens,
                                  std::vector<int> &outTokenBuffer,
                                  std::vector<float> &outConstantBuffer,
@@ -468,9 +492,9 @@ static void serializeTokensToGPU(const std::vector<Token> &tokens,
     }
 }
 
-// ----------------------------------------------------------------------------
+
 // Serialize a single ParsedEquation to GPU buffers
-// ----------------------------------------------------------------------------
+
 inline GPUSerializedEquation serializeEquationForGPU(const ParsedEquation &eq)
 {
     GPUSerializedEquation result;
@@ -496,9 +520,9 @@ inline GPUSerializedEquation serializeEquationForGPU(const ParsedEquation &eq)
     return result;
 }
 
-// ----------------------------------------------------------------------------
+
 // Batch of equations – aggregates all buffers and mappings
-// ----------------------------------------------------------------------------
+
 struct GPUEquationBatch
 {
     std::vector<int>   globalTokenBuffer_ax, globalTokenBuffer_ay, globalTokenBuffer_angular,
@@ -520,9 +544,9 @@ struct GPUEquationBatch
     }
 };
 
-// ----------------------------------------------------------------------------
+
 // Serialize a vector of ParsedEquation into a single batch
-// ----------------------------------------------------------------------------
+
 inline GPUEquationBatch serializeEquationBatchForGPU(const std::vector<ParsedEquation> &equations)
 {
     GPUEquationBatch batch;
@@ -578,9 +602,9 @@ inline GPUEquationBatch serializeEquationBatchForGPU(const std::vector<ParsedEqu
     return batch;
 }
 
-// ----------------------------------------------------------------------------
+
 // Debug printing utilities
-// ----------------------------------------------------------------------------
+
 inline void printGPUSerializedEquation(const GPUSerializedEquation &eq)
 {
     std::cout << "=== GPU Serialized Equation ===\n";

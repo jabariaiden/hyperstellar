@@ -73,6 +73,15 @@ enum TokenType
     TOKEN_TARGET_DATA_X,
     TOKEN_TARGET_DATA_Y,
 
+    TOKEN_SAMPLE_PREV_R,
+    TOKEN_SAMPLE_PREV_G,
+    TOKEN_SAMPLE_PREV_B,
+    TOKEN_SAMPLE_PREV_A,
+    TOKEN_AVG_PREV_R,
+    TOKEN_AVG_PREV_G,
+    TOKEN_AVG_PREV_B,
+    TOKEN_AVG_PREV_A,
+
     // Comparison operators
     TOKEN_LT, // <
     TOKEN_LE, // <=

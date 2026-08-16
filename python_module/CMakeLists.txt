@@ -92,6 +92,7 @@ set(CORE_SOURCES
     ../src/physics_system.cpp
     ../src/utils.cpp
     ../src/vectorfield.cpp
+    ../src/script_manager.cpp
 )
 
 set(PYTHON_SOURCES

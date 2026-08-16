@@ -126,22 +126,15 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>Copying stellar.pyd to Python package	Copying shaders to Python package</Message>
+      <Message>Copying stellar.pyd and shaders to C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/_build/Debug/stellar.cp313-win_amd64.pyd C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd
 if %errorlevel% neq 0 goto :cmEnd
-:cmEnd
-endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
-:cmErrorLevel
-exit /b %1
-:cmDone
-if %errorlevel% neq 0 goto :VCEnd
-setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
-if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/math.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/paint.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/quad.vert C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert
 if %errorlevel% neq 0 goto :cmEnd
@@ -219,22 +212,15 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>Copying stellar.pyd to Python package	Copying shaders to Python package</Message>
+      <Message>Copying stellar.pyd and shaders to C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/_build/Release/stellar.cp313-win_amd64.pyd C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd
 if %errorlevel% neq 0 goto :cmEnd
-:cmEnd
-endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
-:cmErrorLevel
-exit /b %1
-:cmDone
-if %errorlevel% neq 0 goto :VCEnd
-setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
-if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/math.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/paint.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/quad.vert C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert
 if %errorlevel% neq 0 goto :cmEnd
@@ -313,22 +299,15 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>Copying stellar.pyd to Python package	Copying shaders to Python package</Message>
+      <Message>Copying stellar.pyd and shaders to C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/_build/MinSizeRel/stellar.cp313-win_amd64.pyd C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd
 if %errorlevel% neq 0 goto :cmEnd
-:cmEnd
-endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
-:cmErrorLevel
-exit /b %1
-:cmDone
-if %errorlevel% neq 0 goto :VCEnd
-setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
-if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/math.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/paint.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/quad.vert C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert
 if %errorlevel% neq 0 goto :cmEnd
@@ -405,22 +384,15 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <PostBuildEvent>
-      <Message>Copying stellar.pyd to Python package	Copying shaders to Python package</Message>
+      <Message>Copying stellar.pyd and shaders to C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64</Message>
       <Command>setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64
+"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/_build/RelWithDebInfo/stellar.cp313-win_amd64.pyd C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd
 if %errorlevel% neq 0 goto :cmEnd
-:cmEnd
-endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
-:cmErrorLevel
-exit /b %1
-:cmDone
-if %errorlevel% neq 0 goto :VCEnd
-setlocal
-"C:\Program Files\CMake\bin\cmake.exe" -E make_directory C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders
-if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/math.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/paint.comp C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp
 if %errorlevel% neq 0 goto :cmEnd
 "C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/user/hyperstellar-public/python_module/shaders/quad.vert C:/Users/user/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert
 if %errorlevel% neq 0 goto :cmEnd
@@ -519,6 +491,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\user\hyperstellar-public\src\physics_system.cpp" />
     <ClCompile Include="C:\Users\user\hyperstellar-public\src\utils.cpp" />
     <ClCompile Include="C:\Users\user\hyperstellar-public\src\vectorfield.cpp" />
+    <ClCompile Include="C:\Users\user\hyperstellar-public\src\script_manager.cpp" />
     <ClCompile Include="C:\Users\user\hyperstellar-public\python_module\bindings.cpp" />
     <ClCompile Include="C:\Users\user\hyperstellar-public\python_module\simulation_wrapper.cpp" />
     <ClCompile Include="C:\Users\user\hyperstellar-public\src\glad.c" />

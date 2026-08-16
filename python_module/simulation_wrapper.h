@@ -7,6 +7,7 @@
 #include <fstream>
 #include <vector>
 #include <array>
+#include "script_manager.h"
 
 // Forward declarations
 class SimulationWrapper;
@@ -41,26 +42,19 @@ struct ObjectState
 };
 
 // Batch update data structure
-struct BatchUpdateData {
+struct BatchUpdateData
+{
     int index;
-    float x;
-    float y;
-    float vx;
-    float vy;
-    float mass;
-    float charge;
-    float rotation;
-    float angular_velocity;
-    float width;
-    float height;
-    float r;
-    float g;
-    float b;
-    float a;
+    float x, y, vx, vy, mass, charge, rotation, angular_velocity;
+    float size; // radius for circle/polygon
+    float width, height;
+    float r, g, b, a;
+    int polygon_sides; // 0 = keep existing for polygon
 };
 
 // Batch get data structure
-struct BatchGetData {
+struct BatchGetData
+{
     float x;
     float y;
     float vx;
@@ -81,12 +75,14 @@ struct BatchGetData {
 };
 
 // Constraint types for Python
-struct DistanceConstraint {
+struct DistanceConstraint
+{
     int target_object;
-    float rest_length;   // Desired distance between objects
+    float rest_length; // Desired distance between objects
 
     DistanceConstraint(int target = 0, float length = 5.0f)
-        : target_object(target), rest_length(length) {
+        : target_object(target), rest_length(length)
+    {
     }
 };
 
@@ -108,7 +104,8 @@ struct ConstraintConfig
     float param1, param2, param3, param4;
 };
 
-enum class PyCollisionShape {
+enum class PyCollisionShape
+{
     NONE = 0,
     CIRCLE = 1,
     AABB = 2,
@@ -116,7 +113,8 @@ enum class PyCollisionShape {
 };
 
 // Collision property struct
-struct CollisionConfig {
+struct CollisionConfig
+{
     bool enabled = true;
     PyCollisionShape shape = PyCollisionShape::NONE;
     float restitution = 0.7f;
@@ -129,8 +127,8 @@ struct ObjectConfig
     float vx = 0.0f, vy = 0.0f;
     float mass = 1.0f;
     float charge = 0.0f;
-    float rotation = 0.0f;         
-    float angular_velocity = 0.0f; 
+    float rotation = 0.0f;
+    float angular_velocity = 0.0f;
     PySkinType skin = PySkinType::PY_SKIN_CIRCLE;
     float size = 0.3f;
     float width = 0.5f;  // for rectangles
@@ -150,7 +148,8 @@ struct BatchConfig
 };
 
 // Helper class for key state
-class KeyState {
+class KeyState
+{
     bool m_pressed;
     bool m_released;
 public:
@@ -160,11 +159,13 @@ public:
 };
 
 // Helper class for keyboard monitoring
-class KeyboardMonitor {
-    SimulationWrapper* m_sim;
+class KeyboardMonitor
+{
+    SimulationWrapper *m_sim;
+
 public:
-    KeyboardMonitor(SimulationWrapper* sim) : m_sim(sim) {}
-    KeyState get_key_state(const std::string& name) const;
+    KeyboardMonitor(SimulationWrapper *sim) : m_sim(sim) {}
+    KeyState get_key_state(const std::string &name) const;
 };
 
 class SimulationWrapper
@@ -179,12 +180,15 @@ private:
     int m_width, m_height;
     float m_simulationTime = 0.0f;
     bool m_enable_grid;
+    float m_speed = 1.0f;
+    
+    ScriptManager scriptManager;
 
     // Keyboard state tracking
     static constexpr int MAX_KEYS = 512;
     std::array<bool, MAX_KEYS> m_currentKeys{};
     std::array<bool, MAX_KEYS> m_previousKeys{};
-    
+
     void update_keyboard_state();
 
     bool init_headless();
@@ -196,7 +200,7 @@ private:
 
 public:
     SimulationWrapper(bool headless = true, int width = 1280, int height = 720,
-        std::string title = "Physics Simulation", bool enable_grid = true);
+                      std::string title = "Physics Simulation", bool enable_grid = true);
     ~SimulationWrapper();
 
     void set_grid_enabled(bool enabled) { m_enable_grid = enabled; }
@@ -206,7 +210,11 @@ public:
     bool is_key_pressed(int key) const;
     bool is_key_just_pressed(int key) const;
     bool is_key_just_released(int key) const;
-    
+
+    // script management
+    int register_script(const std::string &source);
+    void set_script(int objectIndex, int scriptId);
+
     // Camera control
     void set_camera_position(float x, float y);
     std::pair<float, float> get_camera_position() const;
@@ -215,6 +223,8 @@ public:
 
     // Core simulation
     void update(float dt);
+    float get_speed() const { return m_speed; }
+    void set_speed(float speed) { m_speed = speed; }
 
     int add_object(
         float x = 0.0f, float y = 0.0f,
@@ -237,16 +247,20 @@ public:
         float vx, float vy,
         float mass, float charge,
         float rotation, float angular_velocity,
+        float size, // radius for circle/polygon (ignored for rectangle)
         float width, float height,
-        float r, float g, float b, float a);
+        float r, float g, float b, float a,
+        int polygon_sides = 0 // only used for polygons; 0 = keep existing
+    );
 
     // Batch get and update
-    std::vector<BatchGetData> batch_get(const std::vector<int>& indices) const;
-    void batch_update(const std::vector<BatchUpdateData>& updates);
+    std::vector<BatchGetData> batch_get(const std::vector<int> &indices) const;
+    void batch_update(const std::vector<BatchUpdateData> &updates);
 
-    //paint 
-    void paint(const std::string& equation);
+    // paint
+    void paint(const std::string &equation);
     void set_paint_resolution(int width, int height);
+    void set_paint_script(int script_id);
 
     // Convenience methods for specific properties
     void set_rotation(int index, float rotation);
@@ -307,6 +321,25 @@ public:
     bool are_all_shaders_ready() const;
     float get_shader_load_progress() const;
     std::string get_shader_load_status() const;
+
+    // ---- Scratchpad, Signal Queue, Agents ----
+    int create_scratchpad(size_t size);
+    void destroy_scratchpad(int id);
+    void upload_scratchpad(int id, const std::vector<float> &data);
+    std::vector<float> map_scratchpad(int id);
+    size_t scratchpad_size(int id);
+    bool is_valid_scratchpad(int id);
+
+    void set_signal_queue_capacity(size_t capacity);
+    void set_signal_queue_overflow_policy(int policy);
+    void clear_signal_queue();
+    size_t get_signal_queue_count();
+
+    void dispatch_agent(int agent_id, bool clear_after = true);
+    void dispatch_all_agents(bool clear_after = true);
+
+    int register_agent(const std::string &source);
+    std::vector<int> get_agent_ids();
 };
 
 #endif // SIMULATION_WRAPPER_H
