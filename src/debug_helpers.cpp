@@ -132,7 +132,7 @@ void DebugPrintParsedEquation(const std::string& name,
     }
 }
 
-// The rest of your functions remain UNCHANGED since they work with serialized data
+// The rest of functions work with serialized data
 bool VerifyEquationMapping(int eqID,
                            const std::vector<int>& allTokensAX,
                            const std::vector<float>& allConstantsAX,

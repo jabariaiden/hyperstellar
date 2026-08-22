@@ -5,7 +5,7 @@ project(stellar_python)
 # ============================================================================
 # FIND PYTHON
 # ============================================================================
-find_package(Python3 3.13 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================

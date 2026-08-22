@@ -1,0 +1,526 @@
+=== Building hyperstellar Python package (Linux) ===
+1. Activating Python environment...
+   ✓ Activated hyperstellar_env
+   Working from: /home/jaybird/Aidens_stuff/hyperstellar-public
+2. Cleaning...
+   ✓ Cleaned
+3. Copying shaders...
+   ✓ Copied 10 shader files
+4. Fixing source paths...
+   ✓ glad.c already in src/
+5. Building C++ module...
+   Configuring...
+-- The C compiler identification is GNU 16.1.1
+-- The CXX compiler identification is GNU 16.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found Python3: /home/jaybird/hyperstellar_env/bin/python3.13 (found suitable version "3.13.15", minimum required is "3.13") found components: Interpreter Development.Module
+-- Python include dirs: /usr/include/python3.13
+CMake Deprecation Warning at pybind11/CMakeLists.txt:8 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- pybind11 v2.11.1 
+-- Performing Test HAS_FLTO
+-- Performing Test HAS_FLTO - Success
+-- Platform: linux-x64
+-- Native output dir: /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/linux-x64
+-- Found PkgConfig: /usr/bin/pkg-config (found version "2.5.1")
+-- Checking for one of the modules 'glfw3'
+-- Using system GLFW: glfw
+-- Configuring done (1.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux
+   Compiling (4 cores)...
+[  9%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o
+[  9%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o
+[ 14%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o
+[ 19%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp.o
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp:1:9: warning: ‘NO_TEXT_RENDERING’ redefined
+    1 | #define NO_TEXT_RENDERING
+      |         ^~~~~~~~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+In file included from /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:2:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_bmp_to_func(void (*)(void*, void*, int), void*, int, int, int, const void*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:514:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  514 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:514:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:514:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_bmp(const char*, int, int, int, const void*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:522:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  522 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:522:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:522:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_tga_to_func(void (*)(void*, void*, int), void*, int, int, int, const void*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:613:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  613 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:613:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:613:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_tga(const char*, int, int, int, const void*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:621:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  621 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:621:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:621:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_hdr_to_func(void (*)(void*, void*, int), void*, int, int, int, const float*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:789:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  789 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:789:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:789:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_hdr(const char*, int, int, int, const float*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:796:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+  796 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:796:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:796:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_jpg_to_func(void (*)(void*, void*, int), void*, int, int, int, const void*, int)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1609:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+ 1609 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1609:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1609:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h: In function ‘int stbi_write_jpg(const char*, int, int, int, const void*, int)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1618:32: warning: missing initializer for member ‘stbi__write_context::context’ [-Wmissing-field-initializers]
+ 1618 |    stbi__write_context s = { 0 };
+      |                                ^
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1618:32: warning: missing initializer for member ‘stbi__write_context::buffer’ [-Wmissing-field-initializers]
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/stb_image_write.h:1618:32: warning: missing initializer for member ‘stbi__write_context::buf_used’ [-Wmissing-field-initializers]
+[ 23%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o
+[ 28%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp: In static member function ‘static float Axis::CalculateDynamicBuffer(const Camera&, float, float)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp:177:17: warning: unused variable ‘MAX_ZOOM’ [-Wunused-variable]
+  177 |     const float MAX_ZOOM = 100.0f;           // Camera::ProcessInput clamp
+      |                 ^~~~~~~~
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp: In function ‘bool Objects::Init(void*)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:1158:9: warning: unused variable ‘defaultEqID’ [-Wunused-variable]
+ 1158 |     int defaultEqID = AddOrGetEquation("default_zero", defaultEq);
+      |         ^~~~~~~~~~~
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp:104:13: warning: ‘bool isRightAssoc(TokenType)’ defined but not used [-Wunused-function]
+  104 | static bool isRightAssoc(TokenType t) { return t == TOKEN_POW; }
+      |             ^~~~~~~~~~~~
+[ 33%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp: At global scope:
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:52:15: warning: ‘g_signalQueueCount’ defined but not used [-Wunused-variable]
+   52 | static size_t g_signalQueueCount = 0; // read from GPU
+      |               ^~~~~~~~~~~~~~~~~~
+/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:43:13: warning: ‘g_scratchpadPoolDirty’ defined but not used [-Wunused-variable]
+   43 | static bool g_scratchpadPoolDirty = false;
+      |             ^~~~~~~~~~~~~~~~~~~~~
+[ 38%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
+[ 42%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o
+[ 47%] Building CXX object CMakeFiles/stellar.dir/bindings.cpp.o
+[ 52%] Building CXX object CMakeFiles/stellar.dir/simulation_wrapper.cpp.o
+[ 57%] Building C object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o
+[ 61%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_glfw.cpp.o
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp: In member function ‘void SimulationWrapper::update(float)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp:854:64: warning: comparison of integer expressions of different signedness: ‘long unsigned int’ and ‘GLsizeiptr’ {aka ‘long int’} [-Wsign-compare]
+  854 |                                 if (idx * sizeof(ContactPoint) >= size) break;
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp: In member function ‘void SimulationWrapper::load_from_file(const std::string&)’:
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp:2257:17: warning: unused variable ‘pid’ [-Wunused-variable]
+ 2257 |             int pid = add_object_raw(
+      |                 ^~~
+[ 66%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_opengl3.cpp.o
+[ 71%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui.cpp.o
+[ 76%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_demo.cpp.o
+[ 80%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_draw.cpp.o
+[ 85%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp.o
+[ 90%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp.o
+[ 95%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.o
+[100%] Linking CXX shared module stellar.so
+Copying stellar.so and shaders to /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../hyperstellar/src/hyperstellar/_native/linux-x64
+[100%] Built target stellar
+   ✓ stellar.so → linux-x64/stellar.so
+   ✓ Shaders copied
+6. Building Python wheel...
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - setuptools>=42
+  - wheel
+* Getting build dependencies for sdist...
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running egg_info
+writing hyperstellar/src/hyperstellar.egg-info/PKG-INFO
+writing dependency_links to hyperstellar/src/hyperstellar.egg-info/dependency_links.txt
+writing top-level names to hyperstellar/src/hyperstellar.egg-info/top_level.txt
+reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+* Building sdist...
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running sdist
+running egg_info
+writing hyperstellar/src/hyperstellar.egg-info/PKG-INFO
+writing dependency_links to hyperstellar/src/hyperstellar.egg-info/dependency_links.txt
+writing top-level names to hyperstellar/src/hyperstellar.egg-info/top_level.txt
+reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+running check
+creating hyperstellar-1.5.0
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar.egg-info
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64
+creating hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+creating hyperstellar-1.5.0/tests
+copying files to hyperstellar-1.5.0...
+copying LICENSE -> hyperstellar-1.5.0
+copying README.md -> hyperstellar-1.5.0
+copying pyproject.toml -> hyperstellar-1.5.0
+copying hyperstellar/src/hyperstellar/__init__.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/__init__.pyi -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/debug.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/jit.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/py.typed -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/shader.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/typed.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar.egg-info/PKG-INFO -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar.egg-info
+copying hyperstellar/src/hyperstellar.egg-info/SOURCES.txt -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar.egg-info
+copying hyperstellar/src/hyperstellar.egg-info/dependency_links.txt -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar.egg-info
+copying hyperstellar/src/hyperstellar.egg-info/top_level.txt -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar.egg-info
+copying hyperstellar/src/hyperstellar/_native/linux-x64/stellar.so -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/axis.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/axis.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/fragShader.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/geoShader.geom -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/math.comp -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/paint.comp -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.geom -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/vertexShader.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/axis.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/axis.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/fragShader.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/geoShader.geom -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.frag -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.geom -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/vertexShader.vert -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar/_native/windows-x64/shaders
+copying tests/test.py -> hyperstellar-1.5.0/tests
+Writing hyperstellar-1.5.0/setup.cfg
+Creating tar archive
+removing 'hyperstellar-1.5.0' (and everything under it)
+* Building wheel from sdist
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - setuptools>=42
+  - wheel
+* Getting build dependencies for wheel...
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running egg_info
+writing hyperstellar/src/hyperstellar.egg-info/PKG-INFO
+writing dependency_links to hyperstellar/src/hyperstellar.egg-info/dependency_links.txt
+writing top-level names to hyperstellar/src/hyperstellar.egg-info/top_level.txt
+reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+* Building wheel...
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+!!
+
+        ********************************************************************************
+        Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+        By 2027-Feb-18, you need to update your project and remove deprecated calls
+        or your builds will no longer be supported.
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  corresp(dist, value, root_dir)
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  dist._finalize_license_expression()
+/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+!!
+
+        ********************************************************************************
+        Please consider removing the following classifiers in favor of a SPDX license expression:
+
+        License :: OSI Approved :: MIT License
+
+        See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+        ********************************************************************************
+
+!!
+  self._finalize_license_expression()
+running bdist_wheel
+running build
+running build_py
+creating build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/typed.py -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/shader.py -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/jit.py -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/debug.py -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/__init__.py -> build/lib/hyperstellar
+running egg_info
+writing hyperstellar/src/hyperstellar.egg-info/PKG-INFO
+writing dependency_links to hyperstellar/src/hyperstellar.egg-info/dependency_links.txt
+writing top-level names to hyperstellar/src/hyperstellar.egg-info/top_level.txt
+reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
+copying hyperstellar/src/hyperstellar/__init__.pyi -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/py.typed -> build/lib/hyperstellar
+creating build/lib/hyperstellar/_native/windows-x64
+copying hyperstellar/src/hyperstellar/_native/windows-x64/stellar.pyd -> build/lib/hyperstellar/_native/windows-x64
+creating build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/vertexShader.vert -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.vert -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.geom -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/quad.frag -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/paint.comp -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/math.comp -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/geoShader.geom -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/fragShader.frag -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/axis.vert -> build/lib/hyperstellar/_native/windows-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/windows-x64/shaders/axis.frag -> build/lib/hyperstellar/_native/windows-x64/shaders
+creating build/lib/hyperstellar/_native/linux-x64
+copying hyperstellar/src/hyperstellar/_native/linux-x64/stellar.so -> build/lib/hyperstellar/_native/linux-x64
+creating build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/vertexShader.vert -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.vert -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.geom -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/quad.frag -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/paint.comp -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/math.comp -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/geoShader.geom -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/fragShader.frag -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/axis.vert -> build/lib/hyperstellar/_native/linux-x64/shaders
+copying hyperstellar/src/hyperstellar/_native/linux-x64/shaders/axis.frag -> build/lib/hyperstellar/_native/linux-x64/shaders
+installing to build/bdist.linux-x86_64/wheel
+running install
+running install_lib
+creating build/bdist.linux-x86_64/wheel
+creating build/bdist.linux-x86_64/wheel/hyperstellar
+creating build/bdist.linux-x86_64/wheel/hyperstellar/_native
+creating build/bdist.linux-x86_64/wheel/hyperstellar/_native/linux-x64
+creating build/bdist.linux-x86_64/wheel/hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/axis.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/axis.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/fragShader.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/geoShader.geom -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/math.comp -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/paint.comp -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/quad.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/quad.geom -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/quad.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/shaders/vertexShader.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64/shaders
+copying build/lib/hyperstellar/_native/linux-x64/stellar.so -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/linux-x64
+creating build/bdist.linux-x86_64/wheel/hyperstellar/_native/windows-x64
+creating build/bdist.linux-x86_64/wheel/hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/axis.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/axis.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/fragShader.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/geoShader.geom -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/math.comp -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/paint.comp -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/quad.frag -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/quad.geom -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/quad.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/shaders/vertexShader.vert -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64/shaders
+copying build/lib/hyperstellar/_native/windows-x64/stellar.pyd -> build/bdist.linux-x86_64/wheel/./hyperstellar/_native/windows-x64
+copying build/lib/hyperstellar/py.typed -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/__init__.pyi -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/__init__.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/debug.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/jit.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/shader.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/typed.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+running install_egg_info
+Copying hyperstellar/src/hyperstellar.egg-info to build/bdist.linux-x86_64/wheel/./hyperstellar-1.5.0-py3.13.egg-info
+running install_scripts
+creating build/bdist.linux-x86_64/wheel/hyperstellar-1.5.0.dist-info/WHEEL
+creating '/home/jaybird/Aidens_stuff/hyperstellar-public/dist/.tmp-lzq4fhaa/hyperstellar-1.5.0-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
+adding 'hyperstellar/__init__.py'
+adding 'hyperstellar/__init__.pyi'
+adding 'hyperstellar/debug.py'
+adding 'hyperstellar/jit.py'
+adding 'hyperstellar/py.typed'
+adding 'hyperstellar/shader.py'
+adding 'hyperstellar/typed.py'
+adding 'hyperstellar/_native/linux-x64/stellar.so'
+adding 'hyperstellar/_native/linux-x64/shaders/axis.frag'
+adding 'hyperstellar/_native/linux-x64/shaders/axis.vert'
+adding 'hyperstellar/_native/linux-x64/shaders/fragShader.frag'
+adding 'hyperstellar/_native/linux-x64/shaders/geoShader.geom'
+adding 'hyperstellar/_native/linux-x64/shaders/math.comp'
+adding 'hyperstellar/_native/linux-x64/shaders/paint.comp'
+adding 'hyperstellar/_native/linux-x64/shaders/quad.frag'
+adding 'hyperstellar/_native/linux-x64/shaders/quad.geom'
+adding 'hyperstellar/_native/linux-x64/shaders/quad.vert'
+adding 'hyperstellar/_native/linux-x64/shaders/vertexShader.vert'
+adding 'hyperstellar/_native/windows-x64/stellar.pyd'
+adding 'hyperstellar/_native/windows-x64/shaders/axis.frag'
+adding 'hyperstellar/_native/windows-x64/shaders/axis.vert'
+adding 'hyperstellar/_native/windows-x64/shaders/fragShader.frag'
+adding 'hyperstellar/_native/windows-x64/shaders/geoShader.geom'
+adding 'hyperstellar/_native/windows-x64/shaders/math.comp'
+adding 'hyperstellar/_native/windows-x64/shaders/paint.comp'
+adding 'hyperstellar/_native/windows-x64/shaders/quad.frag'
+adding 'hyperstellar/_native/windows-x64/shaders/quad.geom'
+adding 'hyperstellar/_native/windows-x64/shaders/quad.vert'
+adding 'hyperstellar/_native/windows-x64/shaders/vertexShader.vert'
+adding 'hyperstellar-1.5.0.dist-info/licenses/LICENSE'
+adding 'hyperstellar-1.5.0.dist-info/METADATA'
+adding 'hyperstellar-1.5.0.dist-info/WHEEL'
+adding 'hyperstellar-1.5.0.dist-info/top_level.txt'
+adding 'hyperstellar-1.5.0.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+Successfully built hyperstellar-1.5.0.tar.gz and hyperstellar-1.5.0-py3-none-any.whl
+   ✓ Renamed wheel for Linux
+   ✓ Built: hyperstellar-1.5.0-cp313-cp313-manylinux_2_39_x86_64.whl
+
+=== Done ===
+Wheel: dist/hyperstellar-1.5.0-cp313-cp313-manylinux_2_39_x86_64.whl

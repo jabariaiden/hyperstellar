@@ -1,11 +1,25 @@
+#!/usr/bin/env python3
+"""
+JIT (Just-In-Time) compilation system for Hyperstellar.
+
+Translates a decorated Python function into a GLSL compute shader.
+Supports three modes:
+  - 'object' (default): runs per particle, updates Object SSBOs.
+  - 'paint': runs per pixel, reads/writes textures (double‑buffered).
+  - 'agent': runs over the signal queue (one workgroup per signal).
+
+This module contains the AST visitor (GLSLGenerator) and the public
+decorator `script`. The actual shader wrapping logic is in `shader.py`.
+"""
+
 import ast
 import inspect
 import textwrap
-from turtle import mode
+from typing import Any, Dict, Set, Optional, Callable, Union, List, Tuple
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # GLSLGenerator – translates Python AST to GLSL compute shader code
-# =============================================================================
+# -----------------------------------------------------------------------------
 class GLSLGenerator(ast.NodeVisitor):
     """
     Translates a decorated Python function into a GLSL compute shader.
@@ -30,30 +44,49 @@ class GLSLGenerator(ast.NodeVisitor):
       - Paint mode with pan/zoom compensation
       - Scratchpad read/write (objects read only, agents read/write)
       - Signal queue enqueue (objects) and dequeue (agents)
+      - 3D ray‑tracing primitives: sphere, plane, intersect, camera_ray, raymarch, etc.
+      - Tuple unpacking: x, y, z = expr
+      - Tuple literals as vector constructors: (x, y, z) → vec3(x, y, z)
+      - SDF function inlining for raymarch
+      - Extended math functions: asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, exp2, log2, inversesqrt, faceforward, outerProduct, matrixCompMult, transpose, inverse, determinant
+      - Utility functions: saturate, lerp, fbm, random (alias for rand)
+      - elif chains
+      - @ operator for matrix multiplication
+      - Swizzling with rgba and stpq sets
+      - pass statement (no‑op)
+      -  Function parameters: declare your function with parameters (e.g., def gravity(x, y):) and they are automatically mapped to the object's state.
+      -  Explicit return: return (ax, ay, angular) or (ax, ay, angular, color) instead of assigning to magic variables.
+      -  Explicit imports: from hyperstellar.glsl import sin, cos, sqrt, ...  – these are mapped to GLSL built‑ins and are linter‑friendly.
     """
-    def __init__(self, debug=False, mode='object'):
+    def __init__(self, debug: bool = False, mode: str = 'object') -> None:
         self.debug = debug
         self.mode = mode
-        self.lines = []
-        self.indent = 0
-        self.globals = {}                   # user's global namespace
-        self.assigned_vars = set()          # variables that need declaration
-        self.var_types = {}                 # variable -> GLSL type
-        self.complex_vars = set()           # names known to be complex
-        self.inline_depth = 0
-        self.max_inline_depth = 10
-        self.inlined_functions = set()
-        self.rand_call_counter = 0          # unique seed for each rand()
-        self.user_handles_collisions = False
-        self.user_applies_constraints = False
+        self.lines: List[str] = []
+        self.indent: int = 0
+        self.globals: Dict[str, Any] = {}                   # user's global namespace
+        self.assigned_vars: Set[str] = set()               # variables that need declaration
+        self.var_types: Dict[str, str] = {}                # variable -> GLSL type
+        self.complex_vars: Set[str] = set()                # names known to be complex
+        self.inline_depth: int = 0
+        self.max_inline_depth: int = 10
+        self.inlined_functions: Set[str] = set()
+        self.rand_call_counter: int = 0                    # unique seed for each rand()
+        self.user_handles_collisions: bool = False
+        self.user_applies_constraints: bool = False
+        self.sdf_functions: Dict[str, Tuple[ast.FunctionDef, List[str]]] = {}
+        self.raymarch_functions: Dict[str, str] = {}
+        self.has_return: bool = False                      # whether function uses return
+        self.return_expr: Optional[ast.AST] = None         # captured return expression
+        self.param_names: List[str] = []                   # function parameter names
+        self.imported_names: Set[str] = set()              # names imported from hyperstellar.glsl
 
-    def indent_str(self):
+    def indent_str(self) -> str:
         return "    " * self.indent
 
     # ------------------------------------------------------------------------
-    # Main entry point: parse the Python function and generate GLSL
+    # Main entry point
     # ------------------------------------------------------------------------
-    def generate(self, func):
+    def generate(self, func: Callable) -> str:
         """
         Parse the given Python function, visit its AST, and produce the
         complete GLSL shader source.
@@ -68,11 +101,20 @@ class GLSLGenerator(ast.NodeVisitor):
         self.rand_call_counter = 0
         self.user_handles_collisions = False
         self.user_applies_constraints = False
+        self.sdf_functions.clear()
+        self.raymarch_functions.clear()
+        self.has_return = False
+        self.return_expr = None
+        self.param_names = []
+        self.imported_names.clear()
 
         tree = ast.parse(inspect.getsource(func))
         if not isinstance(tree.body[0], ast.FunctionDef):
             raise ValueError("Not a function definition")
         func_node = tree.body[0]
+
+        # extract parameter names
+        self.param_names = [arg.arg for arg in func_node.args.args]
 
         collector = AssignCollector()
         collector.visit(func_node)
@@ -86,7 +128,10 @@ class GLSLGenerator(ast.NodeVisitor):
                 elif node.func.id in ('detect_collision', 'resolve_collision'):
                     self.user_handles_collisions = True
 
-        # Predefined variables depend on mode (they are not declared in user code)
+        # Check for return statement and capture its expression
+        self._scan_for_return(func_node)
+
+        # Predefined variables depend on mode
         if self.mode == 'paint':
             predefined = {'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
                           't', 'color', 'idx', 'num_objects', 'dt', 'time',
@@ -99,1073 +144,339 @@ class GLSLGenerator(ast.NodeVisitor):
                           'color', 'pos', 'vel', 'num_objects', 'dt', 'time', 'idx',
                           'group_count', 'i', 'ax', 'ay', 'angular'}
         self.assigned_vars = collector.vars - predefined
-
-        # For paint mode, 'color' is a built‑in vec4 that the user can write to.
         if self.mode == 'paint':
             self.assigned_vars.add('color')
+        # If the function uses return, we still declare ax, ay, angular as locals
+        # (they are assigned from the return values) but we don't need to declare them
+        # as assigned variables because they are not set by user code.
+        # However, we must ensure they are declared in the GLSL code.
+        if self.has_return:
+            self.assigned_vars.add('ax')
+            self.assigned_vars.add('ay')
+            self.assigned_vars.add('angular')
+            if self.mode == 'paint':
+                self.assigned_vars.add('color')
 
-        # Walk the AST and collect GLSL statements
+        # Collect SDF functions: functions with one parameter that are used as arguments to raymarch
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.FunctionDef) and node.name != func_node.name:
+                if len(node.args.args) == 1:
+                    self.sdf_functions[node.name] = (node, [arg.arg for arg in node.args.args])
+
+        # Walk the AST (this builds self.lines with the user's code)
         self.visit(func_node)
+
+        # Build prologue to map parameters to built-in variables
+        prologue = self._build_parameter_prologue()
+
+        # Combine prologue + user code
         body = "\n".join(self.lines)
+        if prologue:
+            body = prologue + "\n" + body
 
-        # Wrap with the appropriate shader skeleton
-        if self.mode == 'paint':
-            shader = self._wrap_paint_shader(body)
-        elif self.mode == 'agent':
-            shader = self._wrap_agent_shader(body)
-        else:
-            shader = self._wrap_object_shader(body)
+        # If we have a return expression, we need to insert the assignments after the user code
+        if self.has_return and self.return_expr is not None:
+            # The return expression is already visited; we need to capture the GLSL code
+            # that computes the return values and assign them to ax, ay, angular, color.
+            ret_code = self._process_return(self.return_expr)
+            if ret_code:
+                body += "\n" + ret_code
 
-        if self.debug:
-            print("[JIT Debug] Generated shader:\n", shader)
-        return shader
-
-    # ------------------------------------------------------------------------
-    # Object shader wrapper (full physics, symplectic Euler, constraints/collisions off by default)
-    # ------------------------------------------------------------------------
-    def _wrap_object_shader(self, body):
-        """
-        Build the complete compute shader for object‑mode scripts.
-        Includes (conditionally):
-          - Object, Constraint, Collision structs
-          - All SSBO bindings (constraints and collisions only if used)
-          - Utility functions (safePow, noise, complex arithmetic)
-          - Constraint solvers and collision detection
-          - User‑exposed APIs (apply_constraints, detect_collision, ...)
-          - Main() that reads the object, executes user code (including inline constraints),
-            then optionally applies SSBO constraints and/or collisions, and writes back.
-        Inline constraints (spring, distance, boundary, angle) are generated directly
-        in the user code and do not require additional shader functions.
-        """
-        decls = []
-        for v in sorted(self.assigned_vars):
-            typ = self.var_types.get(v, "float")
-            decls.append(f"    {typ} {v};")
-        decls_str = "\n".join(decls)
-
-        # Include automatically unless user explicitly took control.
-        include_constraints = 0 if self.user_applies_constraints else 1
-        include_collisions = 0 if self.user_handles_collisions else 1
-
-        return f'''#version 430 core
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
-
-// ----------------------------------------------------------------------------
-// DATA STRUCTURES
-// ----------------------------------------------------------------------------
-struct Object {{
-    vec2 position;
-    vec2 velocity;
-    float mass;
-    float charge;
-    int visualSkinType;
-    int collisionShapeType;
-    vec4 visualData;
-    vec4 collisionData;
-    vec4 color;
-    int equationID;
-    int scriptID;
-    int _pad[2];
-}};
-
-struct Constraint {{
-    int type;
-    int targetObjectID;
-    float param1;
-    float param2;
-    float param3;
-    float param4;
-    int _pad1;
-    int _pad2;
-}};
-
-struct ObjectConstraints {{
-    int objectID;
-    int numConstraints;
-    int constraintOffset;
-    int _pad;
-}};
-
-struct CollisionProperties {{
-    int enabled;
-    int shapeType;
-    float restitution;
-    float friction;
-    float mass_factor;
-    int _pad1;
-    int _pad2;
-    int _pad3;
-}};
-
-struct CollisionInfo {{
-    bool hasCollision;
-    vec2 normal;
-    float penetration;
-    int otherObjectID;
-    vec2 contactPoint;
-}};
-
-struct ContactPoint {{
-    vec2 normal;
-    vec2 position;
-    float penetration;
-    float accumulatedNormalImpulse;
-    float accumulatedTangentImpulse;
-    int frameCount;
-}};
-
-// ----------------------------------------------------------------------------
-// BUFFERS AND UNIFORMS
-// ----------------------------------------------------------------------------
-layout(std430, binding = 0) readonly buffer ObjectsIn {{ Object objectsIn[]; }};
-layout(std430, binding = 1) writeonly buffer ObjectsOut {{ Object objectsOut[]; }};
-layout(std430, binding = 9) readonly buffer ObjectIndices {{ int indices[]; }};
-
-#if {include_constraints}
-layout(std430, binding = 5) readonly buffer Constraints {{ Constraint constraints[]; }};
-layout(std430, binding = 6) readonly buffer ObjectConstraintMappings {{ ObjectConstraints objectConstraints[]; }};
-#endif
-
-#if {include_collisions}
-layout(std430, binding = 7) readonly buffer CollisionProps {{ CollisionProperties collisionProps[]; }};
-layout(std430, binding = 8) buffer ContactBuffer {{ ContactPoint contacts[]; }};
-#endif
-
-uniform int uNumObjects;
-uniform int uGroupCount;
-uniform float uDt;
-uniform float uTime;
-uniform float uDerivativeEpsilon;
-
-uniform float k;
-uniform float b;
-uniform float g;
-uniform vec2 uGravityDir;
-uniform float uRestitution;
-uniform float uCoupling;
-uniform vec2 uExternalForce;
-uniform float uDriveFreq;
-uniform float uDriveAmp;
-
-uniform int uEnableWarmStart;
-uniform int uMaxContactIterations;
-
-// ----------------------------------------------------------------------------
-// SCRATCHPAD (read-only for objects)
-// ----------------------------------------------------------------------------
-layout(std430, binding = 10) buffer ScratchpadPool {{ float scratchpadData[]; }};
-uniform int uScratchpadOffsets[16];
-
-float scratchpad_read(int id, int idx) {{
-    return scratchpadData[uScratchpadOffsets[id] + idx];
-}}
-
-// ----------------------------------------------------------------------------
-// SIGNAL QUEUE (objects can only enqueue)
-// ----------------------------------------------------------------------------
-struct Signal {{
-    uint agentID;
-    uint objectIdx;
-    float payload;
-}};
-
-layout(std430, binding = 11) buffer SignalQueue {{
-    uint count;
-    Signal signals[];
-}};
-
-uniform uint uSignalQueueCapacity;
-uniform int  uSignalQueueOverflowPolicy;
-
-void signal_enqueue(uint agentID, float payload) {{
-    uint idx = atomicAdd(count, 1u);
-    if (idx < uSignalQueueCapacity) {{
-        signals[idx].agentID = agentID;
-        signals[idx].objectIdx = uint(gl_GlobalInvocationID.x);
-        signals[idx].payload = payload;
-    }}
-}}
-
-// ----------------------------------------------------------------------------
-// CONSTANTS & UTILITIES
-// ----------------------------------------------------------------------------
-const float EPSILON = 1e-6;
-const float SAFE_MIN_VALUE = 1e-6;
-const float SAFE_MAX_EXP = 50.0;
-const float PI = 3.14159265359;
-const int CONSTRAINT_DISTANCE = 0;
-const int CONSTRAINT_BOUNDARY = 1;
-const int CONSTRAINT_ANGLE = 2;
-const float CONSTRAINT_STIFFNESS = 1.0;
-const int MAX_CONSTRAINT_ITERATIONS = 3;
-const int COLLISION_NONE = 0;
-const int COLLISION_CIRCLE = 1;
-const int COLLISION_AABB = 2;
-const int COLLISION_POLYGON = 3;
-const int MAX_CONTACTS_PER_OBJECT = 4;
-const int MAX_CONTACT_FRAMES = 5;
-
-float safeDivide(float n, float d) {{
-    return (abs(d) < EPSILON) ? 0.0 : n / d;
-}}
-float safePow(float base, float exp) {{
-    if (base < 0.0) {{
-        float intPart;
-        if (abs(modf(exp, intPart)) < EPSILON) {{
-            float result = pow(-base, exp);
-            if (int(intPart) % 2 == 1) result = -result;
-            return result;
-        }}
-    }}
-    return pow(max(0.0, base), exp);
-}}
-float safeLog(float v) {{ return log(max(SAFE_MIN_VALUE, v)); }}
-float safeExp(float v) {{ return exp(clamp(v, -SAFE_MAX_EXP, SAFE_MAX_EXP)); }}
-bool isInvalid(float v) {{ return isinf(v) || isnan(v); }}
-vec2 sanitizeVec2(vec2 v) {{
-    if (isInvalid(v.x)) v.x = 0.0;
-    if (isInvalid(v.y)) v.y = 0.0;
-    return v;
-}}
-vec4 sanitizeVec4(vec4 v) {{
-    for (int i = 0; i < 4; ++i)
-        if (isInvalid(v[i])) v[i] = 0.0;
-    return v;
-}}
-float signFunc(float x) {{ return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }}
-float stepFunc(float x) {{ return (x >= 0.0) ? 1.0 : 0.0; }}
-
-float rand(vec2 seed) {{
-    return fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
-}}
-float smoothNoise(vec2 p) {{
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    float a = rand(i);
-    float b = rand(i + vec2(1.0, 0.0));
-    float c = rand(i + vec2(0.0, 1.0));
-    float d = rand(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}}
-float noise(vec2 p) {{
-    float sum = 0.0;
-    float amp = 0.5;
-    float freq = 4.0;
-    for (int i = 0; i < 3; ++i) {{
-        sum += amp * smoothNoise(p * freq);
-        amp *= 0.5;
-        freq *= 2.0;
-    }}
-    return sum;
-}}
-
-// ----------------------------------------------------------------------------
-// COMPLEX NUMBERS
-// ----------------------------------------------------------------------------
-vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
-vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
-vec2 cMul(vec2 a, vec2 b) {{
-    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
-}}
-vec2 cDiv(vec2 a, vec2 b) {{
-    float d = b.x*b.x + b.y*b.y;
-    if (abs(d) < EPSILON) return vec2(0.0);
-    return vec2((a.x*b.x + a.y*b.y)/d, (a.y*b.x - a.x*b.y)/d);
-}}
-vec2 cLog(vec2 z) {{
-    return vec2(safeLog(length(z)), atan(z.y, z.x));
-}}
-vec2 cExp(vec2 z) {{
-    float ea = safeExp(z.x);
-    return vec2(ea * cos(z.y), ea * sin(z.y));
-}}
-vec2 cPow(vec2 b, vec2 e) {{
-    if (length(b) < EPSILON) return vec2(0.0);
-    return cExp(cMul(e, cLog(b)));
-}}
-vec2 cSin(vec2 z) {{ return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y)); }}
-vec2 cCos(vec2 z) {{ return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y)); }}
-vec2 cTan(vec2 z) {{ return cDiv(cSin(z), cCos(z)); }}
-
-// ----------------------------------------------------------------------------
-// ROTATION HELPERS
-// ----------------------------------------------------------------------------
-vec2 rotatePoint(vec2 p, float a) {{
-    float ca = cos(a), sa = sin(a);
-    return vec2(p.x*ca - p.y*sa, p.x*sa + p.y*ca);
-}}
-vec2 worldToLocal(vec2 wp, vec2 op, float r) {{
-    return rotatePoint(wp - op, -r);
-}}
-vec2 localToWorld(vec2 lp, vec2 op, float r) {{
-    return op + rotatePoint(lp, r);
-}}
-vec2 getSupportPoint(vec2 pos, vec2 halfExt, float rot, vec2 dir) {{
-    float cr = cos(rot), sr = sin(rot);
-    vec2 localDir = vec2(dot(dir, vec2(cr, sr)), dot(dir, vec2(-sr, cr)));
-    vec2 localSupport = vec2(sign(localDir.x) * halfExt.x, sign(localDir.y) * halfExt.y);
-    return pos + vec2(localSupport.x*cr - localSupport.y*sr, localSupport.x*sr + localSupport.y*cr);
-}}
-float getMomentOfInertia(float mass, int shapeType, float w, float h, float r) {{
-    if (shapeType == COLLISION_CIRCLE) return 0.5 * mass * r * r;
-    if (shapeType == COLLISION_AABB) return (1.0/12.0) * mass * (w*w + h*h);
-    return 0.5 * mass * r * r;
-}}
-
-// ----------------------------------------------------------------------------
-// COLLISION DETECTION (only used if user calls detect_collision or resolve_collision)
-// ----------------------------------------------------------------------------
-CollisionInfo detectCircleCircle(vec2 pa, float ra, vec2 pb, float rb, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    vec2 d = pb - pa;
-    float dsq = dot(d, d);
-    float rs = ra + rb;
-    if (dsq < rs*rs && dsq > EPSILON) {{
-        float dist = sqrt(dsq);
-        info.hasCollision = true;
-        info.normal = d / dist;
-        info.penetration = rs - dist;
-        info.contactPoint = pa + d * (ra / rs);
-    }}
-    return info;
-}}
-
-CollisionInfo detectAABBAABB(vec2 pa, vec2 ha, float ra, vec2 pb, vec2 hb, float rb, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    vec2 axes[4];
-    axes[0] = vec2(cos(ra), sin(ra));
-    axes[1] = vec2(-sin(ra), cos(ra));
-    axes[2] = vec2(cos(rb), sin(rb));
-    axes[3] = vec2(-sin(rb), cos(rb));
-    vec2 d = pb - pa;
-    for (int i = 0; i < 4; ++i) {{
-        vec2 axis = axes[i];
-        float projA_rad = abs(dot(axes[0], axis)) * ha.x + abs(dot(axes[1], axis)) * ha.y;
-        float projB_rad = abs(dot(axes[2], axis)) * hb.x + abs(dot(axes[3], axis)) * hb.y;
-        float projA_center = 0.0;
-        float projB_center = dot(d, axis);
-        float sep = abs(projB_center - projA_center) - (projA_rad + projB_rad);
-        if (sep > 1e-4) return info;
-        float overlap = -sep;
-        if (overlap < info.penetration) {{
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(d, axis) < 0.0) info.normal = -axis;
-        }}
-    }}
-    info.hasCollision = true;
-    info.contactPoint = getSupportPoint(pa, ha, ra, info.normal);
-    return info;
-}}
-
-vec2 projectPolygon(vec2 center, float radius, int sides, float rot, vec2 axis) {{
-    float minP = 1e10, maxP = -1e10;
-    float step = 2.0 * PI / float(sides);
-    for (int i = 0; i < sides; ++i) {{
-        float a = rot + float(i) * step;
-        vec2 v = center + radius * vec2(cos(a), sin(a));
-        float p = dot(v, axis);
-        minP = min(minP, p);
-        maxP = max(maxP, p);
-    }}
-    return vec2(minP, maxP);
-}}
-
-vec2 getPolygonNormal(int side, int total, float rot) {{
-    float step = 2.0 * PI / float(total);
-    float a = rot + float(side) * step;
-    vec2 edge = vec2(cos(a + step), sin(a + step)) - vec2(cos(a), sin(a));
-    return normalize(vec2(-edge.y, edge.x));
-}}
-
-CollisionInfo detectPolygonPolygon(vec2 pa, float ra, int sa, float rta, vec2 pb, float rb, int sb, float rtb, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    int total = sa + sb;
-    for (int i = 0; i < total; ++i) {{
-        vec2 axis = (i < sa) ? getPolygonNormal(i, sa, rta) : getPolygonNormal(i - sa, sb, rtb);
-        vec2 projA = projectPolygon(pa, ra, sa, rta, axis);
-        vec2 projB = projectPolygon(pb, rb, sb, rtb, axis);
-        if (projA.y < projB.x || projB.y < projA.x) return info;
-        float overlap = min(projA.y, projB.y) - max(projA.x, projB.x);
-        if (overlap < info.penetration) {{
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pb - pa, axis) < 0.0) info.normal = -axis;
-        }}
-    }}
-    info.hasCollision = true;
-    return info;
-}}
-
-CollisionInfo detectCircleAABB(vec2 cp, float cr, vec2 bp, vec2 he, float brot, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    vec2 local = worldToLocal(cp, bp, brot);
-    vec2 closest = clamp(local, -he, he);
-    vec2 d = local - closest;
-    float dsq = dot(d, d);
-    if (dsq < cr*cr) {{
-        float dist = sqrt(dsq);
-        info.hasCollision = true;
-        if (dist > EPSILON) {{
-            vec2 localNormal = -(d / dist);
-            info.normal = rotatePoint(localNormal, brot);
-            info.penetration = cr - dist;
-            info.contactPoint = cp - info.normal * (cr - info.penetration * 0.5);
-        }} else {{
-            vec2 toEdge = -local;
-            vec2 absToEdge = abs(toEdge);
-            vec2 edgeDist = he - absToEdge;
-            vec2 localNormal;
-            if (edgeDist.x < edgeDist.y) {{
-                localNormal = vec2(sign(toEdge.x), 0.0);
-                info.penetration = cr + edgeDist.x;
-            }} else {{
-                localNormal = vec2(0.0, sign(toEdge.y));
-                info.penetration = cr + edgeDist.y;
-            }}
-            info.normal = rotatePoint(localNormal, brot);
-            info.contactPoint = cp - info.normal * cr;
-        }}
-    }}
-    return info;
-}}
-
-CollisionInfo detectCirclePolygon(vec2 cp, float cr, vec2 pp, float pr, int ps, float prot, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    float step = 2.0 * PI / float(ps);
-    for (int i = 0; i < ps; ++i) {{
-        vec2 axis = getPolygonNormal(i, ps, prot);
-        float cproj = dot(cp, axis);
-        vec2 crange = vec2(cproj - cr, cproj + cr);
-        vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-        if (crange.y < prange.x || prange.y < crange.x) return info;
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
-        if (overlap < info.penetration) {{
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
-        }}
-    }}
-    vec2 closest = pp;
-    float closestDsq = 1e10;
-    for (int i = 0; i < ps; ++i) {{
-        float a = prot + float(i) * step;
-        vec2 v = pp + pr * vec2(cos(a), sin(a));
-        float dsq = dot(v - cp, v - cp);
-        if (dsq < closestDsq) {{ closestDsq = dsq; closest = v; }}
-    }}
-    vec2 axis = normalize(cp - closest);
-    float cproj = dot(cp, axis);
-    vec2 crange = vec2(cproj - cr, cproj + cr);
-    vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-    if (!(crange.y < prange.x || prange.y < crange.x)) {{
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
-        if (overlap < info.penetration) {{
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
-        }}
-        info.hasCollision = true;
-    }}
-    if (info.hasCollision) info.contactPoint = cp - info.normal * cr;
-    return info;
-}}
-
-CollisionInfo detectPolygonAABB(vec2 pp, float pr, int ps, float prot, vec2 bp, vec2 he, float brot, int ob) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    vec2 verts[32];
-    float step = 2.0 * PI / float(ps);
-    for (int i = 0; i < ps && i < 32; ++i) {{
-        float a = prot + float(i) * step;
-        verts[i] = pp + pr * vec2(cos(a), sin(a));
-    }}
-    vec2 bax[2];
-    bax[0] = vec2(cos(brot), sin(brot));
-    bax[1] = vec2(-sin(brot), cos(brot));
-    vec2 bc[4] = vec2[](
-        vec2(-he.x, -he.y), vec2( he.x, -he.y),
-        vec2( he.x,  he.y), vec2(-he.x,  he.y)
-    );
-    vec2 bv[4];
-    for (int i = 0; i < 4; ++i) bv[i] = bp + bc[i].x * bax[0] + bc[i].y * bax[1];
-    vec2 axes[34];
-    int ac = 0;
-    for (int i = 0; i < ps; ++i) {{
-        int n = (i + 1) % ps;
-        vec2 e = verts[n] - verts[i];
-        axes[ac++] = normalize(vec2(-e.y, e.x));
-    }}
-    axes[ac++] = bax[0];
-    axes[ac++] = bax[1];
-    for (int i = 0; i < ac; ++i) {{
-        vec2 axis = axes[i];
-        float pmin = dot(verts[0], axis), pmax = pmin;
-        for (int j = 1; j < ps; ++j) {{
-            float p = dot(verts[j], axis);
-            pmin = min(pmin, p);
-            pmax = max(pmax, p);
-        }}
-        float bmin = dot(bv[0], axis), bmax = bmin;
-        for (int j = 1; j < 4; ++j) {{
-            float p = dot(bv[j], axis);
-            bmin = min(bmin, p);
-            bmax = max(bmax, p);
-        }}
-        if (pmax < bmin - 1e-4 || bmax < pmin - 1e-4) return info;
-        float overlap = min(pmax, bmax) - max(pmin, bmin);
-        if (overlap < info.penetration) {{
-            info.penetration = overlap;
-            info.normal = axis;
-            vec2 centerDiff = bp - pp;
-            if (dot(centerDiff, axis) < 0.0) info.normal = -axis;
-        }}
-    }}
-    info.hasCollision = true;
-    info.contactPoint = (pp + bp) * 0.5;
-    return info;
-}}
-
-CollisionInfo detectCollision(Object a, Object b, int ib, int self) {{
-    CollisionInfo info;
-    info.hasCollision = false;
-    CollisionProperties pa = collisionProps[self];
-    CollisionProperties pb = collisionProps[ib];
-    if (pa.enabled == 0 || pb.enabled == 0) return info;
-    int sa = pa.shapeType, sb = pb.shapeType;
-    if (sa == COLLISION_NONE || sb == COLLISION_NONE) return info;
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_CIRCLE)
-        return detectCircleCircle(a.position, a.visualData.x, b.position, b.visualData.x, ib);
-    if (sa == COLLISION_AABB && sb == COLLISION_AABB) {{
-        vec2 ha = a.visualData.xy * 0.5, hb = b.visualData.xy * 0.5;
-        return detectAABBAABB(a.position, ha, a.visualData.z, b.position, hb, b.visualData.z, ib);
-    }}
-    if (sa == COLLISION_POLYGON && sb == COLLISION_POLYGON)
-        return detectPolygonPolygon(a.position, a.visualData.x, int(a.visualData.y), a.visualData.z,
-                                    b.position, b.visualData.x, int(b.visualData.y), b.visualData.z, ib);
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_AABB) {{
-        vec2 hb = b.visualData.xy * 0.5;
-        return detectCircleAABB(a.position, a.visualData.x, b.position, hb, b.visualData.z, ib);
-    }}
-    if (sa == COLLISION_AABB && sb == COLLISION_CIRCLE) {{
-        vec2 ha = a.visualData.xy * 0.5;
-        CollisionInfo ci = detectCircleAABB(b.position, b.visualData.x, a.position, ha, a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }}
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_POLYGON)
-        return detectCirclePolygon(a.position, a.visualData.x, b.position, b.visualData.x, int(b.visualData.y), b.visualData.z, ib);
-    if (sa == COLLISION_POLYGON && sb == COLLISION_CIRCLE) {{
-        CollisionInfo ci = detectCirclePolygon(b.position, b.visualData.x, a.position, a.visualData.x, int(a.visualData.y), a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }}
-    if (sa == COLLISION_POLYGON && sb == COLLISION_AABB) {{
-        vec2 hb = b.visualData.xy * 0.5;
-        return detectPolygonAABB(a.position, a.visualData.x, int(a.visualData.y), a.visualData.z,
-                                 b.position, hb, b.visualData.z, ib);
-    }}
-    if (sa == COLLISION_AABB && sb == COLLISION_POLYGON) {{
-        vec2 ha = a.visualData.xy * 0.5;
-        CollisionInfo ci = detectPolygonAABB(b.position, b.visualData.x, int(b.visualData.y), b.visualData.z,
-                                             a.position, ha, a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }}
-    return info;
-}}
-
-// ----------------------------------------------------------------------------
-// COLLISION RESPONSE WITH TORQUE (only used if user calls resolve_collision)
-// ----------------------------------------------------------------------------
-void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, float ma, float ia,
-                                inout vec2 pb, inout vec2 vb, inout float wb, float mb, float ib,
-                                vec2 n, vec2 cp, float pen, float rest, float fric) {{
-    const float posCorr = 0.8, slop = 0.001;
-    if (pen > slop) {{
-        float tot = ma + mb;
-        float invTot = 1.0 / tot;
-        vec2 corr = (pen - slop) * posCorr * n;
-        pa -= corr * (mb * invTot);
-        pb += corr * (ma * invTot);
-    }}
-    vec2 ra = cp - pa;
-    vec2 rb = cp - pb;
-    vec2 vac = va + vec2(-wa * ra.y, wa * ra.x);
-    vec2 vbc = vb + vec2(-wb * rb.y, wb * rb.x);
-    vec2 rel = vbc - vac;
-    float vn = dot(rel, n);
-    if (vn > 0.0) return;
-    float e = clamp(rest, 0.0, 1.0);
-    float num = -(1.0 + e) * vn;
-    float rap = dot(ra, n), rbp = dot(rb, n);
-    float den = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
-    if (abs(den) < EPSILON) return;
-    float j = num / den;
-    vec2 imp = j * n;
-    va -= imp / ma;
-    vb += imp / mb;
-    wa -= (ra.x * imp.y - ra.y * imp.x) / ia;
-    wb += (rb.x * imp.y - rb.y * imp.x) / ib;
-    if (fric > 0.0) {{
-        vac = va + vec2(-wa * ra.y, wa * ra.x);
-        vbc = vb + vec2(-wb * rb.y, wb * rb.x);
-        rel = vbc - vac;
-        vec2 tan = rel - n * dot(rel, n);
-        float tl = length(tan);
-        if (tl > EPSILON) {{
-            tan /= tl;
-            float vt = dot(rel, tan);
-            float jt = -vt * fric;
-            float dent = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
-            if (abs(dent) > EPSILON) {{
-                jt /= dent;
-                float maxJt = abs(j) * fric;
-                jt = clamp(jt, -maxJt, maxJt);
-                vec2 fimp = jt * tan;
-                va -= fimp / ma;
-                vb += fimp / mb;
-                wa -= (ra.x * fimp.y - ra.y * fimp.x) / ia;
-                wb += (rb.x * fimp.y - rb.y * fimp.x) / ib;
-            }}
-        }}
-    }}
-}}
-
-// ----------------------------------------------------------------------------
-// CONTACT PERSISTENCE (warm starting) – only used if collisions are enabled
-// ----------------------------------------------------------------------------
-int findPersistentContact(int a, int b, vec2 n) {{
-    int base = a * MAX_CONTACTS_PER_OBJECT;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {{
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        ContactPoint c = contacts[ci];
-        if (c.frameCount > 0 && dot(c.normal, n) > 0.9) return ci;
-    }}
-    return -1;
-}}
-
-void updateContactPoint(int a, int b, vec2 n, vec2 pos, float pen) {{
-    int base = a * MAX_CONTACTS_PER_OBJECT;
-    int oldest = base, oldestFrames = 9999;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {{
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        ContactPoint c = contacts[ci];
-        if (c.frameCount == 0 || dot(c.normal, n) > 0.9) {{
-            contacts[ci].normal = n;
-            contacts[ci].position = pos;
-            contacts[ci].penetration = pen;
-            contacts[ci].frameCount = min(c.frameCount + 1, MAX_CONTACT_FRAMES);
-            return;
-        }}
-        if (c.frameCount < oldestFrames) {{
-            oldestFrames = c.frameCount;
-            oldest = ci;
-        }}
-    }}
-    if (oldest >= 0 && oldest < contacts.length()) {{
-        contacts[oldest].normal = n;
-        contacts[oldest].position = pos;
-        contacts[oldest].penetration = pen;
-        contacts[oldest].frameCount = 1;
-        contacts[oldest].accumulatedNormalImpulse = 0.0;
-        contacts[oldest].accumulatedTangentImpulse = 0.0;
-    }}
-}}
-
-void ageContacts(int idx) {{
-    int base = idx * MAX_CONTACTS_PER_OBJECT;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {{
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        if (contacts[ci].frameCount > 0) {{
-            contacts[ci].frameCount--;
-            if (contacts[ci].frameCount == 0) {{
-                contacts[ci].accumulatedNormalImpulse = 0.0;
-                contacts[ci].accumulatedTangentImpulse = 0.0;
-            }}
-        }}
-    }}
-}}
-
-// ----------------------------------------------------------------------------
-// USER‑EXPOSED COLLISION FUNCTIONS (only available if user called them)
-// ----------------------------------------------------------------------------
-bool detect_collision(int other) {{
-    if (other < 0 || other >= uNumObjects || other == int(gl_GlobalInvocationID.x)) return false;
-    Object self_obj = objectsIn[int(gl_GlobalInvocationID.x)];
-    Object other_obj = objectsIn[other];
-    CollisionInfo col = detectCollision(self_obj, other_obj, other, int(gl_GlobalInvocationID.x));
-    return col.hasCollision;
-}}
-
-void resolve_collision(int other) {{
-    if (other < 0 || other >= uNumObjects || other == int(gl_GlobalInvocationID.x)) return;
-    int self = int(gl_GlobalInvocationID.x);
-    Object self_obj = objectsIn[self];
-    Object other_obj = objectsIn[other];
-    CollisionInfo col = detectCollision(self_obj, other_obj, other, self);
-    if (!col.hasCollision) return;
-    CollisionProperties propA = collisionProps[self];
-    CollisionProperties propB = collisionProps[other];
-    float rest = min(propA.restitution, propB.restitution);
-    float fric = sqrt(propA.friction * propB.friction);
-    float mA = self_obj.mass, mB = max(EPSILON, other_obj.mass);
-    float wA = self_obj.visualData.w, wB = other_obj.visualData.w;
-    float iA = getMomentOfInertia(mA, propA.shapeType, self_obj.visualData.x, self_obj.visualData.y, self_obj.visualData.x * 0.5);
-    float iB = getMomentOfInertia(mB, propB.shapeType, other_obj.visualData.x, other_obj.visualData.y, other_obj.visualData.x * 0.5);
-    vec2 pa = self_obj.position, va = self_obj.velocity;
-    vec2 pb = other_obj.position, vb = other_obj.velocity;
-    resolveCollisionWithTorque(pa, va, wA, mA, iA,
-                               pb, vb, wB, mB, iB,
-                               col.normal, col.contactPoint, col.penetration,
-                               rest, fric);
-    objectsOut[self].position = pa;
-    objectsOut[self].velocity = va;
-    objectsOut[self].visualData.w = wA;
-}}
-
-// ----------------------------------------------------------------------------
-// CONSTRAINT SOLVERS (only used if user calls apply_constraints)
-// ----------------------------------------------------------------------------
-void solveDistanceConstraint(inout vec2 pos, inout vec2 vel, Constraint c, int self) {{
-    if (c.targetObjectID < 0 || c.targetObjectID >= uNumObjects || c.targetObjectID == self) return;
-    Object target = objectsIn[c.targetObjectID];
-    vec2 offset = pos - target.position;
-    float dist = length(offset);
-    if (dist < EPSILON) return;
-    vec2 normal = offset / dist;
-    vec2 desired = normal * c.param1;
-    pos -= (offset - desired) * CONSTRAINT_STIFFNESS;
-    vec2 relVel = vel - target.velocity;
-    vel -= dot(relVel, normal) * normal;
-}}
-
-void solveBoundaryConstraint(inout vec2 pos, inout vec2 vel, Constraint c) {{
-    float x1 = c.param1, x2 = c.param2, y1 = c.param3, y2 = c.param4;
-    float minX = min(x1, x2), maxX = max(x1, x2);
-    float minY = min(y1, y2), maxY = max(y1, y2);
-    const float elasticity = 0.7, friction = 0.95;
-    if (pos.x < minX) {{ pos.x = minX; vel.x = abs(vel.x) * elasticity; vel.y *= friction; }}
-    else if (pos.x > maxX) {{ pos.x = maxX; vel.x = -abs(vel.x) * elasticity; vel.y *= friction; }}
-    if (pos.y < minY) {{ pos.y = minY; vel.y = abs(vel.y) * elasticity; vel.x *= friction; }}
-    else if (pos.y > maxY) {{ pos.y = maxY; vel.y = -abs(vel.y) * elasticity; vel.x *= friction; }}
-}}
-
-void solveAngleConstraint(inout vec2 pos, inout vec2 vel, Constraint c, vec2 originalPos) {{
-    vec2 dir = pos - originalPos;
-    float radius = length(dir);
-    if (radius < EPSILON) return;
-    float current = atan(dir.y, dir.x);
-    current = mod(current + 2.0*PI, 2.0*PI);
-    float minA = mod(c.param1 + 2.0*PI, 2.0*PI);
-    float maxA = mod(c.param2 + 2.0*PI, 2.0*PI);
-    bool outOfBounds = false;
-    float corrected = current;
-    if (minA <= maxA) {{
-        if (current < minA || current > maxA) {{
-            outOfBounds = true;
-            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
-        }}
-    }} else {{
-        if (current < minA && current > maxA) {{
-            outOfBounds = true;
-            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
-        }}
-    }}
-    if (outOfBounds) {{
-        pos = originalPos + vec2(cos(corrected), sin(corrected)) * radius;
-        vec2 radial = normalize(pos - originalPos);
-        vec2 tangent = vec2(-radial.y, radial.x);
-        vel = tangent * dot(vel, tangent) * 0.9;
-    }}
-}}
-
-void applyConstraints(inout vec2 pos, inout vec2 vel, int self, vec2 originalPos) {{
-    ObjectConstraints pc = objectConstraints[self];
-    if (pc.numConstraints <= 0) return;
-    for (int iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; ++iter) {{
-        for (int i = 0; i < pc.numConstraints; ++i) {{
-            Constraint c = constraints[pc.constraintOffset + i];
-            if (c.type == CONSTRAINT_DISTANCE) solveDistanceConstraint(pos, vel, c, self);
-            else if (c.type == CONSTRAINT_BOUNDARY) solveBoundaryConstraint(pos, vel, c);
-            else if (c.type == CONSTRAINT_ANGLE) solveAngleConstraint(pos, vel, c, originalPos);
-        }}
-    }}
-}}
-
-// ----------------------------------------------------------------------------
-// USER‑EXPOSED CONSTRAINT API
-// ----------------------------------------------------------------------------
-int get_constraint_count() {{
-    int self = int(gl_GlobalInvocationID.x);
-    return objectConstraints[self].numConstraints;
-}}
-
-int get_constraint_type(int idx) {{
-    int self = int(gl_GlobalInvocationID.x);
-    ObjectConstraints pc = objectConstraints[self];
-    if (idx < 0 || idx >= pc.numConstraints) return -1;
-    return constraints[pc.constraintOffset + idx].type;
-}}
-
-int get_constraint_target(int idx) {{
-    int self = int(gl_GlobalInvocationID.x);
-    ObjectConstraints pc = objectConstraints[self];
-    if (idx < 0 || idx >= pc.numConstraints) return -1;
-    return constraints[pc.constraintOffset + idx].targetObjectID;
-}}
-
-float get_constraint_param(int idx, int n) {{
-    int self = int(gl_GlobalInvocationID.x);
-    ObjectConstraints pc = objectConstraints[self];
-    if (idx < 0 || idx >= pc.numConstraints) return 0.0;
-    Constraint c = constraints[pc.constraintOffset + idx];
-    if (n == 1) return c.param1;
-    if (n == 2) return c.param2;
-    if (n == 3) return c.param3;
-    if (n == 4) return c.param4;
-    return 0.0;
-}}
-
-void apply_constraints() {{
-    int self = int(gl_GlobalInvocationID.x);
-    Object p = objectsIn[self];
-    vec2 pos = p.position;
-    vec2 vel = p.velocity;
-    vec2 originalPos = pos;
-    applyConstraints(pos, vel, self, originalPos);
-    objectsOut[self].position = pos;
-    objectsOut[self].velocity = vel;
-}}
-
-// ----------------------------------------------------------------------------
-// MAIN
-// ----------------------------------------------------------------------------
-void main() {{
-    int idx = int(gl_GlobalInvocationID.x);
-    if (idx >= uGroupCount) return;
-    int objectIndex = indices[idx];
-
-    Object p = objectsIn[objectIndex];
-    vec2 pos = p.position;
-    vec2 vel = p.velocity;
-    float mass = max(EPSILON, p.mass);
-    float charge = p.charge;
-    float theta = p.visualData.z;
-    float omega = p.visualData.w;
-    vec4 color = p.color;
-    int self = objectIndex;
-    vec2 originalPos = pos;
-
-    float ax = 0.0, ay = 0.0, angular = 0.0;
-
-    // ---- user code (x, y, vx, vy are aliases) ----
-    float x = pos.x;
-    float y = pos.y;
-    float vx = vel.x;
-    float vy = vel.y;
-{decls_str}
-{body}
-
-    // ---- sanitize outputs ----
-    ax = (isInvalid(ax) ? 0.0 : ax);
-    ay = (isInvalid(ay) ? 0.0 : ay);
-    angular = (isInvalid(angular) ? 0.0 : angular);
-    color = sanitizeVec4(color);
-
-    // ---- apply SSBO constraints (only if user called apply_constraints()) ----
-    #if {include_constraints}
-    applyConstraints(pos, vel, self, originalPos);
-    #endif
-
-    // ---- automatic collision handling (only if user called detect_collision or resolve_collision) ----
-    #if {include_collisions}
-    bool hadCollision = false;
-    for (int i = 0; i < uNumObjects; ++i) {{
-        if (i == self) continue;
-        Object other = objectsIn[i];
-        CollisionProperties propA = collisionProps[self];
-        CollisionProperties propB = collisionProps[i];
-        if (propA.enabled == 0 || propB.enabled == 0) continue;
-        if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
-
-        CollisionInfo col = detectCollision(p, other, i, self);
-        if (col.hasCollision) {{
-            hadCollision = true;
-            float rest = min(propA.restitution, propB.restitution);
-            float fric = sqrt(propA.friction * propB.friction);
-            float mA = mass, mB = max(EPSILON, other.mass);
-            float wA = omega, wB = other.visualData.w;
-            float iA = getMomentOfInertia(mA, propA.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);
-            float iB = getMomentOfInertia(mB, propB.shapeType, other.visualData.x, other.visualData.y, other.visualData.x * 0.5);
-            vec2 tempPos = other.position;
-            vec2 tempVel = other.velocity;
-            float tempOmega = wB;
-            resolveCollisionWithTorque(pos, vel, omega, mA, iA,
-                                       tempPos, tempVel, tempOmega, mB, iB,
-                                       col.normal, col.contactPoint, col.penetration,
-                                       rest, fric);
-        }}
-    }}
-    if (hadCollision) {{
-        vel = sanitizeVec2(vel);
-        omega = clamp(omega, -100.0, 100.0);
-    }}
-    if (uEnableWarmStart == 1) ageContacts(self);
-    #endif
-
-    // ---- symplectic Euler integration (always) ----
-    vx += ax * uDt;
-    vy += ay * uDt;
-    x += vx * uDt;
-    y += vy * uDt;
-    theta += angular * uDt;
-
-    // ---- sanitize final position/velocity ----
-    x = sanitizeVec2(vec2(x, y)).x;
-    y = sanitizeVec2(vec2(x, y)).y;
-    vx = sanitizeVec2(vec2(vx, vy)).x;
-    vy = sanitizeVec2(vec2(vx, vy)).y;
-    theta = mod(theta, 2.0*PI);
-    if (theta < 0.0) theta += 2.0*PI;
-
-    // ---- write back ----
-    objectsOut[objectIndex].position = vec2(x, y);
-    objectsOut[objectIndex].velocity = vec2(vx, vy);
-    objectsOut[objectIndex].mass = mass;
-    objectsOut[objectIndex].charge = charge;
-    objectsOut[objectIndex].visualSkinType = p.visualSkinType;
-    objectsOut[objectIndex].collisionShapeType = p.collisionShapeType;
-    objectsOut[objectIndex].visualData.x = p.visualData.x;
-    objectsOut[objectIndex].visualData.y = p.visualData.y;
-    objectsOut[objectIndex].visualData.z = theta;
-    objectsOut[objectIndex].visualData.w = omega;
-    objectsOut[objectIndex].collisionData.x = ax;
-    objectsOut[objectIndex].collisionData.y = ay;
-    objectsOut[objectIndex].collisionData.z = p.collisionData.z;
-    objectsOut[objectIndex].collisionData.w = p.collisionData.w;
-    objectsOut[objectIndex].color = color;
-    objectsOut[objectIndex].equationID = p.equationID;
-    objectsOut[objectIndex].scriptID = p.scriptID;
-    objectsOut[objectIndex]._pad[0] = 0;
-    objectsOut[objectIndex]._pad[1] = 0;
-}}
-'''
+        # Delegate shader wrapping to the separate module
+        from . import shader
+        return shader.wrap_shader(
+            mode=self.mode,
+            body=body,
+            header=self._ray_tracing_header(),
+            sdf_defs=self._generate_sdf_defs(),
+            assigned_vars=self.assigned_vars,
+            var_types=self.var_types,
+            user_handles_collisions=self.user_handles_collisions,
+            user_applies_constraints=self.user_applies_constraints,
+            debug=self.debug
+        )
 
     # ------------------------------------------------------------------------
-    # Paint shader wrapper (unchanged except for scratchpad read)
+    # Build parameter mapping prologue
     # ------------------------------------------------------------------------
-    def _wrap_paint_shader(self, body):
+    def _build_parameter_prologue(self) -> str:
         """
-        Build the compute shader for paint‑mode scripts.
-        Includes:
-          - Double‑buffered texture read/write
-          - Object SSBO binding for p[index]
-          - Pan/zoom compensation uniforms and functions
-          - Previous‑frame sampling (sample_prev_*, avg_prev_*)
-          - Scratchpad read (read‑only)
+        Generate GLSL code that assigns the function parameters to the
+        corresponding object state variables. For example, if the user wrote:
+            def gravity(x, y):
+                ...
+        we will generate:
+            float x = pos.x;
+            float y = pos.y;
         """
-        decls = []
-        for v in sorted(self.assigned_vars):
-            if v == 'color':
-                typ = 'vec4'
+        if not self.param_names:
+            return ""
+
+        # Mapping from parameter name to GLSL expression that retrieves the object state
+        # For object mode, we have: x, y, vx, vy, mass, charge, theta, omega, color
+        # We also support 'pos' and 'vel' but they are vec2; we might map them as well.
+        mapping = {
+            'x': 'pos.x',
+            'y': 'pos.y',
+            'vx': 'vel.x',
+            'vy': 'vel.y',
+            'mass': 'mass',
+            'charge': 'charge',
+            'theta': 'theta',
+            'omega': 'omega',
+            'color': 'color',   # vec4
+            'pos': 'pos',
+            'vel': 'vel',
+        }
+
+        lines = []
+        for pname in self.param_names:
+            if pname in mapping:
+                expr = mapping[pname]
+                # Determine type: if pname is 'color', type is vec4; if 'pos' or 'vel', vec2; else float.
+                if pname == 'color':
+                    typ = 'vec4'
+                elif pname in ('pos', 'vel'):
+                    typ = 'vec2'
+                else:
+                    typ = 'float'
+                lines.append(f"    {typ} {pname} = {expr};")
             else:
-                typ = self.var_types.get(v, "float")
-            decls.append(f"    {typ} {v};")
-        decls_str = "\n".join(decls)
+                # For unknown parameters, we could treat as float zero, but we'll raise a warning?
+                # To be safe, we'll just declare them as float and assign 0.0.
+                # This avoids breaking existing scripts if they had unused parameters.
+                # We'll also add a comment.
+                lines.append(f"    // WARNING: parameter '{pname}' is not a known object property; defaulting to 0.0")
+                lines.append(f"    float {pname} = 0.0;")
+        return "\n".join(lines)
 
-        return f'''#version 430 core
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+    # ------------------------------------------------------------------------
+    # Helper: scan for return statement
+    # ------------------------------------------------------------------------
+    def _scan_for_return(self, node: ast.FunctionDef) -> None:
+        """Scan the function body for a return statement and capture its expression."""
+        for stmt in node.body:
+            if isinstance(stmt, ast.Return):
+                self.has_return = True
+                self.return_expr = stmt.value
+                return
+            # Also check nested blocks (if, for, while)
+            if isinstance(stmt, (ast.If, ast.For, ast.While)):
+                for inner in stmt.body:
+                    if isinstance(inner, ast.Return):
+                        self.has_return = True
+                        self.return_expr = inner.value
+                        return
 
-uniform sampler2D uPrevFrame;
-layout(rgba8, binding = 0) writeonly uniform image2D uPaintTarget;
+    # ------------------------------------------------------------------------
+    # Helper: process return expression and generate assignment code
+    # ------------------------------------------------------------------------
+    def _process_return(self, node: ast.AST) -> str:
+        """Generate GLSL code to assign the return values to ax, ay, angular, and color."""
+        if not isinstance(node, (ast.Tuple, ast.List)):
+            raise SyntaxError("return must be a tuple of (ax, ay, angular) or (ax, ay, angular, color)")
+        elems = node.elts
+        if not (3 <= len(elems) <= 4):
+            raise SyntaxError("return must have 3 or 4 elements: (ax, ay, angular) or (ax, ay, angular, color)")
 
-struct Object {{
-    vec2 position;
-    vec2 velocity;
-    float mass;
-    float charge;
-    int visualSkinType;
-    int collisionShapeType;
-    vec4 visualData;
-    vec4 collisionData;
-    vec4 color;
-    int equationID;
-    int scriptID;
-    int _pad[2];
-}};
-layout(std430, binding = 0) readonly buffer ObjectsIn {{ Object objectsIn[]; }};
+        ax_glsl = self._expr_to_glsl(elems[0])
+        ay_glsl = self._expr_to_glsl(elems[1])
+        angular_glsl = self._expr_to_glsl(elems[2])
+        lines = []
+        lines.append(f"    ax = {ax_glsl};")
+        lines.append(f"    ay = {ay_glsl};")
+        lines.append(f"    angular = {angular_glsl};")
+        if len(elems) == 4:
+            color_glsl = self._expr_to_glsl(elems[3])
+            lines.append(f"    color = {color_glsl};")
+        return "\n".join(lines)
 
-uniform int uNumObjects;
-uniform float uTime;
-uniform float uCameraX;
-uniform float uCameraY;
-uniform float uHalfWidth;
-uniform float uHalfHeight;
-uniform int uScreenWidth;
-uniform int uScreenHeight;
-uniform int uTexWidth;
-uniform int uTexHeight;
-uniform float uDt;
+    # ------------------------------------------------------------------------
+    # Helper: generate SDF and raymarch definitions
+    # ------------------------------------------------------------------------
+    def _generate_sdf_defs(self) -> str:
+        sdf_defs = ""
+        for name, (sdf_node, params) in self.sdf_functions.items():
+            param_name = params[0]
+            temp_gen = GLSLGenerator(debug=self.debug, mode='object')
+            temp_gen.var_types = self.var_types.copy()
+            temp_gen.complex_vars = self.complex_vars.copy()
+            temp_gen.var_types[param_name] = 'vec3'
+            if len(sdf_node.body) == 1 and isinstance(sdf_node.body[0], ast.Return):
+                ret_expr = temp_gen._expr_to_glsl(sdf_node.body[0].value)
+                sdf_defs += f"float {name}(vec3 {param_name}) {{ return {ret_expr}; }}\n"
+            else:
+                temp_gen.lines = []
+                temp_gen.indent = 0
+                for stmt in sdf_node.body:
+                    temp_gen.visit(stmt)
+                body_lines = "\n".join(temp_gen.lines)
+                sdf_defs += f"float {name}(vec3 {param_name}) {{\n{body_lines}\n}}\n"
 
-uniform vec2  uTexSize;
-uniform vec2  uPanDelta;
-uniform float uZoomRatio;
-uniform float uScale;
-
-// Scratchpad (read‑only)
-layout(std430, binding = 10) buffer ScratchpadPool {{ float scratchpadData[]; }};
-uniform int uScratchpadOffsets[16];
-
-float scratchpad_read(int id, int idx) {{
-    return scratchpadData[uScratchpadOffsets[id] + idx];
-}}
-
-const float EPSILON = 1e-6;
-
-float safeDivide(float n, float d) {{
-    return (abs(d) < EPSILON) ? 0.0 : n / d;
-}}
-float safePow(float b, float e) {{
-    if (b < 0.0) {{
-        float intPart;
-        if (abs(modf(e, intPart)) < EPSILON) {{
-            float result = pow(-b, e);
-            if (int(intPart) % 2 == 1) result = -result;
-            return result;
+        # Generate specialized raymarch functions for each SDF
+        raymarch_defs = ""
+        for sdf_name in self.sdf_functions.keys():
+            func_name = f"raymarch_{sdf_name}"
+            raymarch_defs += f"""
+Hit {func_name}(Ray r, float t_min, float t_max, int steps, float eps) {{
+    Hit h; h.hit = false; h.t = 1e10;
+    float t = t_min;
+    for (int i = 0; i < steps; i++) {{
+        vec3 p = r.origin + t * r.direction;
+        float d = {sdf_name}(p);
+        if (d < eps) {{
+            h.hit = true; h.t = t; h.point = p;
+            float e = max(eps * 10.0, 1e-5);
+            vec3 n = normalize(vec3(
+                {sdf_name}(p + vec3(e,0,0)) - {sdf_name}(p - vec3(e,0,0)),
+                {sdf_name}(p + vec3(0,e,0)) - {sdf_name}(p - vec3(0,e,0)),
+                {sdf_name}(p + vec3(0,0,e)) - {sdf_name}(p - vec3(0,0,e))
+            ));
+            h.normal = n;
+            h.uv = vec2(0.0);
+            h.material = 0;
+            break;
         }}
+        t += d;
+        if (t > t_max) break;
     }}
-    return pow(max(0.0, b), e);
+    return h;
 }}
-float safeLog(float v) {{ return log(max(EPSILON, v)); }}
-float safeExp(float v) {{ return exp(clamp(v, -50.0, 50.0)); }}
-bool isInvalid(float v) {{ return isinf(v) || isnan(v); }}
-float signFunc(float x) {{ return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }}
-float stepFunc(float x) {{ return (x >= 0.0) ? 1.0 : 0.0; }}
+"""
+        return sdf_defs + raymarch_defs
 
-float rand(vec2 seed) {{
+    # ------------------------------------------------------------------------
+    # Ray‑tracing GLSL header (extended with additional utilities)
+    # ------------------------------------------------------------------------
+    def _ray_tracing_header(self) -> str:
+        return """
+// ---- 3D Ray‑tracing primitives ----
+struct Ray { vec3 origin; vec3 direction; };
+struct Hit { bool hit; float t; vec3 point; vec3 normal; vec2 uv; int material; };
+struct CameraBasis { vec3 right; vec3 up; vec3 forward; };
+
+#define OBJECT_TYPE_SPHERE 0
+#define OBJECT_TYPE_PLANE  1
+struct GeoObject { int type; vec4 data; };
+
+GeoObject sphere(vec3 center, float radius) {
+    GeoObject o; o.type = OBJECT_TYPE_SPHERE; o.data = vec4(center, radius); return o;
+}
+GeoObject plane(vec3 normal, float d) {
+    GeoObject o; o.type = OBJECT_TYPE_PLANE; o.data = vec4(normal, d); return o;
+}
+
+Hit intersectSphere(Ray r, vec3 center, float radius) {
+    vec3 oc = r.origin - center;
+    float a = dot(r.direction, r.direction);
+    float b = 2.0 * dot(oc, r.direction);
+    float c = dot(oc, oc) - radius*radius;
+    float disc = b*b - 4.0*a*c;
+    Hit h; h.hit = false; h.t = 1e10; h.point = vec3(0.0); h.normal = vec3(0.0); h.uv = vec2(0.0); h.material = 0;
+    if (disc > 0.0) {
+        float t = (-b - sqrt(disc)) / (2.0 * a);
+        if (t > 0.0) {
+            h.hit = true; h.t = t;
+            h.point = r.origin + t * r.direction;
+            h.normal = normalize(h.point - center);
+            h.uv = vec2(0.0);
+            h.material = 0;
+        }
+    }
+    return h;
+}
+
+Hit intersectPlane(Ray r, vec3 normal, float d) {
+    Hit h; h.hit = false; h.t = 1e10; h.point = vec3(0.0); h.normal = vec3(0.0); h.uv = vec2(0.0); h.material = 0;
+    float denom = dot(r.direction, normal);
+    if (abs(denom) > 1e-6) {
+        float t = -(dot(r.origin, normal) + d) / denom;
+        if (t > 0.0) {
+            h.hit = true; h.t = t;
+            h.point = r.origin + t * r.direction;
+            h.normal = normal;
+            h.uv = vec2(0.0);
+            h.material = 0;
+        }
+    }
+    return h;
+}
+
+Hit intersect(Ray r, GeoObject obj) {
+    if (obj.type == OBJECT_TYPE_SPHERE) {
+        return intersectSphere(r, obj.data.xyz, obj.data.w);
+    } else if (obj.type == OBJECT_TYPE_PLANE) {
+        return intersectPlane(r, obj.data.xyz, obj.data.w);
+    }
+    Hit miss; miss.hit = false; miss.t = 1e10; return miss;
+}
+
+Hit miss_hit() {
+    Hit h; h.hit = false; h.t = 1e10; h.point = vec3(0.0); h.normal = vec3(0.0); h.uv = vec2(0.0); h.material = 0;
+    return h;
+}
+
+Hit closest_hit(Hit a, Hit b) {
+    if (!a.hit && !b.hit) return miss_hit();
+    if (!a.hit) return b;
+    if (!b.hit) return a;
+    return (a.t < b.t) ? a : b;
+}
+
+CameraBasis look_at(vec3 eye, vec3 target, vec3 up) {
+    CameraBasis cb;
+    cb.forward = normalize(target - eye);
+    cb.right = normalize(cross(cb.forward, up));
+    cb.up = cross(cb.right, cb.forward);
+    return cb;
+}
+
+// ---- Explicit version for custom NDC (jitter, DOF, secondary rays, etc.) ----
+Ray camera_ray_ndc(float ndcX, float ndcY, vec3 eye, vec3 target, vec3 up, float fov, float aspect) {
+    CameraBasis cb = look_at(eye, target, up);
+    float tanFov = tan(radians(fov) * 0.5);
+    vec3 dir = normalize(cb.forward + tanFov * (ndcX * aspect * cb.right + ndcY * cb.up));
+    Ray r; r.origin = eye; r.direction = dir; return r;
+}
+
+// ---- Macro for simple camera ray – WASD works correctly, aspect matches screen ----
+// ---- Helper function that takes all needed camera parameters as arguments ----
+//#define camera_ray(eye, target, up, fov) camera_ray_ndc(ndcX, ndcY, eye, target, up, fov, uHalfWidth/uHalfHeight)
+
+
+// ---- New helper: uses px/py to integrate with 2D camera, and horizontal‑right basis ----
+Ray camera_ray_pxpy(vec3 eye, vec3 target, vec3 up, float fov, float px, float py) {
+    vec3 fwd = normalize(target - eye);
+    vec3 right = normalize(vec3(fwd.z, 0.0, -fwd.x));
+    vec3 up_vec = cross(right, fwd);
+    float focal = 1.0 / tan(radians(fov) * 0.5);
+    vec3 dir = normalize(px * right + py * up_vec + focal * fwd);
+    Ray r; r.origin = eye; r.direction = dir; return r;
+}
+
+// Macro forwards to the helper, passing px and py from the calling scope.
+#define camera_ray(eye, target, up, fov) camera_ray_pxpy(eye, target, up, fov, px, py)
+
+vec3 offset_ray_origin(vec3 pos, vec3 normal) {
+    return pos + normal * 1e-4;
+}
+
+vec3 reflect(vec3 v, vec3 n) {
+    return v - 2.0 * dot(v, n) * n;
+}
+
+vec3 refract(vec3 v, vec3 n, float eta) {
+    float cosi = -dot(v, n);
+    float cost2 = 1.0 - eta*eta * (1.0 - cosi*cosi);
+    if (cost2 < 0.0) return vec3(0.0);
+    return eta * v + (eta * cosi - sqrt(cost2)) * n;
+}
+
+// ---- Random and noise functions (must be defined before fbm) ----
+float rand(vec2 seed) {
     return fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
-}}
-float smoothNoise(vec2 p) {{
+}
+float smoothNoise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     vec2 u = f * f * (3.0 - 2.0 * f);
@@ -1174,286 +485,69 @@ float smoothNoise(vec2 p) {{
     float c = rand(i + vec2(0.0, 1.0));
     float d = rand(i + vec2(1.0, 1.0));
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}}
-float noise(vec2 p) {{
+}
+float noise(vec2 p) {
     float sum = 0.0;
     float amp = 0.5;
     float freq = 4.0;
-    for (int i = 0; i < 3; ++i) {{
+    for (int i = 0; i < 3; ++i) {
         sum += amp * smoothNoise(p * freq);
         amp *= 0.5;
         freq *= 2.0;
-    }}
+    }
     return sum;
-}}
+}
 
-const vec2 i = vec2(0.0, 1.0);
-vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
-vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
-vec2 cMul(vec2 a, vec2 b) {{
-    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
-}}
-vec2 cDiv(vec2 a, vec2 b) {{
-    float d = b.x*b.x + b.y*b.y;
-    if (abs(d) < EPSILON) return vec2(0.0);
-    return vec2((a.x*b.x + a.y*b.y)/d, (a.y*b.x - a.x*b.y)/d);
-}}
-vec2 cLog(vec2 z) {{
-    float r = length(z);
-    float theta = atan(z.y, z.x);
-    return vec2(safeLog(r), theta);
-}}
-vec2 cExp(vec2 z) {{
-    float r = safeExp(z.x);
-    return r * vec2(cos(z.y), sin(z.y));
-}}
-vec2 cPow(vec2 b, vec2 e) {{
-    return cExp(cMul(e, cLog(b)));
-}}
-vec2 cSin(vec2 z) {{
-    return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y));
-}}
-vec2 cCos(vec2 z) {{
-    return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y));
-}}
-vec2 cTan(vec2 z) {{
-    return cDiv(cSin(z), cCos(z));
-}}
-float real(vec2 z) {{ return z.x; }}
-float imag(vec2 z) {{ return z.y; }}
-vec2 conj(vec2 z) {{ return vec2(z.x, -z.y); }}
-float arg(vec2 z) {{ return atan(z.y, z.x); }}
+// ---- Additional math utilities ----
+float saturate(float x) { return clamp(x, 0.0, 1.0); }
+vec2 saturate(vec2 x) { return clamp(x, 0.0, 1.0); }
+vec3 saturate(vec3 x) { return clamp(x, 0.0, 1.0); }
+vec4 saturate(vec4 x) { return clamp(x, 0.0, 1.0); }
 
-vec4 samplePrev(float wx, float wy) {{
-    float tx = (wx - (uCameraX - uHalfWidth)) / (2.0 * uHalfWidth);
-    float ty = (wy - (uCameraY - uHalfHeight)) / (2.0 * uHalfHeight);
-    tx = clamp(tx, 0.0, 1.0);
-    ty = clamp(ty, 0.0, 1.0);
-    return texture(uPrevFrame, vec2(tx, ty));
-}}
+float lerp(float a, float b, float t) { return mix(a, b, t); }
+vec2 lerp(vec2 a, vec2 b, float t) { return mix(a, b, t); }
+vec3 lerp(vec3 a, vec3 b, float t) { return mix(a, b, t); }
+vec4 lerp(vec4 a, vec4 b, float t) { return mix(a, b, t); }
 
-float samplePrevBox(vec2 center, float radius, int channel) {{
-    const int N = 5;
-    float step = radius / float(N - 1);
-    float sum = 0.0;
-    float count = 0.0;
-    for (int i = 0; i < N; ++i) {{
-        for (int j = 0; j < N; ++j) {{
-            float wx = center.x + (float(i) - float(N-1)/2.0) * step;
-            float wy = center.y + (float(j) - float(N-1)/2.0) * step;
-            vec4 col = samplePrev(wx, wy);
-            if (channel == 0) sum += col.r;
-            else if (channel == 1) sum += col.g;
-            else if (channel == 2) sum += col.b;
-            else sum += col.a;
-            count++;
-        }}
-    }}
-    return sum / count;
-}}
+float random(vec2 seed) { return rand(seed); }
 
-float avgPrevFrame(int channel) {{
-    const int N = 10;
-    float sum = 0.0;
-    float count = 0.0;
-    for (int i = 0; i < N; ++i) {{
-        for (int j = 0; j < N; ++j) {{
-            float fx = float(i) / float(N - 1);
-            float fy = float(j) / float(N - 1);
-            float wx = (uCameraX - uHalfWidth) + fx * 2.0 * uHalfWidth;
-            float wy = (uCameraY - uHalfHeight) + fy * 2.0 * uHalfHeight;
-            vec4 col = samplePrev(wx, wy);
-            if (channel == 0) sum += col.r;
-            else if (channel == 1) sum += col.g;
-            else if (channel == 2) sum += col.b;
-            else sum += col.a;
-            count++;
-        }}
-    }}
-    return sum / count;
-}}
-
-float sample_prev_r(vec2 center, float radius) {{ return samplePrevBox(center, radius, 0); }}
-float sample_prev_g(vec2 center, float radius) {{ return samplePrevBox(center, radius, 1); }}
-float sample_prev_b(vec2 center, float radius) {{ return samplePrevBox(center, radius, 2); }}
-float sample_prev_a(vec2 center, float radius) {{ return samplePrevBox(center, radius, 3); }}
-float avg_prev_r() {{ return avgPrevFrame(0); }}
-float avg_prev_g() {{ return avgPrevFrame(1); }}
-float avg_prev_b() {{ return avgPrevFrame(2); }}
-float avg_prev_a() {{ return avgPrevFrame(3); }}
-
-float getObjectProperty(int idx, int hash, int self) {{
-    if (idx < 0 || idx >= uNumObjects || idx == self) return 0.0;
-    Object o = objectsIn[idx];
-    int h = hash;
-    if (h == 1) return o.position.x;
-    if (h == 2) return o.position.y;
-    if (h == 3) return o.velocity.x;
-    if (h == 4) return o.velocity.y;
-    if (h == 5) return o.collisionData.x;
-    if (h == 6) return o.collisionData.y;
-    if (h == 22) return o.mass;
-    if (h == 23) return o.charge;
-    if (h == 8) return o.visualData.z;
-    if (h == 27) return o.visualData.w;
-    if (h == 9) return o.color.r;
-    if (h == 10) return o.color.g;
-    if (h == 11) return o.color.b;
-    if (h == 12) return o.color.a;
-    if (h == 100) return o.visualData.x;
-    if (h == 101) return o.visualData.y;
-    if (h == 102) return o.visualData.x;
-    if (h == 103) return o.visualData.x;
-    if (h == 104) return o.visualData.y;
-    return 0.0;
-}}
-
-float getVariableValue(int hash) {{
-    if (hash == 17) return 3.14159265359;
-    if (hash == 18) return 2.71828182846;
-    if (hash == 7) return uTime;
-    return 0.0;
-}}
-
-ivec2 getPrevSampleCoord(ivec2 currentCoord) {{
-    vec2 uv = (vec2(currentCoord) + vec2(0.5)) / uTexSize;
-    vec2 prevUV = (0.5 + (uv - 0.5) * uZoomRatio) - uPanDelta;
-    ivec2 prevPixel = ivec2(prevUV * uTexSize);
-    prevPixel.y = int(uTexSize.y) - 1 - prevPixel.y;
-    return prevPixel;
-}}
-
-void main() {{
-    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
-    if (coord.x >= uTexWidth || coord.y >= uTexHeight) return;
-
-    float screenX = (float(coord.x) + 0.5) * float(uScreenWidth) / float(uTexWidth);
-    float screenY = (float(coord.y) + 0.5) * float(uScreenHeight) / float(uTexHeight);
-    float ndcX = (screenX / uScreenWidth) * 2.0 - 1.0;
-    float ndcY = 1.0 - (screenY / uScreenHeight) * 2.0;
-    float px = uCameraX + ndcX * uHalfWidth;
-    float py = uCameraY + ndcY * uHalfHeight;
-
-    ivec2 prevCoord = getPrevSampleCoord(coord);
-    vec4 prev = vec4(0.0);
-    if (prevCoord.x >= 0 && prevCoord.x < int(uTexSize.x) &&
-        prevCoord.y >= 0 && prevCoord.y < int(uTexSize.y)) {{
-        prev = texelFetch(uPrevFrame, prevCoord, 0);
-    }}
-    float prev_r = prev.r;
-    float prev_g = prev.g;
-    float prev_b = prev.b;
-    float prev_a = prev.a;
-    float t = uTime;
-
-    // user‑declared variables
-{decls_str}
-
-    // user code
-{body}
-
-    vec4 outColor = vec4(color.r, color.g, color.b, color.a);
-    imageStore(uPaintTarget, ivec2(coord.x, uTexHeight - 1 - coord.y), outColor);
-}}
-'''
-
-    # ------------------------------------------------------------------------
-    # Agent shader wrapper (new for agent mode)
-    # ------------------------------------------------------------------------
-    def _wrap_agent_shader(self, body):
-        """
-        Build the compute shader for agent‑mode scripts.
-        Runs one thread per pending signal.
-        Includes:
-          - Object SSBO (read‑only)
-          - Scratchpad read/write
-          - Signal queue read (read‑only)
-          - Built‑ins: signal_object_idx, signal_payload
-          - Uniforms: uNumObjects, uAgentID, uSignalCount
-        """
-        decls = []
-        for v in sorted(self.assigned_vars):
-            typ = self.var_types.get(v, "float")
-            decls.append(f"    {typ} {v};")
-        decls_str = "\n".join(decls)
-
-        return f'''#version 430 core
-layout(local_size_x = 64) in;
-
-// ----------------------------------------------------------------------------
-// OBJECT SSBO (read‑only)
-// ----------------------------------------------------------------------------
-struct Object {{
-    vec2 position;
-    vec2 velocity;
-    float mass;
-    float charge;
-    int visualSkinType;
-    int collisionShapeType;
-    vec4 visualData;
-    vec4 collisionData;
-    vec4 color;
-    int equationID;
-    int scriptID;
-    int _pad[2];
-}};
-layout(std430, binding = 0) readonly buffer ObjectsIn {{ Object objectsIn[]; }};
-
-// ----------------------------------------------------------------------------
-// SCRATCHPAD (read/write)
-// ----------------------------------------------------------------------------
-layout(std430, binding = 10) buffer ScratchpadPool {{ float scratchpadData[]; }};
-uniform int uScratchpadOffsets[16];
-
-float scratchpad_read(int id, int idx) {{
-    return scratchpadData[uScratchpadOffsets[id] + idx];
-}}
-void scratchpad_write(int id, int idx, float val) {{
-    scratchpadData[uScratchpadOffsets[id] + idx] = val;
-}}
-
-// ----------------------------------------------------------------------------
-// SIGNAL QUEUE (read‑only)
-// ----------------------------------------------------------------------------
-struct Signal {{ uint agentID; uint objectIdx; float payload; }};
-layout(std430, binding = 11) readonly buffer SignalQueue {{
-    uint count;
-    Signal signals[];
-}};
-
-uniform int uNumObjects;
-uniform int uAgentID;
-uniform int uSignalCount;
-
-// ----------------------------------------------------------------------------
-// MAIN
-// ----------------------------------------------------------------------------
-void main() {{
-    uint idx = gl_GlobalInvocationID.x;
-    if (idx >= uSignalCount) return;
-    Signal s = signals[idx];
-    if (s.agentID != uAgentID) return;
-
-    // Built‑ins for the user
-    uint signal_object_idx = s.objectIdx;
-    float signal_payload = s.payload;
-
-    // Declare user variables
-{decls_str}
-
-    // User code
-{body}
-}}
-'''
+float fbm(vec2 p, int octaves) {
+    float value = 0.0;
+    float amp = 0.5;
+    float freq = 1.0;
+    for (int i = 0; i < octaves; i++) {
+        value += amp * noise(p * freq);
+        amp *= 0.5;
+        freq *= 2.0;
+    }
+    return value;
+}
+"""
 
     # ------------------------------------------------------------------------
     # AST Visitors
     # ------------------------------------------------------------------------
-    def visit_FunctionDef(self, node):
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         for stmt in node.body:
             self.visit(stmt)
 
-    def visit_Expr(self, node):
+    def visit_Pass(self, node: ast.Pass) -> None:
+        # Do nothing; pass is a no-op in GLSL
+        pass
+
+    # handle import from hyperstellar.glsl
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module == 'hyperstellar.glsl':
+            for alias in node.names:
+                self.imported_names.add(alias.name)
+        # Do not emit any GLSL code for imports
+
+    def visit_Import(self, node: ast.Import) -> None:
+        # Ignore regular imports; we only care about 'import hyperstellar.glsl as glsl' maybe?
+        # For now, we ignore all imports. We could add support for alias later.
+        pass
+
+    def visit_Expr(self, node: ast.Expr) -> None:
         if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
             func_name = node.value.func.id
             if func_name == 'apply_constraints':
@@ -1478,10 +572,8 @@ void main() {{
                 return
         self.generic_visit(node)
 
-    # ------------------------------------------------------------------------
-    # Inline constraint handlers (unchanged)
-    # ------------------------------------------------------------------------
-    def _handle_spring(self, node):
+    # ---- Inline constraint handlers (unchanged) ----
+    def _handle_spring(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
         stiffness = self._expr_to_glsl(kwargs.get('stiffness', ast.Constant(value=1.0)))
@@ -1510,7 +602,7 @@ void main() {{
         '''
         self.lines.append(self.indent_str() + code.strip())
 
-    def _handle_distance(self, node):
+    def _handle_distance(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
         length = self._expr_to_glsl(kwargs.get('length', ast.Constant(value=1.0)))
@@ -1541,7 +633,7 @@ void main() {{
         '''
         self.lines.append(self.indent_str() + code.strip())
 
-    def _handle_boundary(self, node):
+    def _handle_boundary(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         min_x = self._expr_to_glsl(kwargs.get('min_x', ast.Constant(value=-1e10)))
         max_x = self._expr_to_glsl(kwargs.get('max_x', ast.Constant(value=1e10)))
@@ -1562,7 +654,7 @@ void main() {{
         '''
         self.lines.append(self.indent_str() + code.strip())
 
-    def _handle_angle(self, node):
+    def _handle_angle(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target1 = self._expr_to_glsl(kwargs.get('target1', ast.Constant(value=0)))
         target2 = self._expr_to_glsl(kwargs.get('target2', ast.Constant(value=0)))
@@ -1621,10 +713,8 @@ void main() {{
         '''
         self.lines.append(self.indent_str() + code.strip())
 
-    # ------------------------------------------------------------------------
-    # Other AST visitors (unchanged)
-    # ------------------------------------------------------------------------
-    def visit_Assign(self, node):
+    # ---- Assign (with tuple unpacking support) ----
+    def visit_Assign(self, node: ast.Assign) -> None:
         if len(node.targets) != 1:
             raise SyntaxError("Only single target assignments supported")
         target = node.targets[0]
@@ -1640,13 +730,35 @@ void main() {{
                 if not typ or typ == "float":
                     self.var_types[varname] = "vec2"
             self.lines.append(self.indent_str() + f"{varname} = {expr_str};")
+        elif isinstance(target, ast.Tuple):
+            # Tuple unpacking – corrected to avoid packing struct fields into a vector
+            rhs_type = self._infer_expr_type(node.value)
+            if rhs_type and rhs_type.startswith('vec'):
+                comps = ['x', 'y', 'z', 'w']
+                for i, elt in enumerate(target.elts):
+                    if isinstance(elt, ast.Name):
+                        var = elt.id
+                        self.lines.append(self.indent_str() + f"{var} = {expr_str}.{comps[i]};")
+                    else:
+                        raise SyntaxError("Unpacking target must be simple names")
+            elif isinstance(node.value, ast.Tuple):
+                if len(target.elts) != len(node.value.elts):
+                    raise SyntaxError("Tuple unpacking length mismatch")
+                for lhs, rhs in zip(target.elts, node.value.elts):
+                    lhs_name = lhs.id if isinstance(lhs, ast.Name) else None
+                    if lhs_name is None:
+                        raise SyntaxError("Unpacking target must be simple names")
+                    rhs_expr = self._expr_to_glsl(rhs)
+                    self.lines.append(self.indent_str() + f"{lhs_name} = {rhs_expr};")
+            else:
+                raise SyntaxError("Unsupported RHS for tuple unpacking")
         elif isinstance(target, ast.Attribute):
             lvalue = self._visit_attribute(target)
             self.lines.append(self.indent_str() + f"{lvalue} = {expr_str};")
         else:
             raise SyntaxError("Unsupported assignment target")
 
-    def visit_AugAssign(self, node):
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
         if isinstance(node.target, ast.Name):
             target = node.target.id
             op = self._aug_op(node.op)
@@ -1659,22 +771,34 @@ void main() {{
         else:
             raise SyntaxError("Only simple augmented assignments")
 
-    def visit_If(self, node):
-        cond = self._expr_to_glsl(node.test)
-        self.lines.append(self.indent_str() + f"if ({cond}) {{")
-        self.indent += 1
-        for stmt in node.body:
-            self.visit(stmt)
-        self.indent -= 1
-        if node.orelse:
-            self.lines.append(self.indent_str() + "} else {")
+    # ---- If statement with elif chain support ----
+    def visit_If(self, node: ast.If) -> None:
+        # Helper to recursively emit if/elif/else chain
+        def emit_if_chain(if_node: ast.If) -> None:
+            cond = self._expr_to_glsl(if_node.test)
+            self.lines.append(self.indent_str() + f"if ({cond}) {{")
             self.indent += 1
-            for stmt in node.orelse:
+            for stmt in if_node.body:
                 self.visit(stmt)
             self.indent -= 1
-        self.lines.append(self.indent_str() + "}")
+            if if_node.orelse:
+                # Check if orelse is a single If (elif)
+                if len(if_node.orelse) == 1 and isinstance(if_node.orelse[0], ast.If):
+                    self.lines.append(self.indent_str() + "} else ")
+                    emit_if_chain(if_node.orelse[0])
+                else:
+                    self.lines.append(self.indent_str() + "} else {")
+                    self.indent += 1
+                    for stmt in if_node.orelse:
+                        self.visit(stmt)
+                    self.indent -= 1
+                    self.lines.append(self.indent_str() + "}")
+            else:
+                self.lines.append(self.indent_str() + "}")
 
-    def visit_For(self, node):
+        emit_if_chain(node)
+
+    def visit_For(self, node: ast.For) -> None:
         if not isinstance(node.iter, ast.Call) or not isinstance(node.iter.func, ast.Name) or node.iter.func.id != 'range':
             raise SyntaxError("Only 'for i in range(...)' supported")
         args = node.iter.args
@@ -1700,7 +824,7 @@ void main() {{
         self.indent -= 1
         self.lines.append(self.indent_str() + "}")
 
-    def visit_While(self, node):
+    def visit_While(self, node: ast.While) -> None:
         cond = self._expr_to_glsl(node.test)
         self.lines.append(self.indent_str() + f"while ({cond}) {{")
         self.indent += 1
@@ -1709,19 +833,19 @@ void main() {{
         self.indent -= 1
         self.lines.append(self.indent_str() + "}")
 
-    def visit_Continue(self, node):
+    def visit_Continue(self, node: ast.Continue) -> None:
         self.lines.append(self.indent_str() + "continue;")
 
-    def visit_Break(self, node):
+    def visit_Break(self, node: ast.Break) -> None:
         self.lines.append(self.indent_str() + "break;")
 
-    def visit_IfExp(self, node):
+    def visit_IfExp(self, node: ast.IfExp) -> str:
         cond = self._expr_to_glsl(node.test)
         body = self._expr_to_glsl(node.body)
         orelse = self._expr_to_glsl(node.orelse)
         return f"(({cond}) ? ({body}) : ({orelse}))"
 
-    def visit_List(self, node):
+    def visit_List(self, node: ast.List) -> str:
         rank = self._list_rank(node)
         if rank == 1:
             elems = [self._expr_to_glsl(e) for e in node.elts]
@@ -1749,7 +873,7 @@ void main() {{
         else:
             raise NotImplementedError("Tensor rank > 2 not supported")
 
-    def _list_rank(self, node):
+    def _list_rank(self, node: ast.List) -> int:
         if not isinstance(node, ast.List):
             return 0
         if not node.elts:
@@ -1759,7 +883,7 @@ void main() {{
             return 1 + self._list_rank(first)
         return 1
 
-    def _infer_list_type(self, node):
+    def _infer_list_type(self, node: ast.List) -> Optional[str]:
         rank = self._list_rank(node)
         if rank == 1:
             n = len(node.elts)
@@ -1777,7 +901,7 @@ void main() {{
                 return f"mat{n_rows}"
         return None
 
-    def _is_complex_expr(self, node):
+    def _is_complex_expr(self, node: ast.AST) -> bool:
         if isinstance(node, ast.Constant):
             return isinstance(node.value, complex)
         if isinstance(node, ast.Name):
@@ -1796,8 +920,12 @@ void main() {{
             return False
         return False
 
-    def _infer_expr_type(self, node):
+    # ---- Type inference (extended for new functions) ----
+    def _infer_expr_type(self, node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Name):
+            # Check if it's an imported name – treat as float for now
+            if node.id in self.imported_names:
+                return None  # imported functions don't have a fixed type in this context
             return self.var_types.get(node.id)
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
@@ -1807,55 +935,194 @@ void main() {{
             return None
         if isinstance(node, ast.List):
             return self._infer_list_type(node)
+        if isinstance(node, ast.Tuple):
+            n = len(node.elts)
+            if n in (2, 3, 4):
+                return f"vec{n}"
+            return None
         if isinstance(node, ast.BinOp):
             left_type = self._infer_expr_type(node.left)
             right_type = self._infer_expr_type(node.right)
             if left_type and right_type and left_type == right_type:
                 return left_type
+            # Matrix * vector => vector
             if left_type and left_type.startswith('mat') and right_type and right_type.startswith('vec'):
-                size = left_type[3]
-                if right_type == f'vec{size}':
-                    return f'vec{size}'
+                size = int(left_type[3])
+                if right_type == f"vec{size}":
+                    return f"vec{size}"
+            # vector * matrix => vector
             if left_type and left_type.startswith('vec') and right_type and right_type.startswith('mat'):
-                size = right_type[3]
-                if left_type == f'vec{size}':
-                    return f'vec{size}'
-            if left_type == "float" and right_type:
+                size = int(right_type[3])
+                if left_type == f"vec{size}":
+                    return f"vec{size}"
+            # Scalar * vector => vector
+            if left_type == "float" and right_type and right_type.startswith('vec'):
                 return right_type
-            if right_type == "float" and left_type:
+            if right_type == "float" and left_type and left_type.startswith('vec'):
                 return left_type
+            # Scalar * matrix => matrix
+            if left_type == "float" and right_type and right_type.startswith('mat'):
+                return right_type
+            if right_type == "float" and left_type and left_type.startswith('mat'):
+                return left_type
+            # @ (matrix multiply) is handled same as * for GLSL
+            if isinstance(node.op, ast.MatMult):
+                if left_type and right_type:
+                    # if both matrices, result is matrix (left type)
+                    if left_type.startswith('mat') and right_type.startswith('mat'):
+                        # check dimensions? assume compatible
+                        return left_type
+                    # if matrix * vector -> vector
+                    if left_type.startswith('mat') and right_type.startswith('vec'):
+                        size = int(left_type[3])
+                        if right_type == f"vec{size}":
+                            return f"vec{size}"
+                    # if vector * matrix -> vector (transpose?) GLSL doesn't allow vec*mat, only mat*vec, but we might not need
+                # fallback
             if self._is_complex_expr(node):
                 return "vec2"
             return None
+        if isinstance(node, ast.UnaryOp):
+            return self._infer_expr_type(node.operand)
         if isinstance(node, ast.Call):
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
-            if func_name in ('sin', 'cos', 'tan', 'sqrt', 'log', 'exp', 'abs',
-                             'floor', 'ceil', 'frac', 'sign', 'step', 'noise',
-                             'rand', 'length'):
+            if not func_name:
+                return None
+
+            # ---- Ray‑tracing functions ----
+            if func_name in ('sphere', 'plane'):
+                return "GeoObject"
+            if func_name in ('intersect', 'miss_hit', 'closest_hit', 'raymarch'):
+                return "Hit"
+            if func_name == 'look_at':
+                return "CameraBasis"
+            # camera_ray is a macro that expands to camera_ray_ndc, which returns Ray.
+            if func_name == 'camera_ray' or func_name == 'camera_ray_ndc':
+                return "Ray"
+            if func_name in ('offset_ray_origin', 'reflect', 'refract'):
+                return "vec3"
+            if func_name in ('vec2', 'vec3', 'vec4'):
+                return func_name
+
+            # ---- Existing vector functions (and extended list) ----
+            unary_return_same = {'normalize', 'reflect', 'abs', 'sign', 'floor', 'ceil', 'frac', 'fract',
+                                 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
+                                 'asinh', 'acosh', 'atanh', 'exp', 'exp2', 'log', 'log2', 'sqrt', 'inversesqrt',
+                                 'step', 'clamp', 'saturate', 'lerp', 'mix', 'smoothstep'}
+            if func_name in unary_return_same:
+                if len(node.args) >= 1:
+                    arg_type = self._infer_expr_type(node.args[0])
+                    if arg_type and arg_type.startswith('vec'):
+                        return arg_type
                 return "float"
-            if func_name in ('min', 'max', 'clamp', 'mod', 'atan2', 'dot'):
-                return "float"
+
             if func_name == 'cross':
                 return "vec3"
-            if func_name == 'diff':
+            if func_name == 'mix':
+                if len(node.args) >= 3:
+                    t1 = self._infer_expr_type(node.args[0])
+                    t2 = self._infer_expr_type(node.args[1])
+                    if t1 and t2 and t1 == t2:
+                        return t1
+                    if t1 and t1.startswith('vec'):
+                        return t1
+                    if t2 and t2.startswith('vec'):
+                        return t2
                 return "float"
-            if func_name == 'len':
+            if func_name == 'smoothstep':
+                if len(node.args) >= 3:
+                    arg_type = self._infer_expr_type(node.args[2])
+                    if arg_type and arg_type.startswith('vec'):
+                        return arg_type
+                return "float"
+            if func_name in ('distance', 'length', 'dot', 'determinant', 'fbm', 'random', 'rand',
+                             'real', 'imag', 'arg', 'sum', 'len'):
+                return "float"
+            if func_name in ('sin', 'cos', 'tan', 'sqrt', 'log', 'exp', 'abs',
+                             'floor', 'ceil', 'frac', 'fract', 'sign', 'step',
+                             'noise', 'rand', 'radians', 'degrees', 'min', 'max', 'clamp', 'mod', 'atan2'):
+                # these are already covered above; kept for compatibility
+                if len(node.args) >= 1:
+                    arg_type = self._infer_expr_type(node.args[0])
+                    if arg_type and arg_type.startswith('vec'):
+                        return arg_type
                 return "float"
             if func_name in ('cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp',
                              'cPow', 'cSin', 'cCos', 'cTan', 'conj'):
                 return "vec2"
-            if func_name in ('real', 'imag', 'arg', 'sum', 'min', 'max'):
-                return "float"
+            # Matrix functions
+            if func_name == 'outerProduct':
+                if len(node.args) >= 2:
+                    t1 = self._infer_expr_type(node.args[0])
+                    t2 = self._infer_expr_type(node.args[1])
+                    if t1 and t1.startswith('vec') and t2 and t2.startswith('vec'):
+                        n = int(t1[3])
+                        m = int(t2[3])
+                        return f"mat{n}x{m}"  # GLSL uses matCxR (columns x rows)
+                return "mat2"
+            if func_name == 'matrixCompMult':
+                if len(node.args) >= 2:
+                    t = self._infer_expr_type(node.args[0])
+                    if t and t.startswith('mat'):
+                        return t
+                return "mat2"
+            if func_name == 'transpose':
+                if len(node.args) >= 1:
+                    t = self._infer_expr_type(node.args[0])
+                    if t and t.startswith('mat'):
+                        # transpose keeps same dimensions? Actually for square it's same.
+                        return t
+                return "mat2"
+            if func_name == 'inverse':
+                if len(node.args) >= 1:
+                    t = self._infer_expr_type(node.args[0])
+                    if t and t.startswith('mat'):
+                        return t
+                return "mat2"
+            if func_name == 'faceforward':
+                if len(node.args) >= 3:
+                    t = self._infer_expr_type(node.args[0])
+                    if t and t.startswith('vec'):
+                        return t
+                return "vec3"
+            # ---- Explicit handling for dot, length, distance, and common math ----
+            if func_name in ('dot', 'length', 'distance', 'determinant'):
+                return 'float'
+            if func_name in ('max', 'min', 'clamp', 'mod', 'pow', 'sqrt', 'abs', 'sign', 'floor', 'ceil', 'fract', 'step'):
+                if len(node.args) >= 1:
+                    arg_type = self._infer_expr_type(node.args[0])
+                    if arg_type and arg_type.startswith('vec'):
+                        return arg_type
+                return 'float'
             return None
         if isinstance(node, ast.Subscript):
             value_type = self._infer_expr_type(node.value)
             if value_type and value_type.startswith('vec'):
                 return "float"
             if value_type and value_type.startswith('mat'):
-                size = value_type[3]
+                size = int(value_type[3])
                 return f"vec{size}"
             return None
         if isinstance(node, ast.Attribute):
+            # For struct fields, we infer type
+            base_type = self._infer_expr_type(node.value)
+            if base_type:
+                field_type_map = {
+                    'Ray': {'origin': 'vec3', 'direction': 'vec3'},
+                    'Hit': {'point': 'vec3', 'normal': 'vec3', 'uv': 'vec2', 't': 'float', 'hit': 'bool', 'material': 'int'},
+                    'GeoObject': {'data': 'vec4', 'type': 'int'},
+                    'CameraBasis': {'right': 'vec3', 'up': 'vec3', 'forward': 'vec3'},
+                }
+                if base_type in field_type_map and node.attr in field_type_map[base_type]:
+                    return field_type_map[base_type][node.attr]
+                # Swizzling: if base is a vector, handle swizzles
+                if base_type.startswith('vec'):
+                    # Check if attr is a valid swizzle (xyzw, rgba, stpq)
+                    if all(c in 'xyzwrgba' for c in node.attr) and len(node.attr) <= 4:
+                        if len(node.attr) == 1:
+                            return 'float'
+                        else:
+                            return base_type  # same vector type
             return None
         if isinstance(node, ast.IfExp):
             body_type = self._infer_expr_type(node.body)
@@ -1865,7 +1132,7 @@ void main() {{
             return None
         return None
 
-    def _visit_subscript(self, node):
+    def _visit_subscript(self, node: ast.Subscript) -> str:
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
             slice_expr = self._get_slice_expr(node.slice)
             idx = self._expr_to_glsl(slice_expr)
@@ -1889,12 +1156,28 @@ void main() {{
         idx = self._expr_to_glsl(slice_expr)
         return f"{value}[{idx}]"
 
-    def _get_slice_expr(self, slice_node):
+    def _get_slice_expr(self, slice_node: ast.AST) -> ast.AST:
         if isinstance(slice_node, ast.Index):
             return slice_node.value
         return slice_node
 
-    def _visit_attribute(self, node):
+    # ---- Attribute access (extended for rgba and stpq swizzling) ----
+    def _visit_attribute(self, node: ast.Attribute) -> str:
+        # ---- Vector swizzling on known variable types ----
+        if isinstance(node.value, ast.Name):
+            var_name = node.value.id
+            if var_name in self.var_types:
+                typ = self.var_types[var_name]
+                if typ and typ.startswith('vec'):
+                    attr = node.attr
+                    # Allow xyzw, rgba, stpq sets (but not mixed)
+                    valid_sets = ['xyzw', 'rgba', 'stpq']
+                    for s in valid_sets:
+                        if all(c in s for c in attr) and len(attr) <= 4:
+                            return f"{var_name}.{attr}"
+                    # If not matching, fall through
+
+        # ---- p.x, p.y, etc. ----
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
             mapping = {
                 'x': 'position.x', 'y': 'position.y',
@@ -1907,6 +1190,7 @@ void main() {{
                 return mapping[node.attr]
             raise SyntaxError(f"Unknown p attribute: {node.attr}")
 
+        # ---- p[index].x, etc. ----
         if isinstance(node.value, ast.Subscript):
             if isinstance(node.value.value, ast.Name) and node.value.value.id == 'p':
                 slice_expr = self._get_slice_expr(node.value.slice)
@@ -1923,6 +1207,7 @@ void main() {{
                     return f"{obj_ref}.{field_map[node.attr]}"
                 raise SyntaxError(f"Unknown property for p[index]: {node.attr}")
 
+        # ---- Complex number properties ----
         base_str = self._expr_to_glsl(node.value)
         if self._is_complex_expr(node.value):
             if node.attr == 'real':
@@ -1932,6 +1217,30 @@ void main() {{
             if node.attr == 'conjugate':
                 return f"conj({base_str})"
 
+        # ---- Access to struct fields (Ray, Hit, GeoObject, CameraBasis, vectors) ----
+        base_var = node.value
+        base_str = self._expr_to_glsl(base_var)
+        base_type = self._infer_expr_type(base_var)
+        if base_type:
+            field_map = {
+                'Ray': {'origin': 'origin', 'direction': 'direction'},
+                'Hit': {'hit': 'hit', 't': 't', 'point': 'point', 'normal': 'normal', 'uv': 'uv', 'material': 'material'},
+                'GeoObject': {'type': 'type', 'data': 'data'},
+                'CameraBasis': {'right': 'right', 'up': 'up', 'forward': 'forward'},
+                'vec2': {'x': 'x', 'y': 'y'},
+                'vec3': {'x': 'x', 'y': 'y', 'z': 'z'},
+                'vec4': {'x': 'x', 'y': 'y', 'z': 'z', 'w': 'w'},
+            }
+            if base_type in field_map:
+                field = node.attr
+                if field in field_map[base_type]:
+                    return f"{base_str}.{field_map[base_type][field]}"
+                elif base_type.startswith('vec') and all(c in 'xyzwrgba' for c in field) and len(field) <= 4:
+                    # allow swizzling with any of the sets
+                    return f"{base_str}.{field}"
+                raise SyntaxError(f"Unknown field {field} for type {base_type}")
+
+        # ---- Fallback for other attribute access ----
         if isinstance(node.value, ast.Name):
             obj = node.value.id
             field_map = {
@@ -1949,10 +1258,13 @@ void main() {{
 
         raise SyntaxError(f"Unsupported attribute access: {node.attr}")
 
-    def _expr_to_glsl(self, node):
+    # ------------------------------------------------------------------------
+    # Expression translator
+    # ------------------------------------------------------------------------
+    def _expr_to_glsl(self, node: ast.AST) -> str:
         return self._expr_to_glsl_with_subst(node, {})
 
-    def _expr_to_glsl_with_subst(self, node, subst):
+    def _expr_to_glsl_with_subst(self, node: ast.AST, subst: Dict[str, str]) -> str:
         if isinstance(node, ast.Constant):
             if isinstance(node.value, bool):
                 return "true" if node.value else "false"
@@ -1963,6 +1275,10 @@ void main() {{
             name = node.id
             if name in subst:
                 return subst[name]
+            # check if name is imported from hyperstellar.glsl
+            if name in self.imported_names:
+                # It's a GLSL built-in function; we just return the name (will be mapped later via _glsl_func_map)
+                return name
             if name == 'i':
                 self.complex_vars.add(name)
                 self.var_types[name] = "vec2"
@@ -1977,7 +1293,6 @@ void main() {{
                 return 'objectIndex' if self.mode != 'agent' else 'int(gl_GlobalInvocationID.x)'
             if name == 'group_count':
                 return 'uGroupCount'
-            # Agent built‑ins
             if self.mode == 'agent' and name in ('signal_object_idx', 'signal_payload'):
                 return name
             if name in ('x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
@@ -2016,8 +1331,8 @@ void main() {{
             else:
                 raise SyntaxError("Unsupported unary operator")
         elif isinstance(node, ast.BinOp):
-            left = self._expr_to_glsl(node.left)
-            right = self._expr_to_glsl(node.right)
+            left = self._expr_to_glsl_with_subst(node.left, subst)
+            right = self._expr_to_glsl_with_subst(node.right, subst)
             left_is_c = self._is_complex_expr(node.left)
             right_is_c = self._is_complex_expr(node.right)
 
@@ -2032,6 +1347,11 @@ void main() {{
                 return f"cMul({left}, {right})"
             if isinstance(node.op, ast.Div) and left_is_c and right_is_c:
                 return f"cDiv({left}, {right})"
+
+            # Matrix multiplication operator '@'
+            if isinstance(node.op, ast.MatMult):
+                # GLSL uses * for matrix multiplication
+                return f"({left} * {right})"
 
             op = self._bin_op(node.op)
             if isinstance(node.op, ast.Div):
@@ -2057,28 +1377,93 @@ void main() {{
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
             args = [self._expr_to_glsl_with_subst(a, subst) for a in node.args]
 
-            # --- NEW: scratchpad read/write and signal ---
-            if func_name == 'scratchpad_read':
-                if len(args) != 2:
-                    raise SyntaxError("scratchpad_read(id, index)")
-                return f"scratchpad_read(int({args[0]}), int({args[1]}))"
-            if func_name == 'scratchpad_write':
-                if len(args) != 3:
-                    raise SyntaxError("scratchpad_write(id, index, value)")
-                return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
-            if func_name == 'signal':
-                if len(args) != 2:
-                    raise SyntaxError("signal(agent_id, payload)")
-                return f"signal_enqueue(int({args[0]}), {args[1]})"
+            # ---- Ray‑tracing functions ----
+            if func_name == 'sphere':
+                if len(args) == 2:
+                    return f"sphere({args[0]}, {args[1]})"
+                raise SyntaxError("sphere(center, radius)")
+            if func_name == 'plane':
+                if len(args) == 2:
+                    return f"plane({args[0]}, {args[1]})"
+                raise SyntaxError("plane(normal, d)")
+            if func_name == 'intersect':
+                if len(args) == 2:
+                    return f"intersect({args[0]}, {args[1]})"
+                raise SyntaxError("intersect(ray, object)")
+            if func_name == 'miss_hit':
+                return "miss_hit()"
+            if func_name == 'closest_hit':
+                if len(args) == 2:
+                    return f"closest_hit({args[0]}, {args[1]})"
+                raise SyntaxError("closest_hit(a, b)")
+            if func_name == 'look_at':
+                if len(args) == 3:
+                    return f"look_at({args[0]}, {args[1]}, {args[2]})"
+                raise SyntaxError("look_at(eye, target, up)")
+            if func_name == 'camera_ray':
+                # Macro expansion – just generate the macro call with the given args.
+                if len(args) == 4:
+                    return f"camera_ray({', '.join(args)})"
+                else:
+                    raise SyntaxError("camera_ray(eye, target, up, fov)")
+            if func_name == 'camera_ray_ndc':
+                if len(args) == 7:
+                    return f"camera_ray_ndc({', '.join(args)})"
+                else:
+                    raise SyntaxError("camera_ray_ndc(ndcX, ndcY, eye, target, up, fov, aspect)")
+            if func_name == 'offset_ray_origin':
+                if len(args) == 2:
+                    return f"offset_ray_origin({args[0]}, {args[1]})"
+                raise SyntaxError("offset_ray_origin(position, normal)")
+            if func_name == 'reflect':
+                if len(args) == 2:
+                    return f"reflect({args[0]}, {args[1]})"
+                raise SyntaxError("reflect(direction, normal)")
+            if func_name == 'refract':
+                if len(args) == 3:
+                    return f"refract({args[0]}, {args[1]}, {args[2]})"
+                raise SyntaxError("refract(direction, normal, eta)")
+            if func_name == 'raymarch':
+                if len(args) >= 3:
+                    if isinstance(node.args[1], ast.Name):
+                        sdf_name = node.args[1].id
+                        unique_name = f"raymarch_{sdf_name}"
+                        if len(args) == 6:
+                            return f"{unique_name}({args[0]}, {args[2]}, {args[3]}, {args[4]}, {args[5]})"
+                        elif len(args) == 5:
+                            return f"{unique_name}({args[0]}, {args[2]}, {args[3]}, {args[4]}, 1e-4)"
+                        else:
+                            raise SyntaxError("raymarch(ray, sdf, t_min, t_max, steps, eps)")
+                    else:
+                        raise SyntaxError("raymarch second argument must be a function name")
+                else:
+                    raise SyntaxError("raymarch(ray, sdf, t_min, t_max, steps, eps)")
 
+            # ---- Scratchpad and signal ----
+            if func_name == 'scratchpad_read':
+                if len(args) == 2:
+                    return f"scratchpad_read(int({args[0]}), int({args[1]}))"
+                raise SyntaxError("scratchpad_read(id, index)")
+            if func_name == 'scratchpad_write':
+                if len(args) == 3:
+                    return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
+                raise SyntaxError("scratchpad_write(id, index, value)")
+            if func_name == 'signal':
+                if len(args) == 2:
+                    return f"signal_enqueue(int({args[0]}), {args[1]})"
+                raise SyntaxError("signal(agent_id, payload)")
+
+            # ---- Derivative ----
             if func_name == 'diff':
                 return self._emit_diff(node, subst)
 
+            # ---- rand ----
             if func_name == 'rand' and len(args) == 0:
                 offset = self.rand_call_counter
                 self.rand_call_counter += 1
                 return f"rand(vec2(uTime, float(objectIndex) + {offset}.0))"
 
+            # ---- len ----
             if func_name == 'len':
                 if len(args) != 1:
                     raise SyntaxError("len() takes exactly one argument")
@@ -2094,6 +1479,7 @@ void main() {{
                     return str(len(arg.elts))
                 return "float(-1.0)"
 
+            # ---- sum ----
             if func_name == 'sum':
                 if len(args) != 1:
                     raise SyntaxError("sum() takes exactly one argument")
@@ -2106,6 +1492,7 @@ void main() {{
                     return f"({' + '.join(comps)})"
                 raise SyntaxError("sum() only works on vectors (vec2/vec3/vec4)")
 
+            # ---- min/max with vector reduction ----
             if func_name == 'min':
                 if len(args) == 1:
                     arg = node.args[0]
@@ -2142,6 +1529,7 @@ void main() {{
                 else:
                     raise SyntaxError("max() takes 1 or 2 arguments")
 
+            # ---- pow, int, float ----
             if func_name == 'pow':
                 if len(args) != 2:
                     raise SyntaxError("pow() takes exactly two arguments")
@@ -2157,6 +1545,7 @@ void main() {{
                     raise SyntaxError("float() takes exactly one argument")
                 return f"float({args[0]})"
 
+            # ---- Paint helper functions ----
             if self.mode == 'paint':
                 if func_name == 'sample_prev_r':
                     return f"sample_prev_r(vec2(px, py), {args[0]})"
@@ -2175,6 +1564,7 @@ void main() {{
                 if func_name == 'avg_prev_a':
                     return "avg_prev_a()"
 
+            # ---- Complex functions ----
             complex_funcs = {
                 'cAdd': 'cAdd', 'cSub': 'cSub', 'cMul': 'cMul', 'cDiv': 'cDiv',
                 'cLog': 'cLog', 'cExp': 'cExp', 'cPow': 'cPow',
@@ -2184,13 +1574,16 @@ void main() {{
             if func_name in complex_funcs:
                 return f"{complex_funcs[func_name]}({', '.join(args)})"
 
+            # ---- Inline Python functions ----
             if func_name and func_name in self.globals:
                 inlined = self._inline_function_call(func_name, args, node)
                 if inlined is not None:
                     return inlined
 
-            if func_name in self._glsl_func_map:
-                return f"{self._glsl_func_map[func_name]}({', '.join(args)})"
+            # ---- GLSL built‑in mapping ----
+            glsl_map = self._glsl_func_map
+            if func_name in glsl_map:
+                return f"{glsl_map[func_name]}({', '.join(args)})"
 
             return f"{func_name}({', '.join(args)})"
         elif isinstance(node, ast.Subscript):
@@ -2199,24 +1592,45 @@ void main() {{
             return self._visit_attribute(node)
         elif isinstance(node, ast.List):
             return self.visit_List(node)
+        elif isinstance(node, ast.Tuple):
+            elems = [self._expr_to_glsl_with_subst(e, subst) for e in node.elts]
+            n = len(elems)
+            if n in (2, 3, 4):
+                return f"vec{n}({', '.join(elems)})"
+            else:
+                raise SyntaxError("Only tuples of length 2, 3, or 4 are supported as vector constructors")
         elif isinstance(node, ast.IfExp):
             return self.visit_IfExp(node)
         else:
             raise NotImplementedError(f"Unsupported expression: {type(node)}")
 
+    # Extended GLSL function mapping (includes new built-ins)
     _glsl_func_map = {
         'sin': 'sin', 'cos': 'cos', 'tan': 'tan',
-        'sqrt': 'sqrt', 'log': 'log', 'exp': 'exp',
+        'asin': 'asin', 'acos': 'acos', 'atan': 'atan',
+        'sinh': 'sinh', 'cosh': 'cosh', 'tanh': 'tanh',
+        'asinh': 'asinh', 'acosh': 'acosh', 'atanh': 'atanh',
+        'sqrt': 'sqrt', 'inversesqrt': 'inversesqrt',
+        'log': 'log', 'log2': 'log2', 'exp': 'exp', 'exp2': 'exp2',
         'abs': 'abs', 'floor': 'floor', 'ceil': 'ceil',
-        'frac': 'frac', 'sign': 'sign', 'step': 'step',
+        'frac': 'frac', 'fract': 'fract', 'sign': 'sign', 'step': 'step',
         'min': 'min', 'max': 'max', 'clamp': 'clamp',
         'mod': 'mod', 'atan2': 'atan2',
-        'dot': 'dot', 'cross': 'cross', 'length': 'length',
-        'noise': 'noise',
-        'conjugate': 'conj'
+        'dot': 'dot', 'cross': 'cross', 'length': 'length', 'distance': 'distance',
+        'normalize': 'normalize', 'reflect': 'reflect', 'refract': 'refract', 'faceforward': 'faceforward',
+        'mix': 'mix', 'smoothstep': 'smoothstep',
+        'radians': 'radians', 'degrees': 'degrees',
+        'noise': 'noise', 'rand': 'rand', 'random': 'rand',  # random alias
+        'conjugate': 'conj',
+        'transpose': 'transpose', 'inverse': 'inverse', 'determinant': 'determinant',
+        'outerProduct': 'outerProduct', 'matrixCompMult': 'matrixCompMult',
+        'saturate': 'saturate', 'lerp': 'lerp', 'fbm': 'fbm',
     }
 
-    def _emit_diff(self, node, subst):
+    # ------------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------------
+    def _emit_diff(self, node: ast.Call, subst: Dict[str, str]) -> str:
         if len(node.args) < 2:
             raise SyntaxError("diff() needs expr and wrt variable")
         expr_node = node.args[0]
@@ -2245,7 +1659,7 @@ void main() {{
             expr_center = self._expr_to_glsl_with_subst(expr_node, subst)
             return f"(({expr_plus} - 2.0*{expr_center} + {expr_minus}) / (EPSILON*EPSILON))"
 
-    def _inline_function_call(self, func_name, args, node):
+    def _inline_function_call(self, func_name: str, args: List[str], node: ast.Call) -> Optional[str]:
         if func_name not in self.globals:
             return None
         func_obj = self.globals[func_name]
@@ -2276,22 +1690,23 @@ void main() {{
         self.inlined_functions.remove(func_name)
         return result
 
-    def _bin_op(self, op):
+    def _bin_op(self, op: ast.AST) -> str:
         if isinstance(op, ast.Add): return "+"
         if isinstance(op, ast.Sub): return "-"
         if isinstance(op, ast.Mult): return "*"
         if isinstance(op, ast.Div): return "/"
         if isinstance(op, ast.FloorDiv): return "/"
+        if isinstance(op, ast.MatMult): return "*"  # matrix multiply
         raise SyntaxError("Unsupported binary operator")
 
-    def _aug_op(self, op):
+    def _aug_op(self, op: ast.AST) -> str:
         if isinstance(op, ast.Add): return "+"
         if isinstance(op, ast.Sub): return "-"
         if isinstance(op, ast.Mult): return "*"
         if isinstance(op, ast.Div): return "/"
         raise SyntaxError("Unsupported augmented assignment")
 
-    def _compare_op(self, op):
+    def _compare_op(self, op: ast.AST) -> str:
         if isinstance(op, ast.Lt): return "<"
         if isinstance(op, ast.LtE): return "<="
         if isinstance(op, ast.Gt): return ">"
@@ -2301,43 +1716,59 @@ void main() {{
         raise SyntaxError("Unsupported comparison operator")
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # AssignCollector – collects target variables assigned within Python AST
-# =============================================================================
+# -----------------------------------------------------------------------------
 class AssignCollector(ast.NodeVisitor):
-    def __init__(self):
-        self.vars = set()
+    def __init__(self) -> None:
+        self.vars: Set[str] = set()
         self._is_root = True
 
-    def _collect_target(self, target):
+    def _collect_target(self, target: ast.AST) -> None:
         if isinstance(target, ast.Name):
             self.vars.add(target.id)
         elif isinstance(target, (ast.Tuple, ast.List)):
             for elt in target.elts:
                 self._collect_target(elt)
 
-    def visit_Assign(self, node):
+    def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
             self._collect_target(target)
         self.generic_visit(node)
 
-    def visit_AugAssign(self, node):
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
         self._collect_target(node.target)
         self.generic_visit(node)
 
-    def visit_For(self, node):
+    def visit_For(self, node: ast.For) -> None:
         self._collect_target(node.target)
         self.generic_visit(node)
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # User‑facing decorator
-# =============================================================================
-def script(sim, debug=False, mode='object'):
-    def decorator(func):
+# -----------------------------------------------------------------------------
+def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
+    """
+    Decorator that compiles a Python function into a GPU compute shader.
+
+    Args:
+        sim: The Simulation instance (used to register the compiled shader).
+        debug: If True, prints the generated shader source.
+        mode: One of 'object' (default), 'paint', or 'agent'.
+
+    Usage:
+        @sim.script(mode='paint')
+        def my_paint():
+            color.r = 0.5
+            color.g = 0.3
+            color.b = 0.8
+            color.a = 1.0
+    """
+    def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)
         shader_source = generator.generate(func)
-        
+
         if mode == 'agent':
             script_id = sim.register_agent(shader_source)   # marks as agent
         else:

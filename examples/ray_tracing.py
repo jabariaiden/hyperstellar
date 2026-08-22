@@ -90,7 +90,7 @@ def raycast_3d():
         floor_col = [f_color*shadow*0.7, f_color*shadow*0.8, f_color*shadow*1.0]
         color = [floor_col[0], floor_col[1], floor_col[2], 1.0]
 
-sim.set_paint_script(raycast_3d._script_id)
+sim.paint(raycast_3d._script_id)
 sim.set_speed(1.0)
 
 print("Controls: Left/Right: yaw, Up/Down: pitch, WASD/QE/Scroll: camera")

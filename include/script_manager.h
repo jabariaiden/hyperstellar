@@ -24,6 +24,7 @@ public:
     void markAsAgent(int id);
     bool isAgent(int id) const;
     std::vector<int> getAgentIDs() const;
+    void unregisterScript(int script_id);
 
     void setAsGlobal();
 

@@ -136,6 +136,16 @@ void ScriptManager::setAsGlobal() {
     Objects::SetScriptManager(this);
 }
 
+void ScriptManager::unregisterScript(int script_id)
+{
+    auto it = scripts.find(script_id);
+    if (it != scripts.end()) {
+        glDeleteProgram(it->second.program);
+        scripts.erase(it);
+        agentIDs.erase(script_id);
+    }
+    agentIDs.erase(script_id);
+}
 
 // Agent tracking
 

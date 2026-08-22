@@ -797,7 +797,7 @@ struct Symbol
     {
         CONSTANT,
         EXPR,
-        TENSOR // new: a tensor literal
+        TENSOR // a tensor literal
     } kind;
     float value;            // for CONSTANT
     std::vector<Token> rpn; // for EXPR

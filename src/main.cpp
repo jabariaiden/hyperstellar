@@ -65,7 +65,7 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // In your initialization, check GPU capabilities:
+    // In initialization, check GPU capabilities:
     GLint maxSSBOsize, maxComputeWorkGroups, maxShaderStorageBlocks;
     glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &maxSSBOsize);
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxComputeWorkGroups);
@@ -119,11 +119,9 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
-        // FIX 1: Clear the main OpenGL framebuffer FIRST
         glClearColor(0.1f, 0.1f, 0.12f, 1.0f);  // Dark background
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // In your main render loop, add:
         Objects::UpdateShaderLoadingStatus();
 
         if (!Objects::IsComputeShaderReady())

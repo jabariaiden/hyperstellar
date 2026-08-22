@@ -12,9 +12,7 @@
 // Forward declaration for JIT script manager
 class ScriptManager;
 
-
 // Object structure – matches GLSL layout exactly (96 bytes)
-
 struct Object
 {
     glm::vec2 position; // offset 0
@@ -36,7 +34,8 @@ struct Object
 static_assert(sizeof(Object) == 96, "Object size must be 96 bytes for GLSL");
 
 extern float g_simulationTime;
-
+extern int g_paintWidth;
+extern int g_paintHeight;
 
 // Equation mapping (for DSL) – 112 bytes, matches GPU
 
@@ -73,7 +72,6 @@ struct EquationMapping
 };
 static_assert(sizeof(EquationMapping) == 112, "EquationMapping must be 112 bytes");
 
-
 // Collision types
 
 enum CollisionShape
@@ -95,22 +93,29 @@ struct CollisionProperties
     int _pad1, _pad2, _pad3;
 };
 
+struct CollisionEvent;
 
 // Objects namespace – main physics object manager
-
 namespace Objects
 {
     static const int MAX_OBJECTS = 10000;
     static const int MAX_EQUATIONS = 256;
     GLuint GetPrevPaintTexture();
 
-    int  CreateScratchpad(size_t numElements);
+    std::vector<int> GetScratchpadIDs();
+    
+    
+
+    // In the Objects class:
+    GLuint GetPaintTexture(int &width, int &height);
+    void GetPaintImage(std::vector<unsigned char> &jpeg_data, int quality = 85);
+    int CreateScratchpad(size_t numElements);
     void DestroyScratchpad(int id);
-    void UploadScratchpadData(int id, const void* data, size_t count);
-    void* MapScratchpad(int id, GLenum access);
-    void  UnmapScratchpad(int id);
+    void UploadScratchpadData(int id, const void *data, size_t count);
+    void *MapScratchpad(int id, GLenum access);
+    void UnmapScratchpad(int id);
     size_t GetScratchpadSize(int id);
-    bool   IsValidScratchpad(int id);
+    bool IsValidScratchpad(int id);
 
     // Signal queue
     void SetSignalQueueCapacity(size_t capacity);
@@ -138,7 +143,8 @@ namespace Objects
     void ResizePaintTexture(int width, int height);
     void CleanupPaint();
     void SetPaintScript(int scriptID);
-    
+    void GetFullFrameImage(std::vector<unsigned char> &jpeg_data, int quality, 
+                              int objectBufferIndex, const glm::mat4 &projView);
 
     // ---- Core simulation ----
     bool Init(void *glfwWindow = nullptr);
@@ -177,6 +183,10 @@ namespace Objects
     bool IsCollisionEnabled(int objectIndex);
     void SetCollisionParameters(bool enableWarmStart, int maxContactIterations);
     void GetCollisionParameters(bool &enableWarmStart, int &maxContactIterations);
+
+    // In namespace Objects
+    GLuint GetContactBuffer();   // returns g_contactBufferSSBO
+    int GetNumObjects();        // already exists
 
     // ---- Object lifecycle ----
     void AddObject();

@@ -7,6 +7,7 @@
 #include <fstream>
 #include <vector>
 #include <array>
+#include <utility>   // for std::pair
 #include "script_manager.h"
 
 // Forward declarations
@@ -147,18 +148,47 @@ struct BatchConfig
     std::string output_file = "";
 };
 
-// Helper class for key state
+// ----------------------------------------------------------------------------
+// Stable object handle and collision event structures
+// ----------------------------------------------------------------------------
+
+struct ObjectHandle
+{
+    int slot;
+    int generation;
+    ObjectHandle() : slot(-1), generation(-1) {}
+    ObjectHandle(int s, int g) : slot(s), generation(g) {}
+};
+
+struct CollisionEvent
+{
+    ObjectHandle object_a;
+    ObjectHandle object_b;
+    float normal_x;
+    float normal_y;
+    float penetration;
+    float contact_x;
+    float contact_y;
+    float impulse;
+    CollisionEvent() : normal_x(0), normal_y(0), penetration(0),
+                       contact_x(0), contact_y(0), impulse(0) {}
+};
+
+// ----------------------------------------------------------------------------
+// Helper classes for keyboard
+// ----------------------------------------------------------------------------
+
 class KeyState
 {
     bool m_pressed;
     bool m_released;
+
 public:
     KeyState(bool pressed, bool released) : m_pressed(pressed), m_released(released) {}
     bool pressed() const { return m_pressed; }
     bool released() const { return m_released; }
 };
 
-// Helper class for keyboard monitoring
 class KeyboardMonitor
 {
     SimulationWrapper *m_sim;
@@ -167,6 +197,10 @@ public:
     KeyboardMonitor(SimulationWrapper *sim) : m_sim(sim) {}
     KeyState get_key_state(const std::string &name) const;
 };
+
+// ----------------------------------------------------------------------------
+// Main simulation class
+// ----------------------------------------------------------------------------
 
 class SimulationWrapper
 {
@@ -181,13 +215,17 @@ private:
     float m_simulationTime = 0.0f;
     bool m_enable_grid;
     float m_speed = 1.0f;
-    
+
     ScriptManager scriptManager;
 
     // Keyboard state tracking
     static constexpr int MAX_KEYS = 512;
     std::array<bool, MAX_KEYS> m_currentKeys{};
     std::array<bool, MAX_KEYS> m_previousKeys{};
+
+    // Mouse tracking for delta
+    mutable double m_prevMouseX = 0.0;
+    mutable double m_prevMouseY = 0.0;
 
     void update_keyboard_state();
 
@@ -226,7 +264,9 @@ public:
     float get_speed() const { return m_speed; }
     void set_speed(float speed) { m_speed = speed; }
 
-    int add_object(
+    // ---- Object management ----
+    // Returns a stable ObjectHandle (recommended)
+    ObjectHandle add_object(
         float x = 0.0f, float y = 0.0f,
         float vx = 0.0f, float vy = 0.0f,
         float mass = 1.0f, float charge = 0.0f,
@@ -237,9 +277,45 @@ public:
         float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
         int polygon_sides = 6);
 
+    // DEPRECATED: raw index version (unstable across removals)
+    int add_object_raw(
+        float x = 0.0f, float y = 0.0f,
+        float vx = 0.0f, float vy = 0.0f,
+        float mass = 1.0f, float charge = 0.0f,
+        float rotation = 0.0f, float angular_velocity = 0.0f,
+        PySkinType skin = PySkinType::PY_SKIN_CIRCLE,
+        float size = 0.3f,
+        float width = 0.5f, float height = 0.3f,
+        float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
+        int polygon_sides = 6);
+
+    // Remove by handle (preferred)
+    void remove_object_handle(const ObjectHandle& handle);
+    // Remove by raw index (deprecated)
     void remove_object(int index);
+    // Batch remove
+    void remove_objects(const std::vector<ObjectHandle>& handles);
+
+    // Clear all objects, constraints, and reset simulation state
+    void clear_all();
+
     int object_count() const;
+
+    // Get object state by raw index or handle
     ObjectState get_object(int index) const;
+    ObjectState get_object(const ObjectHandle& handle) const;  //handle overload
+
+    //IDK
+    void follow_object(const ObjectHandle& handle, float smoothing = 0.05f);
+
+    // Get all objects
+    std::vector<ObjectState> get_all_objects() const;
+
+    // Handle utilities
+    ObjectHandle make_handle(int slot);
+    bool is_handle_valid(const ObjectHandle& handle) const;
+    int get_slot_index(const ObjectHandle& handle) const;
+    ObjectHandle get_handle(int raw_index) const;
 
     void update_object(
         int index,
@@ -261,6 +337,8 @@ public:
     void paint(const std::string &equation);
     void set_paint_resolution(int width, int height);
     void set_paint_script(int script_id);
+    void get_paint_image(std::vector<unsigned char> &jpeg_data, int quality = 85);
+    void get_full_frame(std::vector<unsigned char> &jpeg_data, int quality = 85);
 
     // Convenience methods for specific properties
     void set_rotation(int index, float rotation);
@@ -288,10 +366,23 @@ public:
     bool is_collision_enabled(int index);
     void set_collision_parameters(bool enable_warm_start, int max_contact_iterations);
     std::pair<bool, int> get_collision_parameters() const;
+    
+
+    // ---- Collision callback ----
+    void set_collision_callback(std::function<void(const CollisionEvent&)> callback);
+    void clear_collision_callback();
 
     // System parameters
     void set_parameter(const std::string &name, float value);
     float get_parameter(const std::string &name) const;
+
+    // Keyboard
+    void default_input();
+    void set_key_state(int key, bool pressed);
+
+    // Mouse query
+    std::pair<float, float> get_mouse_position() const;
+    std::pair<float, float> get_mouse_delta() const;
 
     // Simulation control
     void set_paused(bool paused);
@@ -315,6 +406,8 @@ public:
     // Properties
     bool is_headless() const { return m_headless; }
     bool is_initialized() const { return m_initialized; }
+    int get_width() const;
+    int get_height() const;
 
     // Shader loading status
     void update_shader_loading();
@@ -340,6 +433,21 @@ public:
 
     int register_agent(const std::string &source);
     std::vector<int> get_agent_ids();
+
+    // ---- Scratchpad enumeration ----
+    std::vector<int> get_scratchpad_ids() const;
+
+    // ---- Agent management ----
+    void unregister_agent(int agent_id);
+    void clear_agents();
+
+    // ---- Screen↔world conversion ----
+    std::pair<float, float> screen_to_world(float screen_x, float screen_y) const;
+    std::pair<float, float> world_to_screen(float world_x, float world_y) const;
+
+    // ---- Camera convenience ----
+    void fit_camera_to_objects(float padding = 0.2f);
+    void follow_object(int index, float smoothing = 0.05f);
 };
 
 #endif // SIMULATION_WRAPPER_H

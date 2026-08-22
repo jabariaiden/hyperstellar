@@ -1,4 +1,5 @@
 #include "simulation_wrapper.h"
+
 #include "../include/objects.h"
 #include "../include/gpu_serializer.h"
 #include "../include/parser.h"
@@ -17,6 +18,19 @@
 #include <algorithm>
 #include <sstream>
 #include <utility>
+#include <functional>   // for std::function
+#include <vector>
+
+// ----------------------------------------------------------------------------
+// OBJECT HANDLE IMPLEMENTATION
+// ----------------------------------------------------------------------------
+
+// Static generation counter for stable handles
+static std::vector<int> g_objectGenerations(Objects::MAX_OBJECTS, 0);
+static std::vector<bool> g_objectSlotsUsed(Objects::MAX_OBJECTS, false);
+
+// Global collision callback storage
+static std::function<void(const CollisionEvent&)> g_collisionCallback;
 
 namespace
 {
@@ -545,14 +559,77 @@ void SimulationWrapper::process_input()
         // Update keyboard state for this frame
         update_keyboard_state();
 
-        // Handle ESC key to close window
-        if (is_key_just_pressed(GLFW_KEY_ESCAPE))
-            glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
-
-        // Process camera controls (WASD, zoom, etc.)
-        g_camera.ProcessInput(glfwWindow, 0.016f);
+        // Mouse delta is computed lazily in get_mouse_delta
     }
 }
+
+void SimulationWrapper::default_input()
+{
+    if (!m_headless && m_window)
+    {
+        GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
+        glfwMakeContextCurrent(glfwWindow);
+
+        // ---- WASD camera pan ----
+        float speed = 10.0f * g_camera.zoom; // base speed scaled by zoom
+        float dt = 0.016f; // approximate frame time (could be passed, but fixed is fine)
+        if (is_key_pressed(GLFW_KEY_W)) g_camera.position.y += speed * dt;
+        if (is_key_pressed(GLFW_KEY_S)) g_camera.position.y -= speed * dt;
+        if (is_key_pressed(GLFW_KEY_A)) g_camera.position.x -= speed * dt;
+        if (is_key_pressed(GLFW_KEY_D)) g_camera.position.x += speed * dt;
+
+        // ---- Q/E zoom ----
+        if (is_key_pressed(GLFW_KEY_Q)) g_camera.zoom *= 0.95f;
+        if (is_key_pressed(GLFW_KEY_E)) g_camera.zoom *= 1.05f;
+
+        // ---- ESC to close window ----
+        if (is_key_just_pressed(GLFW_KEY_ESCAPE))
+            glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
+    }
+}
+
+std::pair<float, float> SimulationWrapper::get_mouse_position() const
+{
+    if (!m_window) return {0.0f, 0.0f};
+    GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
+    double x, y;
+    glfwGetCursorPos(glfwWindow, &x, &y);
+
+    // Convert to world coordinates
+    int w, h;
+    glfwGetFramebufferSize(glfwWindow, &w, &h);
+    if (w == 0 || h == 0) return {0.0f, 0.0f};
+
+    float ndcX = (float)x / w * 2.0f - 1.0f;
+    float ndcY = 1.0f - (float)y / h * 2.0f;
+
+    float aspect = (float)w / (float)h;
+    float halfWidth = g_camera.zoom * aspect;
+    float halfHeight = g_camera.zoom;
+
+    float worldX = g_camera.position.x + ndcX * halfWidth;
+    float worldY = g_camera.position.y + ndcY * halfHeight;
+
+    return {worldX, worldY};
+}
+
+std::pair<float, float> SimulationWrapper::get_mouse_delta() const
+{
+    if (!m_window) return {0.0f, 0.0f};
+    GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
+    double x, y;
+    glfwGetCursorPos(glfwWindow, &x, &y);
+
+    float dx = static_cast<float>(x - m_prevMouseX);
+    float dy = static_cast<float>(y - m_prevMouseY);
+
+    // Update stored previous position
+    m_prevMouseX = x;
+    m_prevMouseY = y;
+
+    return {dx, dy};
+}
+
 void SimulationWrapper::update_keyboard_state()
 {
     if (!m_window)
@@ -597,6 +674,12 @@ KeyState KeyboardMonitor::get_key_state(const std::string &name) const
     bool pressed = m_sim->is_key_pressed(code);
     bool released = m_sim->is_key_just_released(code);
     return KeyState(pressed, released);
+}
+
+void SimulationWrapper::set_key_state(int key, bool pressed) {
+    if (key < 0 || key >= MAX_KEYS) return;
+    m_previousKeys[key] = m_currentKeys[key];
+    m_currentKeys[key] = pressed;
 }
 
 void SimulationWrapper::set_camera_position(float x, float y)
@@ -743,6 +826,55 @@ void SimulationWrapper::update(float dt)
             Objects::Update(m_currentBuffer, 1 - m_currentBuffer, FIXED_STEP);
             m_currentBuffer = 1 - m_currentBuffer;
 
+            // Fire collision callbacks by reading the contact buffer directly
+            if (g_collisionCallback) {
+                GLuint contactBuffer = Objects::GetContactBuffer();
+                if (contactBuffer) {
+                    // Define the contact point layout matching the shader (48 bytes)
+                    struct ContactPoint {
+                        float normal[2];
+                        float position[2];
+                        float penetration;
+                        float accumulatedNormalImpulse;
+                        float accumulatedTangentImpulse;
+                        int frameCount;
+                        int padding[4]; // total 48 bytes
+                    };
+
+                    glBindBuffer(GL_SHADER_STORAGE_BUFFER, contactBuffer);
+                    GLsizeiptr size = Objects::MAX_OBJECTS * 4 * sizeof(ContactPoint);
+                    void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+                    if (data) {
+                    ContactPoint* contacts = static_cast<ContactPoint*>(data);
+                    int numObjects = Objects::GetNumObjects();
+                        for (int obj = 0; obj < numObjects; ++obj) {
+                            int base = obj * 4;
+                            for (int c = 0; c < 4; ++c) {
+                                int idx = base + c;
+                                if (idx * sizeof(ContactPoint) >= size) break;
+                                ContactPoint& cp = contacts[idx];
+                                if (cp.frameCount > 0) {
+                                    CollisionEvent ev;
+                                    ev.object_a.slot = obj;
+                                    ev.object_a.generation = 0; // generation not stored; you could add a getter
+                                    ev.object_b.slot = -1;
+                                    ev.object_b.generation = -1;
+                                    ev.normal_x = cp.normal[0];
+                                    ev.normal_y = cp.normal[1];
+                                    ev.contact_x = cp.position[0];
+                                    ev.contact_y = cp.position[1];
+                                    ev.penetration = cp.penetration;
+                                    ev.impulse = cp.accumulatedNormalImpulse + cp.accumulatedTangentImpulse;
+                                    g_collisionCallback(ev);
+                                }
+                            }
+                        }
+                        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+                    }
+                    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                }
+            }
+
             glUseProgram(0);
         }
 
@@ -774,7 +906,10 @@ void SimulationWrapper::paint(const std::string &equation)
         gpu.tokenBuffer_b, gpu.constantBuffer_b,
         gpu.tokenBuffer_a, gpu.constantBuffer_a);
 }
-
+void SimulationWrapper::get_paint_image(std::vector<unsigned char> &jpeg_data, int quality) {
+    ensure_initialized();
+    Objects::GetPaintImage(jpeg_data, quality);
+}
 // ============================================================================
 // Render simulation to screen
 // ============================================================================
@@ -848,6 +983,22 @@ void SimulationWrapper::render()
     // Swap buffers and poll events
     glfwSwapBuffers(static_cast<GLFWwindow *>(m_window));
     glfwPollEvents();
+}
+
+void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, int quality) {
+    ensure_initialized();
+
+    // Compute projection matrix from camera
+    int w = g_width;
+    int h = g_height;
+    if (g_paintWidth > 0 && g_paintHeight > 0) {
+        w = g_paintWidth;
+        h = g_paintHeight;
+    }
+    glm::mat4 projection = g_camera.GetProjectionMatrix(w, h);
+
+    // Call the objects system to capture the frame
+    Objects::GetFullFrameImage(jpeg_data, quality, m_currentBuffer, projection);
 }
 
 // ============================================================================
@@ -982,8 +1133,8 @@ bool SimulationWrapper::is_collision_enabled(int index)
 // OBJECT MANAGEMENT FUNCTIONS
 // ============================================================================
 
-// Add a new physics object to the simulation
-int SimulationWrapper::add_object(
+// Add a new physics object to the simulation (raw index version)
+int SimulationWrapper::add_object_raw(
     float x, float y, float vx, float vy,
     float mass, float charge,
     float rotation, float angular_velocity,
@@ -1068,7 +1219,27 @@ int SimulationWrapper::add_object(
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glFlush();
 
+    // Step 6: Track slot for handle generation
+    g_objectSlotsUsed[objectID] = true;
+    g_objectGenerations[objectID] = 0; // Start at 0
+
     return objectID;
+}
+
+// Add a new physics object and return an ObjectHandle
+ObjectHandle SimulationWrapper::add_object(
+    float x, float y, float vx, float vy,
+    float mass, float charge,
+    float rotation, float angular_velocity,
+    PySkinType skin,
+    float size,
+    float width, float height,
+    float r, float g, float b, float a,
+    int polygon_sides)
+{
+    int slot = add_object_raw(x, y, vx, vy, mass, charge, rotation, angular_velocity,
+                              skin, size, width, height, r, g, b, a, polygon_sides);
+    return make_handle(slot);
 }
 
 // Update properties of an existing object
@@ -1132,7 +1303,7 @@ void SimulationWrapper::update_object(
     }
 }
 
-// Remove an object from the simulation
+// Remove an object from the simulation (raw index, updates generation)
 void SimulationWrapper::remove_object(int index)
 {
     ensure_initialized();
@@ -1140,7 +1311,130 @@ void SimulationWrapper::remove_object(int index)
     if (index < 0 || index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
 
+    int lastIdx = Objects::GetNumObjects() - 1;
+    bool isLast = (index == lastIdx);
+    
+    int movedGen = 0;
+    if (!isLast) {
+        movedGen = g_objectGenerations[lastIdx];
+    }
+
     Objects::RemoveObject(index);
+    
+    int newCount = Objects::GetNumObjects(); // after removal, newCount = oldCount-1
+    
+    if (isLast) {
+        g_objectGenerations[index]++;
+        g_objectSlotsUsed[index] = false;
+    } else {
+        g_objectGenerations[index] = movedGen;
+        g_objectSlotsUsed[index] = true;
+        g_objectGenerations[newCount]++;
+        g_objectSlotsUsed[newCount] = false;
+    }
+}
+
+// Batch removal of objects using handles
+void SimulationWrapper::remove_objects(const std::vector<ObjectHandle>& handles)
+{
+    ensure_initialized();
+    
+    std::vector<int> indices;
+    indices.reserve(handles.size());
+    
+    for (const auto& handle : handles) {
+        if (is_handle_valid(handle)) {
+            indices.push_back(handle.slot);
+        }
+    }
+    
+    std::sort(indices.begin(), indices.end(), std::greater<int>());
+    
+    for (int idx : indices) {
+        int lastIdx = Objects::GetNumObjects() - 1;
+        bool isLast = (idx == lastIdx);
+        int movedGen = 0;
+        if (!isLast) {
+            movedGen = g_objectGenerations[lastIdx];
+        }
+        Objects::RemoveObject(idx);
+        int newCount = Objects::GetNumObjects();
+        if (isLast) {
+            g_objectGenerations[idx]++;
+            g_objectSlotsUsed[idx] = false;
+        } else {
+            g_objectGenerations[idx] = movedGen;
+            g_objectSlotsUsed[idx] = true;
+            g_objectGenerations[newCount]++;
+            g_objectSlotsUsed[newCount] = false;
+        }
+    }
+}
+
+// Remove object using a handle
+void SimulationWrapper::remove_object_handle(const ObjectHandle& handle)
+{
+    int index = get_slot_index(handle);
+    remove_object(index);
+}
+
+std::vector<ObjectState> SimulationWrapper::get_all_objects() const
+{
+    ensure_initialized();
+    std::vector<ObjectState> result;
+    int count = object_count();
+    result.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        result.push_back(get_object(i));
+    }
+    return result;
+}
+// Get object state by handle
+ObjectState SimulationWrapper::get_object(const ObjectHandle& handle) const
+{
+    if (!is_handle_valid(handle)) {
+        throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+    }
+    return get_object(handle.slot);
+}
+
+// Follow object by handle
+void SimulationWrapper::follow_object(const ObjectHandle& handle, float smoothing)
+{
+    if (!is_handle_valid(handle)) {
+        throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+    }
+    follow_object(handle.slot, smoothing);
+}
+
+// Clear all objects and reset simulation state
+void SimulationWrapper::clear_all()
+{
+    ensure_initialized();
+    
+    // Remove all objects
+    while (object_count() > 0) {
+        remove_object(0);
+    }
+    
+    // Clear all constraints
+    clear_all_constraints();
+    
+    // Reset script IDs
+    for (int i = 0; i < Objects::MAX_OBJECTS; i++) {
+        g_objectGenerations[i] = 0;
+        g_objectSlotsUsed[i] = false;
+    }
+    
+    // Reset simulation time
+    m_simulationTime = 0.0f;
+    g_simulationTime = 0.0f;
+    
+    // Reset camera
+    g_camera.Reset();
+    
+    // Reset speed
+    m_speed = 1.0f;
 }
 
 // Get current number of objects in simulation
@@ -1854,7 +2148,7 @@ void SimulationWrapper::load_from_file(const std::string &filename)
                     // Create previous object before starting new one
                     if (current_object_id >= 0)
                     {
-                        int pid = add_object(
+                        int pid = add_object_raw(
                             current_object.position.x, current_object.position.y,
                             current_object.velocity.x, current_object.velocity.y,
                             current_object.mass, current_object.charge,
@@ -1960,7 +2254,7 @@ void SimulationWrapper::load_from_file(const std::string &filename)
         // Create final object
         if (current_object_id >= 0)
         {
-            int pid = add_object(
+            int pid = add_object_raw(
                 current_object.position.x, current_object.position.y,
                 current_object.velocity.x, current_object.velocity.y,
                 current_object.mass, current_object.charge,
@@ -2032,7 +2326,7 @@ void SimulationWrapper::run_batch(
         // Create objects from configuration
         for (const auto &pconfig : config.objects)
         {
-            int pid = add_object(
+            int pid = add_object_raw(
                 pconfig.x, pconfig.y,
                 pconfig.vx, pconfig.vy,
                 pconfig.mass, pconfig.charge,
@@ -2165,6 +2459,203 @@ std::string SimulationWrapper::get_shader_load_status() const
     ensure_initialized();
     return Objects::GetShaderLoadStatusMessage();
 }
+
+// ============================================================================
+// HANDLE IMPLEMENTATION
+// ============================================================================
+
+// Generate a new handle for a freshly created object
+ObjectHandle SimulationWrapper::make_handle(int slot) {
+    ObjectHandle h;
+    h.slot = slot;
+    h.generation = g_objectGenerations[slot];
+    return h;
+}
+
+// Check if a handle is still valid
+bool SimulationWrapper::is_handle_valid(const ObjectHandle& handle) const {
+    if (handle.slot < 0 || handle.slot >= Objects::MAX_OBJECTS) return false;
+    if (!g_objectSlotsUsed[handle.slot]) return false;
+    return g_objectGenerations[handle.slot] == handle.generation;
+}
+
+// Get the raw slot index from a handle (throws if invalid)
+int SimulationWrapper::get_slot_index(const ObjectHandle& handle) const {
+    if (!is_handle_valid(handle)) {
+        throw std::runtime_error("ObjectHandle is invalid - object was removed or slot was reused");
+    }
+    return handle.slot;
+}
+
+// Get handle for a raw index (returns invalid handle if slot empty)
+ObjectHandle SimulationWrapper::get_handle(int raw_index) const {
+    if (raw_index < 0 || raw_index >= Objects::GetNumObjects()) {
+        ObjectHandle invalid;
+        invalid.slot = -1;
+        invalid.generation = -1;
+        return invalid;
+    }
+    ObjectHandle h;
+    h.slot = raw_index;
+    h.generation = g_objectGenerations[raw_index];
+    return h;
+}
+
+// ============================================================================
+// COLLISION CALLBACK
+// ============================================================================
+
+void SimulationWrapper::set_collision_callback(std::function<void(const CollisionEvent&)> callback)
+{
+    g_collisionCallback = callback;
+}
+
+void SimulationWrapper::clear_collision_callback()
+{
+    g_collisionCallback = nullptr;
+}
+
+// ============================================================================
+// SCRATCHPAD ENUMERATION
+// ============================================================================
+
+std::vector<int> SimulationWrapper::get_scratchpad_ids() const
+{
+    ensure_initialized();
+    // This requires a function Objects::GetScratchpadIDs() to return keys
+    return Objects::GetScratchpadIDs();
+}
+
+// ============================================================================
+// AGENT MANAGEMENT
+// ============================================================================
+
+void SimulationWrapper::unregister_agent(int agent_id)
+{
+    ensure_initialized();
+    scriptManager.unregisterScript(agent_id);
+}
+
+void SimulationWrapper::clear_agents()
+{
+    ensure_initialized();
+    auto ids = scriptManager.getAgentIDs();
+    for (int id : ids) {
+        scriptManager.unregisterScript(id);
+    }
+}
+
+// ============================================================================
+// SCREEN↔WORLD CONVERSION
+// ============================================================================
+
+std::pair<float, float> SimulationWrapper::screen_to_world(float screen_x, float screen_y) const
+{
+    ensure_initialized();
+    int w = g_width;
+    int h = g_height;
+    
+    if (w == 0 || h == 0) return {0.0f, 0.0f};
+    
+    float ndcX = (screen_x / w) * 2.0f - 1.0f;
+    float ndcY = 1.0f - (screen_y / h) * 2.0f;
+    
+    float aspect = (float)w / (float)h;
+    float halfWidth = g_camera.zoom * aspect;
+    float halfHeight = g_camera.zoom;
+    
+    float worldX = g_camera.position.x + ndcX * halfWidth;
+    float worldY = g_camera.position.y + ndcY * halfHeight;
+    
+    return {worldX, worldY};
+}
+
+std::pair<float, float> SimulationWrapper::world_to_screen(float world_x, float world_y) const
+{
+    ensure_initialized();
+    int w = g_width;
+    int h = g_height;
+    
+    if (w == 0 || h == 0) return {0.0f, 0.0f};
+    
+    float aspect = (float)w / (float)h;
+    float halfWidth = g_camera.zoom * aspect;
+    float halfHeight = g_camera.zoom;
+    
+    float ndcX = (world_x - g_camera.position.x) / halfWidth;
+    float ndcY = (world_y - g_camera.position.y) / halfHeight;
+    
+    float screenX = (ndcX + 1.0f) * 0.5f * w;
+    float screenY = (1.0f - ndcY) * 0.5f * h;
+    
+    return {screenX, screenY};
+}
+
+// ============================================================================
+// CAMERA CONVENIENCE FUNCTIONS
+// ============================================================================
+
+void SimulationWrapper::fit_camera_to_objects(float padding)
+{
+    ensure_initialized();
+    
+    int count = object_count();
+    if (count == 0) return;
+    
+    // Get all object positions
+    std::vector<ObjectState> states = get_all_objects();
+    
+    float minX = states[0].x, maxX = states[0].x;
+    float minY = states[0].y, maxY = states[0].y;
+    
+    for (const auto& s : states) {
+        minX = std::min(minX, s.x);
+        maxX = std::max(maxX, s.x);
+        minY = std::min(minY, s.y);
+        maxY = std::max(maxY, s.y);
+    }
+    
+    float centerX = (minX + maxX) * 0.5f;
+    float centerY = (minY + maxY) * 0.5f;
+    float rangeX = (maxX - minX) * (1.0f + padding);
+    float rangeY = (maxY - minY) * (1.0f + padding);
+    
+    // Set camera position
+    g_camera.position.x = centerX;
+    g_camera.position.y = centerY;
+    
+    // Set zoom to fit both axes
+    int w = g_width;
+    int h = g_height;
+    if (w > 0 && h > 0) {
+        float aspect = (float)w / (float)h;
+        float zoomX = rangeX * 0.5f;
+        float zoomY = rangeY * 0.5f;
+        g_camera.zoom = std::max(zoomX / aspect, zoomY);
+    }
+}
+
+void SimulationWrapper::follow_object(int index, float smoothing)
+{
+    ensure_initialized();
+    
+    if (index < 0 || index >= object_count()) return;
+    
+    ObjectState state = get_object(index);
+    
+    float dx = state.x - g_camera.position.x;
+    float dy = state.y - g_camera.position.y;
+    
+    g_camera.position.x += dx * (1.0f - smoothing);
+    g_camera.position.y += dy * (1.0f - smoothing);
+}
+
+// ============================================================================
+// WIDTH/HEIGHT GETTERS
+// ============================================================================
+
+int SimulationWrapper::get_width() const { return g_width; }
+int SimulationWrapper::get_height() const { return g_height; }
 
 // ============================================================================
 // CLEANUP FUNCTION

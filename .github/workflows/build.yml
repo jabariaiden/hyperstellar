@@ -7,36 +7,66 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  CMAKE_BUILD_TYPE: Release
+
 jobs:
   build-windows:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
-      - name: Install Python deps
+      - name: Install Python build dependencies
         run: pip install build pybind11 wheel setuptools
 
-      - name: Build
-        run: .\build_python.ps1
-        shell: pwsh
+      - name: Prepare shaders and glad
+        run: |
+          New-Item -ItemType Directory -Force -Path python_module/shaders
+          Copy-Item -Path shaders\* -Destination python_module\shaders\ -Recurse -Force
+          if (Test-Path include\glad\glad.c) { Copy-Item include\glad\glad.c src\ }
+
+      - name: Build C++ module
+        run: |
+          New-Item -ItemType Directory -Force -Path _build
+          cd _build
+          cmake ../python_module -DCMAKE_CXX_FLAGS="/DNO_TEXT_RENDERING /DPYTHON_MODULE=1"
+          cmake --build . --config $env:CMAKE_BUILD_TYPE
+          $pyd = Get-ChildItem -Recurse -Filter "stellar*.pyd" | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path ..\hyperstellar\src\hyperstellar\_native\windows-x64
+          Copy-Item $pyd.FullName ..\hyperstellar\src\hyperstellar\_native\windows-x64\stellar.pyd
+          New-Item -ItemType Directory -Force -Path ..\hyperstellar\src\hyperstellar\_native\windows-x64\shaders
+          Copy-Item ..\python_module\shaders\* ..\hyperstellar\src\hyperstellar\_native\windows-x64\shaders\ -Recurse -Force
+
+      - name: Build wheel
+        run: python -m build
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-windows
+          name: wheel-windows-${{ matrix.python-version }}
           path: dist/*.whl
 
   build-linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install system dependencies (GLFW, build tools, Python dev)
         run: |
           sudo apt update
           sudo add-apt-repository ppa:deadsnakes/ppa -y
@@ -44,25 +74,41 @@ jobs:
           sudo apt install -y \
             build-essential cmake pkg-config \
             libglfw3-dev libgl1-mesa-dev libx11-dev \
-            python3.13 python3.13-dev python3.13-venv
+            python${{ matrix.python-version }} python${{ matrix.python-version }}-dev python${{ matrix.python-version }}-venv
 
-      - name: Set up Python 3.13
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
-      - name: Install Python deps
+      - name: Install Python build dependencies
         run: pip install build pybind11 wheel setuptools
 
-      - name: Build
+      - name: Prepare shaders and glad
         run: |
-          chmod +x build_python.sh
-          ./build_python.sh
+          mkdir -p python_module/shaders
+          cp -r shaders/. python_module/shaders/
+          if [ -f include/glad/glad.c ]; then cp include/glad/glad.c src/; fi
+
+      - name: Build C++ module
+        run: |
+          mkdir _build && cd _build
+          cmake ../python_module -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE -DCMAKE_CXX_FLAGS="-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
+          make -j$(nproc)
+          SO=$(find . -name "stellar*.so" | head -1)
+          mkdir -p ../hyperstellar/src/hyperstellar/_native/linux-x64/shaders
+          cp $SO ../hyperstellar/src/hyperstellar/_native/linux-x64/stellar.so
+          cp -r ../python_module/shaders/. ../hyperstellar/src/hyperstellar/_native/linux-x64/shaders/
+
+      - name: Build wheel
+        run: python -m build
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-linux
+          name: wheel-linux-${{ matrix.python-version }}
           path: dist/*.whl
 
   publish:
@@ -70,17 +116,11 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download Windows wheel
+      - name: Download all wheels
         uses: actions/download-artifact@v4
         with:
-          name: wheel-windows
           path: dist
-
-      - name: Download Linux wheel
-        uses: actions/download-artifact@v4
-        with:
-          name: wheel-linux
-          path: dist
+          merge-multiple: true
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
