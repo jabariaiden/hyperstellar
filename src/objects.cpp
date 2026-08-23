@@ -41,6 +41,9 @@ static int g_nextScratchpadId = 0;
 static GLuint g_scratchpadPool = 0;      // single large SSBO
 static size_t g_scratchpadPoolSize = 0;  // total allocated size (in bytes)
 static bool g_scratchpadPoolDirty = false;
+static std::queue<int> g_freeScratchpadIds;   // IDs available for reuse
+static std::vector<std::pair<size_t, size_t>> g_freeBlocks; // offset (bytes), size (bytes)
+
 
 // Maximum size of the scratchpad pool (64 MB)
 static const size_t MAX_SCRATCHPAD_POOL_SIZE = 64 * 1024 * 1024;
@@ -2226,6 +2229,8 @@ void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float
                 }
                 glUniform1iv(offsetLoc, 16, offsets);
             }
+            GLint capLoc = glGetUniformLocation(program, "uSignalQueueCapacity");
+            if (capLoc != -1) glUniform1ui(capLoc, (GLuint)g_signalQueueCapacity);
 
             // Bind textures
             glBindImageTexture(0, g_paintTexture[g_paintWriteIdx], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
@@ -2510,7 +2515,7 @@ bool Objects::IsCollisionEnabled(int objectIndex)
 int Objects::CreateScratchpad(size_t numElements) {
     if (numElements == 0) return -1;
 
-    // Ensure the pool is allocated (it should be from Init, but just in case)
+    // Ensure pool is allocated
     if (g_scratchpadPool == 0) {
         glGenBuffers(1, &g_scratchpadPool);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_scratchpadPool);
@@ -2519,32 +2524,58 @@ int Objects::CreateScratchpad(size_t numElements) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
     }
 
-    // Calculate size in bytes (align to 16 bytes for SSBO)
+    // Calculate aligned size in bytes
     size_t sizeNeeded = numElements * sizeof(float);
     size_t alignment = 16;
     sizeNeeded = (sizeNeeded + alignment - 1) & ~(alignment - 1);
 
-    // Check if we have enough space
-    if (g_scratchpadPoolSize + sizeNeeded > MAX_SCRATCHPAD_POOL_SIZE) {
-        std::cerr << "[Objects] Scratchpad pool exhausted! Requested " << sizeNeeded
-                  << " bytes, available " << (MAX_SCRATCHPAD_POOL_SIZE - g_scratchpadPoolSize)
-                  << " bytes." << std::endl;
+    // Allocate ID
+    int id = -1;
+    if (!g_freeScratchpadIds.empty()) {
+        id = g_freeScratchpadIds.front();
+        g_freeScratchpadIds.pop();
+    } else if (g_nextScratchpadId < 16) {
+        id = g_nextScratchpadId++;
+    } else {
+        std::cerr << "[Objects] Scratchpad ID limit (16) reached. Cannot create new scratchpad." << std::endl;
         return -1;
     }
 
-    // Assign offset for new scratchpad (offset in floats)
-    size_t offsetInFloats = g_scratchpadPoolSize / sizeof(float);
-    g_scratchpadPoolSize += sizeNeeded;
+    // Allocate pool space (first-fit)
+    size_t offset = 0;
+    bool found = false;
+    for (auto it = g_freeBlocks.begin(); it != g_freeBlocks.end(); ++it) {
+        if (it->second >= sizeNeeded) {
+            offset = it->first;
+            if (it->second > sizeNeeded) {
+                // Split the block
+                g_freeBlocks.emplace_back(it->first + sizeNeeded, it->second - sizeNeeded);
+            }
+            g_freeBlocks.erase(it);
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        // Allocate at the end
+        offset = g_scratchpadPoolSize;
+        if (offset + sizeNeeded > MAX_SCRATCHPAD_POOL_SIZE) {
+            std::cerr << "[Objects] Scratchpad pool exhausted! Requested " << sizeNeeded
+                      << " bytes, available " << (MAX_SCRATCHPAD_POOL_SIZE - g_scratchpadPoolSize)
+                      << " bytes." << std::endl;
+            // Return the ID to the free list
+            g_freeScratchpadIds.push(id);
+            return -1;
+        }
+        g_scratchpadPoolSize += sizeNeeded;
+    }
 
-    int id = g_nextScratchpadId++;
     Scratchpad sp;
     sp.buffer = g_scratchpadPool;
     sp.numElements = numElements;
-    sp.offsetInPool = offsetInFloats;
+    sp.offsetInPool = offset / sizeof(float); // offset in floats
     sp.valid = true;
     g_scratchpads[id] = sp;
-
-    // The pool is already bound; no need to re-bind each time.
 
     return id;
 }
@@ -2562,9 +2593,45 @@ std::vector<int> Objects::GetScratchpadIDs()
 void Objects::DestroyScratchpad(int id) {
     auto it = g_scratchpads.find(id);
     if (it == g_scratchpads.end()) return;
-    it->second.valid = false;
+
+    // Free the ID
+    g_freeScratchpadIds.push(id);
+
+    // Free the pool block
+    size_t offset = it->second.offsetInPool * sizeof(float);
+    size_t size = it->second.numElements * sizeof(float);
+    // Ensure size is aligned (it should be)
+    size_t alignment = 16;
+    size = (size + alignment - 1) & ~(alignment - 1);
+
+    // Insert into free blocks and merge with adjacent blocks
+    auto insert_pos = g_freeBlocks.begin();
+    while (insert_pos != g_freeBlocks.end() && insert_pos->first < offset) ++insert_pos;
+
+    // Merge with previous if adjacent
+    if (insert_pos != g_freeBlocks.begin()) {
+        auto prev = std::prev(insert_pos);
+        if (prev->first + prev->second == offset) {
+            prev->second += size;
+            // Now check merge with next
+            if (insert_pos != g_freeBlocks.end() && prev->first + prev->second == insert_pos->first) {
+                prev->second += insert_pos->second;
+                g_freeBlocks.erase(insert_pos);
+            }
+            g_scratchpads.erase(it);
+            return;
+        }
+    }
+
+    // Merge with next if adjacent
+    if (insert_pos != g_freeBlocks.end() && offset + size == insert_pos->first) {
+        insert_pos->first = offset;
+        insert_pos->second += size;
+    } else {
+        g_freeBlocks.insert(insert_pos, {offset, size});
+    }
+
     g_scratchpads.erase(it);
-    // We don't shrink the pool; we could defragment later if needed.
 }
 
 void Objects::UploadScratchpadData(int id, const void* data, size_t count) {
@@ -2583,6 +2650,8 @@ void* Objects::MapScratchpad(int id, GLenum access) {
     auto it = g_scratchpads.find(id);
     if (it == g_scratchpads.end()) return nullptr;
     Scratchpad& sp = it->second;
+    // Ensure GPU writes are visible before CPU read
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sp.buffer);
     return glMapBufferRange(GL_SHADER_STORAGE_BUFFER,
                             sp.offsetInPool * sizeof(float),
@@ -2647,6 +2716,7 @@ void Objects::ClearSignalQueue() {
 
 size_t Objects::GetSignalQueueCount() {
     if (g_signalQueueBuffer == 0) return 0;
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);  // ensure GPU writes are visible
     uint32_t count;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
     glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &count);
@@ -2663,12 +2733,17 @@ void Objects::DispatchAgent(int agentID, bool clearAfter) {
     GLuint prog = g_scriptManager ? g_scriptManager->getProgram(agentID) : 0;
     if (prog == 0) return;
 
+    // Ensure GPU writes are visible to CPU before reading count
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+
     uint32_t count;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_signalQueueBuffer);
     glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &count);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    if (count == 0) return;
+    // Clamp to capacity to avoid reading past allocated buffer
+    uint32_t effectiveCount = (count > g_signalQueueCapacity) ? (uint32_t)g_signalQueueCapacity : count;
+    if (effectiveCount == 0) return;
 
     glUseProgram(prog);
     // Bind object SSBO (binding 0) as readonly – use the most recently updated buffer
@@ -2695,11 +2770,13 @@ void Objects::DispatchAgent(int agentID, bool clearAfter) {
     glUniform1f(glGetUniformLocation(prog, "uTime"), g_simulationTime);
     glUniform1f(glGetUniformLocation(prog, "uDt"), 0.0f); // not used in agent
     glUniform1i(glGetUniformLocation(prog, "uAgentID"), agentID);
-    glUniform1i(glGetUniformLocation(prog, "uSignalCount"), count);
+    glUniform1i(glGetUniformLocation(prog, "uSignalCount"), (int)effectiveCount);
+    GLint capLoc = glGetUniformLocation(prog, "uSignalQueueCapacity");
+    if (capLoc != -1) glUniform1ui(capLoc, (GLuint)g_signalQueueCapacity);
 
-    // Dispatch
+    // Dispatch using effectiveCount
     int workGroupSize = 64;
-    int numWorkGroups = (count + workGroupSize - 1) / workGroupSize;
+    int numWorkGroups = (effectiveCount + workGroupSize - 1) / workGroupSize;
     glDispatchCompute(numWorkGroups, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 

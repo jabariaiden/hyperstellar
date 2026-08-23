@@ -519,7 +519,7 @@ CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //Details about finding PkgConfig
 FIND_PACKAGE_MESSAGE_DETAILS_PkgConfig:INTERNAL=[/usr/bin/pkg-config][v2.5.1()]
 //Details about finding Python3
-FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/hyperstellar_env/bin/python3.13][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.15(3.13)]
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/hyperstellar_env/bin/python3.13][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.15(3.10)]
 GLFW_CFLAGS:INTERNAL=-I/usr/include
 GLFW_CFLAGS_I:INTERNAL=
 GLFW_CFLAGS_OTHER:INTERNAL=

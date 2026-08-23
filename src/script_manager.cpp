@@ -144,7 +144,6 @@ void ScriptManager::unregisterScript(int script_id)
         scripts.erase(it);
         agentIDs.erase(script_id);
     }
-    agentIDs.erase(script_id);
 }
 
 // Agent tracking

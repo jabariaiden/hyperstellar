@@ -279,7 +279,9 @@ void SimulationWrapper::dispatch_all_agents(bool clear_after) {
 int SimulationWrapper::register_agent(const std::string& source) {
     ensure_initialized();
     int id = scriptManager.registerScript(source);
-    scriptManager.markAsAgent(id);
+    if (id >= 0) {
+        scriptManager.markAsAgent(id);
+    }
     return id;
 }
 

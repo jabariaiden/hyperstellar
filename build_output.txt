@@ -22,7 +22,7 @@
 -- Check for working CXX compiler: /usr/bin/c++ - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
--- Found Python3: /home/jaybird/hyperstellar_env/bin/python3.13 (found suitable version "3.13.15", minimum required is "3.13") found components: Interpreter Development.Module
+-- Found Python3: /home/jaybird/hyperstellar_env/bin/python3.13 (found suitable version "3.13.15", minimum required is "3.10") found components: Interpreter Development.Module
 -- Python include dirs: /usr/include/python3.13
 CMake Deprecation Warning at pybind11/CMakeLists.txt:8 (cmake_minimum_required):
   Compatibility with CMake < 3.10 will be removed from a future version of
@@ -41,14 +41,14 @@ CMake Deprecation Warning at pybind11/CMakeLists.txt:8 (cmake_minimum_required):
 -- Found PkgConfig: /usr/bin/pkg-config (found version "2.5.1")
 -- Checking for one of the modules 'glfw3'
 -- Using system GLFW: glfw
--- Configuring done (1.4s)
+-- Configuring done (1.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux
    Compiling (4 cores)...
-[  9%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o
-[  9%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o
-[ 14%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o
-[ 19%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp.o
+[  4%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o
+[  9%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp.o
+[ 19%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o
+[ 19%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp:1:9: warning: ‘NO_TEXT_RENDERING’ redefined
     1 | #define NO_TEXT_RENDERING
       |         ^~~~~~~~~~~~~~~~~
@@ -108,14 +108,15 @@ In file included from /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp:177:17: warning: unused variable ‘MAX_ZOOM’ [-Wunused-variable]
   177 |     const float MAX_ZOOM = 100.0f;           // Camera::ProcessInput clamp
       |                 ^~~~~~~~
+[ 33%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp: In function ‘bool Objects::Init(void*)’:
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:1158:9: warning: unused variable ‘defaultEqID’ [-Wunused-variable]
  1158 |     int defaultEqID = AddOrGetEquation("default_zero", defaultEq);
       |         ^~~~~~~~~~~
+[ 38%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp:104:13: warning: ‘bool isRightAssoc(TokenType)’ defined but not used [-Wunused-function]
   104 | static bool isRightAssoc(TokenType t) { return t == TOKEN_POW; }
       |             ^~~~~~~~~~~~
-[ 33%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp: At global scope:
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:52:15: warning: ‘g_signalQueueCount’ defined but not used [-Wunused-variable]
    52 | static size_t g_signalQueueCount = 0; // read from GPU
@@ -123,7 +124,6 @@ In file included from /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
 /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp:43:13: warning: ‘g_scratchpadPoolDirty’ defined but not used [-Wunused-variable]
    43 | static bool g_scratchpadPoolDirty = false;
       |             ^~~~~~~~~~~~~~~~~~~~~
-[ 38%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
 [ 42%] Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o
 [ 47%] Building CXX object CMakeFiles/stellar.dir/bindings.cpp.o
 [ 52%] Building CXX object CMakeFiles/stellar.dir/simulation_wrapper.cpp.o
@@ -155,7 +155,7 @@ Copying stellar.so and shaders to /home/jaybird/Aidens_stuff/hyperstellar-public
   - setuptools>=42
   - wheel
 * Getting build dependencies for sdist...
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
 !!
 
         ********************************************************************************
@@ -169,7 +169,7 @@ Copying stellar.so and shaders to /home/jaybird/Aidens_stuff/hyperstellar-public
 
 !!
   corresp(dist, value, root_dir)
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -182,7 +182,7 @@ Copying stellar.so and shaders to /home/jaybird/Aidens_stuff/hyperstellar-public
 
 !!
   dist._finalize_license_expression()
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -203,7 +203,7 @@ reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 adding license file 'LICENSE'
 writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 * Building sdist...
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
 !!
 
         ********************************************************************************
@@ -217,7 +217,7 @@ writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 
 !!
   corresp(dist, value, root_dir)
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -230,7 +230,7 @@ writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 
 !!
   dist._finalize_license_expression()
-/tmp/build-env-91i_a9il/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-h19_mdju/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -268,6 +268,7 @@ copying hyperstellar/src/hyperstellar/__init__.py -> hyperstellar-1.5.0/hyperste
 copying hyperstellar/src/hyperstellar/__init__.pyi -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
 copying hyperstellar/src/hyperstellar/debug.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
 copying hyperstellar/src/hyperstellar/jit.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
+copying hyperstellar/src/hyperstellar/jit_linter.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
 copying hyperstellar/src/hyperstellar/py.typed -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
 copying hyperstellar/src/hyperstellar/shader.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
 copying hyperstellar/src/hyperstellar/typed.py -> hyperstellar-1.5.0/hyperstellar/src/hyperstellar
@@ -307,7 +308,7 @@ removing 'hyperstellar-1.5.0' (and everything under it)
   - setuptools>=42
   - wheel
 * Getting build dependencies for wheel...
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
 !!
 
         ********************************************************************************
@@ -321,7 +322,7 @@ removing 'hyperstellar-1.5.0' (and everything under it)
 
 !!
   corresp(dist, value, root_dir)
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -334,7 +335,7 @@ removing 'hyperstellar-1.5.0' (and everything under it)
 
 !!
   dist._finalize_license_expression()
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -355,7 +356,7 @@ reading manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 adding license file 'LICENSE'
 writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 * Building wheel...
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
 !!
 
         ********************************************************************************
@@ -369,7 +370,7 @@ writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 
 !!
   corresp(dist, value, root_dir)
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/config/_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -382,7 +383,7 @@ writing manifest file 'hyperstellar/src/hyperstellar.egg-info/SOURCES.txt'
 
 !!
   dist._finalize_license_expression()
-/tmp/build-env-7_tfsbp0/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+/tmp/build-env-582rd7gw/lib64/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
 !!
 
         ********************************************************************************
@@ -401,6 +402,7 @@ running build_py
 creating build/lib/hyperstellar
 copying hyperstellar/src/hyperstellar/typed.py -> build/lib/hyperstellar
 copying hyperstellar/src/hyperstellar/shader.py -> build/lib/hyperstellar
+copying hyperstellar/src/hyperstellar/jit_linter.py -> build/lib/hyperstellar
 copying hyperstellar/src/hyperstellar/jit.py -> build/lib/hyperstellar
 copying hyperstellar/src/hyperstellar/debug.py -> build/lib/hyperstellar
 copying hyperstellar/src/hyperstellar/__init__.py -> build/lib/hyperstellar
@@ -476,17 +478,19 @@ copying build/lib/hyperstellar/__init__.pyi -> build/bdist.linux-x86_64/wheel/./
 copying build/lib/hyperstellar/__init__.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
 copying build/lib/hyperstellar/debug.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
 copying build/lib/hyperstellar/jit.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
+copying build/lib/hyperstellar/jit_linter.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
 copying build/lib/hyperstellar/shader.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
 copying build/lib/hyperstellar/typed.py -> build/bdist.linux-x86_64/wheel/./hyperstellar
 running install_egg_info
 Copying hyperstellar/src/hyperstellar.egg-info to build/bdist.linux-x86_64/wheel/./hyperstellar-1.5.0-py3.13.egg-info
 running install_scripts
 creating build/bdist.linux-x86_64/wheel/hyperstellar-1.5.0.dist-info/WHEEL
-creating '/home/jaybird/Aidens_stuff/hyperstellar-public/dist/.tmp-lzq4fhaa/hyperstellar-1.5.0-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
+creating '/home/jaybird/Aidens_stuff/hyperstellar-public/dist/.tmp-u073llth/hyperstellar-1.5.0-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
 adding 'hyperstellar/__init__.py'
 adding 'hyperstellar/__init__.pyi'
 adding 'hyperstellar/debug.py'
 adding 'hyperstellar/jit.py'
+adding 'hyperstellar/jit_linter.py'
 adding 'hyperstellar/py.typed'
 adding 'hyperstellar/shader.py'
 adding 'hyperstellar/typed.py'

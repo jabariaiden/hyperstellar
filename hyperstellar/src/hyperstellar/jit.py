@@ -8,18 +8,301 @@ Supports three modes:
   - 'paint': runs per pixel, reads/writes textures (double‑buffered).
   - 'agent': runs over the signal queue (one workgroup per signal).
 
-This module contains the AST visitor (GLSLGenerator) and the public
-decorator `script`. The actual shader wrapping logic is in `shader.py`.
+This module contains:
+  - NameChecker: A linter that validates variable and function names, detects
+    undefined symbols, unused variables, and unsupported syntax before
+    translation.
+  - GLSLGenerator: The AST visitor that translates Python to GLSL.
+  - script: The public decorator that compiles a Python function.
+
+The pipeline is:
+  1. Parse the function source and AST.
+  2. Run NameChecker to catch errors (undefined vars, unknown functions, etc.)
+  3. If errors exist, abort with a detailed error report.
+  4. Otherwise, generate the GLSL.
+  5. Wrap the GLSL in the appropriate shader boilerplate (object, paint, or agent).
+  6. Register the script with the Simulation.
 """
 
 import ast
 import inspect
 import textwrap
+import difflib
 from typing import Any, Dict, Set, Optional, Callable, Union, List, Tuple
 
-# -----------------------------------------------------------------------------
-# GLSLGenerator – translates Python AST to GLSL compute shader code
-# -----------------------------------------------------------------------------
+# =============================================================================
+# IMPORT FROM SIBLING MODULE
+# =============================================================================
+from . import debug  # use the debug module for logging and error reporting
+
+
+# =============================================================================
+# NameChecker – Linter for JIT scripts
+# =============================================================================
+class NameChecker(ast.NodeVisitor):
+    """
+    Linter that checks for:
+      - undefined variables (with "did you mean?" suggestions)
+      - unused variables (warnings)
+      - undefined functions (with "did you mean?" suggestions)
+      - unsupported syntax (yield, lambda, async, with, etc.)
+      - chained comparisons (a < b < c) – not yet supported
+      - invalid function arguments (future)
+
+    It collects all assigned and referenced names, function calls, and then
+    validates them against the known built-ins, user-defined functions,
+    and imported names.
+    """
+
+    def __init__(self, mode: str, debug: bool, source: str, func_node: ast.FunctionDef):
+        self.mode = mode
+        self.debug = debug
+        self.source = source
+        self.func_node = func_node
+
+        # --- Sets to be populated during AST traversal ---
+        self.assigned: Set[str] = set()          # variables assigned (including parameters)
+        self.referenced: Set[str] = set()        # variables referenced
+        self.called_functions: Set[str] = set()  # function names called
+        self.user_functions: Set[str] = set()    # functions defined inside the script
+        self.imported_names: Set[str] = set()    # imported from hyperstellar.glsl
+        self.param_names: Set[str] = set()       # function parameters
+
+        # --- Name nodes with their line numbers for error reporting ---
+        self.name_nodes: List[Tuple[str, int, int, bool]] = []  # (name, lineno, col, is_func_call)
+
+        # --- Error and warning accumulation ---
+        self.errors: List[Tuple[str, int, int, Optional[str]]] = []   # (msg, lineno, col, suggestion)
+        self.warnings: List[Tuple[str, int, int, Optional[str]]] = [] # (msg, lineno, col, suggestion)
+
+        # --- Built-in sets ---
+        self.builtin_vars = self._get_builtin_vars()
+        self.builtin_funcs = self._get_builtin_funcs()
+
+        # --- Run the collector ---
+        self._collect()
+
+    def _get_builtin_vars(self) -> Set[str]:
+        """Return the set of built-in variable names for the current mode."""
+        common = {'num_objects', 'dt', 'time', 'idx', 'group_count', 'i', 'p'}
+        if self.mode == 'object':
+            return common | {'x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
+                             'ax', 'ay', 'angular', 'color', 'pos', 'vel'}
+        elif self.mode == 'paint':
+            return common | {'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
+                             'color', 't'}
+        elif self.mode == 'agent':
+            return common | {'signal_object_idx', 'signal_payload'}
+        else:
+            return common
+
+    def _get_builtin_funcs(self) -> Set[str]:
+        """Return the set of built-in function names exposed to JIT scripts."""
+        return {
+            # Math
+            'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+            'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+            'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor', 'ceil',
+            'fract', 'sign', 'step', 'smoothstep', 'mix', 'clamp', 'mod',
+            'min', 'max', 'dot', 'cross', 'length', 'distance', 'normalize',
+            'reflect', 'refract', 'faceforward', 'transpose', 'inverse',
+            'determinant', 'outerProduct', 'matrixCompMult',
+            'radians', 'degrees', 'saturate', 'lerp', 'fbm', 'noise', 'rand',
+            # JIT-specific
+            'signal', 'scratchpad_read', 'scratchpad_write',
+            'apply_constraints', 'detect_collision', 'resolve_collision',
+            # Ray-tracing
+            'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
+            'look_at', 'camera_ray', 'camera_ray_ndc', 'offset_ray_origin',
+            'reflect', 'refract',
+            # Complex
+            'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
+            'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
+            # Other
+            'int', 'float', 'len', 'sum', 'diff',
+            # Paint helpers
+            'sample_prev_r', 'sample_prev_g', 'sample_prev_b', 'sample_prev_a',
+            'avg_prev_r', 'avg_prev_g', 'avg_prev_b', 'avg_prev_a',
+        }
+
+    def _collect(self) -> None:
+        """Walk the AST to collect assignments, references, and function calls."""
+        # First, collect parameters
+        for arg in self.func_node.args.args:
+            name = arg.arg
+            self.param_names.add(name)
+            self.assigned.add(name)
+
+        # Visit the function body (and nested definitions)
+        self.visit(self.func_node)
+
+        # After the visit, we have all sets populated.
+
+    # ---- Visitor methods to collect data ----
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            self._add_target(target)
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self._add_target(node.target)
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        self._add_target(node.target)
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        # Record user-defined function
+        self.user_functions.add(node.name)
+        # Also collect its parameters
+        for arg in node.args.args:
+            self.param_names.add(arg.arg)
+            self.assigned.add(arg.arg)
+        # Visit the body (but don't treat the function definition itself as a call)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module == 'hyperstellar.glsl':
+            for alias in node.names:
+                self.imported_names.add(alias.name)
+        # No further traversal needed for imports
+
+    def visit_Import(self, node: ast.Import) -> None:
+        # Regular imports are ignored; we don't track modules.
+        pass
+
+    def _add_target(self, target: ast.AST) -> None:
+        """Recursively add names from assignment targets."""
+        if isinstance(target, ast.Name):
+            self.assigned.add(target.id)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for elt in target.elts:
+                self._add_target(elt)
+        # ignore other targets (attributes, subscripts)
+
+    def visit_Name(self, node: ast.Name) -> None:
+        # Record the name reference (we'll check if it's a function call later)
+        self.name_nodes.append((node.id, node.lineno, node.col_offset, False))
+        self.referenced.add(node.id)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        # Record the function name if it's a simple Name
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+            self.called_functions.add(func_name)
+            # Also record this as a function call context for the Name node
+            self.name_nodes.append((func_name, node.lineno, node.col_offset, True))
+        # Visit arguments
+        self.generic_visit(node)
+
+    # ---- Unsupported syntax detection ----
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        self.errors.append(
+            ("Lambda expressions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+        )
+        self.generic_visit(node)
+
+    def visit_Yield(self, node: ast.Yield) -> None:
+        self.errors.append(
+            ("Yield statements are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+        )
+        self.generic_visit(node)
+
+    def visit_With(self, node: ast.With) -> None:
+        self.errors.append(
+            ("With statements are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+        )
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self.errors.append(
+            ("Async functions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+        )
+        self.generic_visit(node)
+
+    def visit_Await(self, node: ast.Await) -> None:
+        self.errors.append(
+            ("Await expressions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+        )
+        self.generic_visit(node)
+
+    def visit_Compare(self, node: ast.Compare) -> None:
+        if len(node.ops) > 1:
+            self.errors.append(
+                ("Chained comparisons (e.g., a < b < c) are not supported; use 'and'.", node.lineno, node.col_offset, None)
+            )
+        self.generic_visit(node)
+
+    # ---- Validation and suggestion engine ----
+
+    def _suggest_variable(self, name: str) -> Optional[str]:
+        """Suggest a similar variable name from the known sets."""
+        candidates = (self.builtin_vars | self.assigned | self.param_names) - {name}
+        matches = debug.get_close_matches(name, candidates, n=1, cutoff=0.7)
+        return matches[0] if matches else None
+
+    def _suggest_function(self, name: str) -> Optional[str]:
+        """Suggest a similar function name from built-in or user-defined functions."""
+        candidates = (self.builtin_funcs | self.user_functions | self.imported_names) - {name}
+        matches = debug.get_close_matches(name, candidates, n=1, cutoff=0.7)
+        return matches[0] if matches else None
+
+    def check(self) -> Tuple[List[Tuple[str, int, int, Optional[str]]],
+                             List[Tuple[str, int, int, Optional[str]]]]:
+        """
+        Perform all validation checks and return (errors, warnings).
+        Errors are fatal; warnings are informational.
+        """
+        # Clear any previous errors/warnings (but we already collected during visit)
+        # We'll now validate the collected data.
+
+        # 1. Check undefined variables (names that are referenced but not assigned/imported/built-in)
+        for name, lineno, col, is_call in self.name_nodes:
+            if is_call:
+                # This name is used as a function call; we check functions separately.
+                continue
+            if name not in self.assigned and name not in self.builtin_vars and name not in self.param_names:
+                suggestion = self._suggest_variable(name)
+                self.errors.append(
+                    (f"Undefined variable '{name}'", lineno, col, suggestion)
+                )
+
+        # 2. Check undefined functions
+        for func_name in self.called_functions:
+            if (func_name not in self.builtin_funcs and
+                func_name not in self.user_functions and
+                func_name not in self.imported_names):
+                suggestion = self._suggest_function(func_name)
+                self.errors.append(
+                    (f"Undefined function '{func_name}'", None, None, suggestion)
+                )
+
+        # 3. Check unused variables (assigned but never referenced)
+        for var in self.assigned:
+            if var not in self.referenced and var not in self.builtin_vars:
+                if var in self.param_names:
+                    # Parameters are not required to be used, but we issue a warning.
+                    self.warnings.append(
+                        (f"Parameter '{var}' is never used.", None, None, None)
+                    )
+                else:
+                    self.warnings.append(
+                        (f"Variable '{var}' is assigned but never used.", None, None, None)
+                    )
+
+        # 4. Check for function arguments count? (future)
+
+        # Return collected errors and warnings
+        return self.errors, self.warnings
+
+
+# =============================================================================
+# GLSLGenerator – AST to GLSL translator
+# =============================================================================
 class GLSLGenerator(ast.NodeVisitor):
     """
     Translates a decorated Python function into a GLSL compute shader.
@@ -54,10 +337,11 @@ class GLSLGenerator(ast.NodeVisitor):
       - @ operator for matrix multiplication
       - Swizzling with rgba and stpq sets
       - pass statement (no‑op)
-      -  Function parameters: declare your function with parameters (e.g., def gravity(x, y):) and they are automatically mapped to the object's state.
-      -  Explicit return: return (ax, ay, angular) or (ax, ay, angular, color) instead of assigning to magic variables.
-      -  Explicit imports: from hyperstellar.glsl import sin, cos, sqrt, ...  – these are mapped to GLSL built‑ins and are linter‑friendly.
+      - Function parameters: declare your function with parameters (e.g., def gravity(x, y):) and they are automatically mapped to the object's state.
+      - Explicit return: return (ax, ay, angular) or (ax, ay, angular, color) instead of assigning to magic variables.
+      - Explicit imports: from hyperstellar.glsl import sin, cos, sqrt, ...  – these are mapped to GLSL built‑ins and are linter‑friendly.
     """
+
     def __init__(self, debug: bool = False, mode: str = 'object') -> None:
         self.debug = debug
         self.mode = mode
@@ -108,12 +392,29 @@ class GLSLGenerator(ast.NodeVisitor):
         self.param_names = []
         self.imported_names.clear()
 
-        tree = ast.parse(inspect.getsource(func))
+        # Get source and AST
+        source = inspect.getsource(func)
+        tree = ast.parse(source)
         if not isinstance(tree.body[0], ast.FunctionDef):
             raise ValueError("Not a function definition")
         func_node = tree.body[0]
 
-        # extract parameter names
+        # ---- LINTER STAGE ----
+        linter = NameChecker(self.mode, self.debug, source, func_node)
+        errors, warnings = linter.check()
+
+        # Report warnings if debug is enabled
+        if self.debug and warnings:
+            for msg, lineno, col, suggestion in warnings:
+                debug.report_warning(msg, source, lineno, col, suggestion)
+
+        # If there are errors, abort with a detailed summary
+        if errors:
+            error_summary = debug.format_error_summary(errors, source)
+            raise SyntaxError(f"JIT compilation failed due to the following errors:\n{error_summary}")
+
+        # ---- Proceed with generation ----
+        # Extract parameter names
         self.param_names = [arg.arg for arg in func_node.args.args]
 
         collector = AssignCollector()
@@ -146,10 +447,6 @@ class GLSLGenerator(ast.NodeVisitor):
         self.assigned_vars = collector.vars - predefined
         if self.mode == 'paint':
             self.assigned_vars.add('color')
-        # If the function uses return, we still declare ax, ay, angular as locals
-        # (they are assigned from the return values) but we don't need to declare them
-        # as assigned variables because they are not set by user code.
-        # However, we must ensure they are declared in the GLSL code.
         if self.has_return:
             self.assigned_vars.add('ax')
             self.assigned_vars.add('ay')
@@ -157,7 +454,7 @@ class GLSLGenerator(ast.NodeVisitor):
             if self.mode == 'paint':
                 self.assigned_vars.add('color')
 
-        # Collect SDF functions: functions with one parameter that are used as arguments to raymarch
+        # Collect SDF functions
         for node in ast.walk(func_node):
             if isinstance(node, ast.FunctionDef) and node.name != func_node.name:
                 if len(node.args.args) == 1:
@@ -176,8 +473,6 @@ class GLSLGenerator(ast.NodeVisitor):
 
         # If we have a return expression, we need to insert the assignments after the user code
         if self.has_return and self.return_expr is not None:
-            # The return expression is already visited; we need to capture the GLSL code
-            # that computes the return values and assign them to ax, ay, angular, color.
             ret_code = self._process_return(self.return_expr)
             if ret_code:
                 body += "\n" + ret_code
@@ -212,28 +507,19 @@ class GLSLGenerator(ast.NodeVisitor):
         if not self.param_names:
             return ""
 
-        # Mapping from parameter name to GLSL expression that retrieves the object state
-        # For object mode, we have: x, y, vx, vy, mass, charge, theta, omega, color
-        # We also support 'pos' and 'vel' but they are vec2; we might map them as well.
         mapping = {
-            'x': 'pos.x',
-            'y': 'pos.y',
-            'vx': 'vel.x',
-            'vy': 'vel.y',
-            'mass': 'mass',
-            'charge': 'charge',
-            'theta': 'theta',
-            'omega': 'omega',
+            'x': 'pos.x', 'y': 'pos.y',
+            'vx': 'vel.x', 'vy': 'vel.y',
+            'mass': 'mass', 'charge': 'charge',
+            'theta': 'theta', 'omega': 'omega',
             'color': 'color',   # vec4
-            'pos': 'pos',
-            'vel': 'vel',
+            'pos': 'pos', 'vel': 'vel',
         }
 
         lines = []
         for pname in self.param_names:
             if pname in mapping:
                 expr = mapping[pname]
-                # Determine type: if pname is 'color', type is vec4; if 'pos' or 'vel', vec2; else float.
                 if pname == 'color':
                     typ = 'vec4'
                 elif pname in ('pos', 'vel'):
@@ -242,10 +528,6 @@ class GLSLGenerator(ast.NodeVisitor):
                     typ = 'float'
                 lines.append(f"    {typ} {pname} = {expr};")
             else:
-                # For unknown parameters, we could treat as float zero, but we'll raise a warning?
-                # To be safe, we'll just declare them as float and assign 0.0.
-                # This avoids breaking existing scripts if they had unused parameters.
-                # We'll also add a comment.
                 lines.append(f"    // WARNING: parameter '{pname}' is not a known object property; defaulting to 0.0")
                 lines.append(f"    float {pname} = 0.0;")
         return "\n".join(lines)
@@ -254,13 +536,11 @@ class GLSLGenerator(ast.NodeVisitor):
     # Helper: scan for return statement
     # ------------------------------------------------------------------------
     def _scan_for_return(self, node: ast.FunctionDef) -> None:
-        """Scan the function body for a return statement and capture its expression."""
         for stmt in node.body:
             if isinstance(stmt, ast.Return):
                 self.has_return = True
                 self.return_expr = stmt.value
                 return
-            # Also check nested blocks (if, for, while)
             if isinstance(stmt, (ast.If, ast.For, ast.While)):
                 for inner in stmt.body:
                     if isinstance(inner, ast.Return):
@@ -272,7 +552,6 @@ class GLSLGenerator(ast.NodeVisitor):
     # Helper: process return expression and generate assignment code
     # ------------------------------------------------------------------------
     def _process_return(self, node: ast.AST) -> str:
-        """Generate GLSL code to assign the return values to ax, ay, angular, and color."""
         if not isinstance(node, (ast.Tuple, ast.List)):
             raise SyntaxError("return must be a tuple of (ax, ay, angular) or (ax, ay, angular, color)")
         elems = node.elts
@@ -313,7 +592,7 @@ class GLSLGenerator(ast.NodeVisitor):
                 body_lines = "\n".join(temp_gen.lines)
                 sdf_defs += f"float {name}(vec3 {param_name}) {{\n{body_lines}\n}}\n"
 
-        # Generate specialized raymarch functions for each SDF
+        # Generate specialized raymarch functions
         raymarch_defs = ""
         for sdf_name in self.sdf_functions.keys():
             func_name = f"raymarch_{sdf_name}"
@@ -439,12 +718,7 @@ Ray camera_ray_ndc(float ndcX, float ndcY, vec3 eye, vec3 target, vec3 up, float
     Ray r; r.origin = eye; r.direction = dir; return r;
 }
 
-// ---- Macro for simple camera ray – WASD works correctly, aspect matches screen ----
-// ---- Helper function that takes all needed camera parameters as arguments ----
-//#define camera_ray(eye, target, up, fov) camera_ray_ndc(ndcX, ndcY, eye, target, up, fov, uHalfWidth/uHalfHeight)
-
-
-// ---- New helper: uses px/py to integrate with 2D camera, and horizontal‑right basis ----
+// ---- Helper that uses px/py to integrate with 2D camera ----
 Ray camera_ray_pxpy(vec3 eye, vec3 target, vec3 up, float fov, float px, float py) {
     vec3 fwd = normalize(target - eye);
     vec3 right = normalize(vec3(fwd.z, 0.0, -fwd.x));
@@ -472,7 +746,7 @@ vec3 refract(vec3 v, vec3 n, float eta) {
     return eta * v + (eta * cosi - sqrt(cost2)) * n;
 }
 
-// ---- Random and noise functions (must be defined before fbm) ----
+// ---- Random and noise functions ----
 float rand(vec2 seed) {
     return fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
 }
@@ -535,16 +809,14 @@ float fbm(vec2 p, int octaves) {
         # Do nothing; pass is a no-op in GLSL
         pass
 
-    # handle import from hyperstellar.glsl
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == 'hyperstellar.glsl':
             for alias in node.names:
                 self.imported_names.add(alias.name)
-        # Do not emit any GLSL code for imports
+        # No GLSL code emitted for imports
 
     def visit_Import(self, node: ast.Import) -> None:
-        # Ignore regular imports; we only care about 'import hyperstellar.glsl as glsl' maybe?
-        # For now, we ignore all imports. We could add support for alias later.
+        # Ignore regular imports
         pass
 
     def visit_Expr(self, node: ast.Expr) -> None:
@@ -557,7 +829,6 @@ float fbm(vec2 p, int octaves) {
                 args = [self._expr_to_glsl(a) for a in node.value.args]
                 self.lines.append(self.indent_str() + f"resolve_collision({', '.join(args)});")
                 return
-            # Inline constraint functions
             if func_name == 'spring':
                 self._handle_spring(node.value)
                 return
@@ -572,7 +843,7 @@ float fbm(vec2 p, int octaves) {
                 return
         self.generic_visit(node)
 
-    # ---- Inline constraint handlers (unchanged) ----
+    # ---- Inline constraint handlers ----
     def _handle_spring(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
@@ -731,7 +1002,6 @@ float fbm(vec2 p, int octaves) {
                     self.var_types[varname] = "vec2"
             self.lines.append(self.indent_str() + f"{varname} = {expr_str};")
         elif isinstance(target, ast.Tuple):
-            # Tuple unpacking – corrected to avoid packing struct fields into a vector
             rhs_type = self._infer_expr_type(node.value)
             if rhs_type and rhs_type.startswith('vec'):
                 comps = ['x', 'y', 'z', 'w']
@@ -773,7 +1043,6 @@ float fbm(vec2 p, int octaves) {
 
     # ---- If statement with elif chain support ----
     def visit_If(self, node: ast.If) -> None:
-        # Helper to recursively emit if/elif/else chain
         def emit_if_chain(if_node: ast.If) -> None:
             cond = self._expr_to_glsl(if_node.test)
             self.lines.append(self.indent_str() + f"if ({cond}) {{")
@@ -782,7 +1051,6 @@ float fbm(vec2 p, int octaves) {
                 self.visit(stmt)
             self.indent -= 1
             if if_node.orelse:
-                # Check if orelse is a single If (elif)
                 if len(if_node.orelse) == 1 and isinstance(if_node.orelse[0], ast.If):
                     self.lines.append(self.indent_str() + "} else ")
                     emit_if_chain(if_node.orelse[0])
@@ -920,12 +1188,11 @@ float fbm(vec2 p, int octaves) {
             return False
         return False
 
-    # ---- Type inference (extended for new functions) ----
+    # ---- Type inference ----
     def _infer_expr_type(self, node: ast.AST) -> Optional[str]:
         if isinstance(node, ast.Name):
-            # Check if it's an imported name – treat as float for now
             if node.id in self.imported_names:
-                return None  # imported functions don't have a fixed type in this context
+                return None
             return self.var_types.get(node.id)
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
@@ -945,40 +1212,30 @@ float fbm(vec2 p, int octaves) {
             right_type = self._infer_expr_type(node.right)
             if left_type and right_type and left_type == right_type:
                 return left_type
-            # Matrix * vector => vector
             if left_type and left_type.startswith('mat') and right_type and right_type.startswith('vec'):
                 size = int(left_type[3])
                 if right_type == f"vec{size}":
                     return f"vec{size}"
-            # vector * matrix => vector
             if left_type and left_type.startswith('vec') and right_type and right_type.startswith('mat'):
                 size = int(right_type[3])
                 if left_type == f"vec{size}":
                     return f"vec{size}"
-            # Scalar * vector => vector
             if left_type == "float" and right_type and right_type.startswith('vec'):
                 return right_type
             if right_type == "float" and left_type and left_type.startswith('vec'):
                 return left_type
-            # Scalar * matrix => matrix
             if left_type == "float" and right_type and right_type.startswith('mat'):
                 return right_type
             if right_type == "float" and left_type and left_type.startswith('mat'):
                 return left_type
-            # @ (matrix multiply) is handled same as * for GLSL
             if isinstance(node.op, ast.MatMult):
                 if left_type and right_type:
-                    # if both matrices, result is matrix (left type)
                     if left_type.startswith('mat') and right_type.startswith('mat'):
-                        # check dimensions? assume compatible
                         return left_type
-                    # if matrix * vector -> vector
                     if left_type.startswith('mat') and right_type.startswith('vec'):
                         size = int(left_type[3])
                         if right_type == f"vec{size}":
                             return f"vec{size}"
-                    # if vector * matrix -> vector (transpose?) GLSL doesn't allow vec*mat, only mat*vec, but we might not need
-                # fallback
             if self._is_complex_expr(node):
                 return "vec2"
             return None
@@ -988,23 +1245,20 @@ float fbm(vec2 p, int octaves) {
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
             if not func_name:
                 return None
-
-            # ---- Ray‑tracing functions ----
+            # Ray-tracing
             if func_name in ('sphere', 'plane'):
                 return "GeoObject"
             if func_name in ('intersect', 'miss_hit', 'closest_hit', 'raymarch'):
                 return "Hit"
             if func_name == 'look_at':
                 return "CameraBasis"
-            # camera_ray is a macro that expands to camera_ray_ndc, which returns Ray.
             if func_name == 'camera_ray' or func_name == 'camera_ray_ndc':
                 return "Ray"
             if func_name in ('offset_ray_origin', 'reflect', 'refract'):
                 return "vec3"
             if func_name in ('vec2', 'vec3', 'vec4'):
                 return func_name
-
-            # ---- Existing vector functions (and extended list) ----
+            # Unary functions that return same type as argument
             unary_return_same = {'normalize', 'reflect', 'abs', 'sign', 'floor', 'ceil', 'frac', 'fract',
                                  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
                                  'asinh', 'acosh', 'atanh', 'exp', 'exp2', 'log', 'log2', 'sqrt', 'inversesqrt',
@@ -1015,7 +1269,6 @@ float fbm(vec2 p, int octaves) {
                     if arg_type and arg_type.startswith('vec'):
                         return arg_type
                 return "float"
-
             if func_name == 'cross':
                 return "vec3"
             if func_name == 'mix':
@@ -1038,15 +1291,6 @@ float fbm(vec2 p, int octaves) {
             if func_name in ('distance', 'length', 'dot', 'determinant', 'fbm', 'random', 'rand',
                              'real', 'imag', 'arg', 'sum', 'len'):
                 return "float"
-            if func_name in ('sin', 'cos', 'tan', 'sqrt', 'log', 'exp', 'abs',
-                             'floor', 'ceil', 'frac', 'fract', 'sign', 'step',
-                             'noise', 'rand', 'radians', 'degrees', 'min', 'max', 'clamp', 'mod', 'atan2'):
-                # these are already covered above; kept for compatibility
-                if len(node.args) >= 1:
-                    arg_type = self._infer_expr_type(node.args[0])
-                    if arg_type and arg_type.startswith('vec'):
-                        return arg_type
-                return "float"
             if func_name in ('cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp',
                              'cPow', 'cSin', 'cCos', 'cTan', 'conj'):
                 return "vec2"
@@ -1058,7 +1302,7 @@ float fbm(vec2 p, int octaves) {
                     if t1 and t1.startswith('vec') and t2 and t2.startswith('vec'):
                         n = int(t1[3])
                         m = int(t2[3])
-                        return f"mat{n}x{m}"  # GLSL uses matCxR (columns x rows)
+                        return f"mat{n}x{m}"
                 return "mat2"
             if func_name == 'matrixCompMult':
                 if len(node.args) >= 2:
@@ -1070,7 +1314,6 @@ float fbm(vec2 p, int octaves) {
                 if len(node.args) >= 1:
                     t = self._infer_expr_type(node.args[0])
                     if t and t.startswith('mat'):
-                        # transpose keeps same dimensions? Actually for square it's same.
                         return t
                 return "mat2"
             if func_name == 'inverse':
@@ -1085,7 +1328,6 @@ float fbm(vec2 p, int octaves) {
                     if t and t.startswith('vec'):
                         return t
                 return "vec3"
-            # ---- Explicit handling for dot, length, distance, and common math ----
             if func_name in ('dot', 'length', 'distance', 'determinant'):
                 return 'float'
             if func_name in ('max', 'min', 'clamp', 'mod', 'pow', 'sqrt', 'abs', 'sign', 'floor', 'ceil', 'fract', 'step'):
@@ -1104,7 +1346,6 @@ float fbm(vec2 p, int octaves) {
                 return f"vec{size}"
             return None
         if isinstance(node, ast.Attribute):
-            # For struct fields, we infer type
             base_type = self._infer_expr_type(node.value)
             if base_type:
                 field_type_map = {
@@ -1115,14 +1356,12 @@ float fbm(vec2 p, int octaves) {
                 }
                 if base_type in field_type_map and node.attr in field_type_map[base_type]:
                     return field_type_map[base_type][node.attr]
-                # Swizzling: if base is a vector, handle swizzles
                 if base_type.startswith('vec'):
-                    # Check if attr is a valid swizzle (xyzw, rgba, stpq)
                     if all(c in 'xyzwrgba' for c in node.attr) and len(node.attr) <= 4:
                         if len(node.attr) == 1:
                             return 'float'
                         else:
-                            return base_type  # same vector type
+                            return base_type
             return None
         if isinstance(node, ast.IfExp):
             body_type = self._infer_expr_type(node.body)
@@ -1161,23 +1400,18 @@ float fbm(vec2 p, int octaves) {
             return slice_node.value
         return slice_node
 
-    # ---- Attribute access (extended for rgba and stpq swizzling) ----
+    # ---- Attribute access ----
     def _visit_attribute(self, node: ast.Attribute) -> str:
-        # ---- Vector swizzling on known variable types ----
         if isinstance(node.value, ast.Name):
             var_name = node.value.id
             if var_name in self.var_types:
                 typ = self.var_types[var_name]
                 if typ and typ.startswith('vec'):
                     attr = node.attr
-                    # Allow xyzw, rgba, stpq sets (but not mixed)
                     valid_sets = ['xyzw', 'rgba', 'stpq']
                     for s in valid_sets:
                         if all(c in s for c in attr) and len(attr) <= 4:
                             return f"{var_name}.{attr}"
-                    # If not matching, fall through
-
-        # ---- p.x, p.y, etc. ----
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
             mapping = {
                 'x': 'position.x', 'y': 'position.y',
@@ -1189,8 +1423,6 @@ float fbm(vec2 p, int octaves) {
             if node.attr in mapping:
                 return mapping[node.attr]
             raise SyntaxError(f"Unknown p attribute: {node.attr}")
-
-        # ---- p[index].x, etc. ----
         if isinstance(node.value, ast.Subscript):
             if isinstance(node.value.value, ast.Name) and node.value.value.id == 'p':
                 slice_expr = self._get_slice_expr(node.value.slice)
@@ -1206,8 +1438,6 @@ float fbm(vec2 p, int octaves) {
                 if node.attr in field_map:
                     return f"{obj_ref}.{field_map[node.attr]}"
                 raise SyntaxError(f"Unknown property for p[index]: {node.attr}")
-
-        # ---- Complex number properties ----
         base_str = self._expr_to_glsl(node.value)
         if self._is_complex_expr(node.value):
             if node.attr == 'real':
@@ -1216,8 +1446,6 @@ float fbm(vec2 p, int octaves) {
                 return f"imag({base_str})"
             if node.attr == 'conjugate':
                 return f"conj({base_str})"
-
-        # ---- Access to struct fields (Ray, Hit, GeoObject, CameraBasis, vectors) ----
         base_var = node.value
         base_str = self._expr_to_glsl(base_var)
         base_type = self._infer_expr_type(base_var)
@@ -1236,11 +1464,8 @@ float fbm(vec2 p, int octaves) {
                 if field in field_map[base_type]:
                     return f"{base_str}.{field_map[base_type][field]}"
                 elif base_type.startswith('vec') and all(c in 'xyzwrgba' for c in field) and len(field) <= 4:
-                    # allow swizzling with any of the sets
                     return f"{base_str}.{field}"
                 raise SyntaxError(f"Unknown field {field} for type {base_type}")
-
-        # ---- Fallback for other attribute access ----
         if isinstance(node.value, ast.Name):
             obj = node.value.id
             field_map = {
@@ -1255,7 +1480,6 @@ float fbm(vec2 p, int octaves) {
                     return field_map[node.attr]
                 else:
                     return f"{obj}.{field_map[node.attr]}"
-
         raise SyntaxError(f"Unsupported attribute access: {node.attr}")
 
     # ------------------------------------------------------------------------
@@ -1275,9 +1499,7 @@ float fbm(vec2 p, int octaves) {
             name = node.id
             if name in subst:
                 return subst[name]
-            # check if name is imported from hyperstellar.glsl
             if name in self.imported_names:
-                # It's a GLSL built-in function; we just return the name (will be mapped later via _glsl_func_map)
                 return name
             if name == 'i':
                 self.complex_vars.add(name)
@@ -1348,9 +1570,7 @@ float fbm(vec2 p, int octaves) {
             if isinstance(node.op, ast.Div) and left_is_c and right_is_c:
                 return f"cDiv({left}, {right})"
 
-            # Matrix multiplication operator '@'
             if isinstance(node.op, ast.MatMult):
-                # GLSL uses * for matrix multiplication
                 return f"({left} * {right})"
 
             op = self._bin_op(node.op)
@@ -1377,7 +1597,28 @@ float fbm(vec2 p, int octaves) {
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
             args = [self._expr_to_glsl_with_subst(a, subst) for a in node.args]
 
-            # ---- Ray‑tracing functions ----
+            # ---- Mode-specific enforcement ----
+            if func_name == 'scratchpad_write':
+                if self.mode != 'agent':
+                    raise SyntaxError("scratchpad_write() is only available in 'agent' scripts.")
+                if len(args) == 3:
+                    return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
+                raise SyntaxError("scratchpad_write(id, index, value)")
+
+            if func_name == 'signal':
+                if self.mode == 'agent':
+                    raise SyntaxError("signal() cannot be used in 'agent' scripts (agents receive signals, they do not enqueue).")
+                if len(args) == 2:
+                    return f"signal_enqueue(int({args[0]}), {args[1]})"
+                raise SyntaxError("signal(agent_id, payload)")
+
+            if func_name in ('apply_constraints', 'detect_collision', 'resolve_collision'):
+                if self.mode != 'object':
+                    raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
+                # these are handled elsewhere, but we still need to return something
+                # The calls are handled in visit_Expr, so they will not appear here.
+
+            # ---- Ray‑tracing ----
             if func_name == 'sphere':
                 if len(args) == 2:
                     return f"sphere({args[0]}, {args[1]})"
@@ -1401,7 +1642,6 @@ float fbm(vec2 p, int octaves) {
                     return f"look_at({args[0]}, {args[1]}, {args[2]})"
                 raise SyntaxError("look_at(eye, target, up)")
             if func_name == 'camera_ray':
-                # Macro expansion – just generate the macro call with the given args.
                 if len(args) == 4:
                     return f"camera_ray({', '.join(args)})"
                 else:
@@ -1439,19 +1679,11 @@ float fbm(vec2 p, int octaves) {
                 else:
                     raise SyntaxError("raymarch(ray, sdf, t_min, t_max, steps, eps)")
 
-            # ---- Scratchpad and signal ----
+            # ---- Scratchpad and signal (already handled above) ----
             if func_name == 'scratchpad_read':
                 if len(args) == 2:
                     return f"scratchpad_read(int({args[0]}), int({args[1]}))"
                 raise SyntaxError("scratchpad_read(id, index)")
-            if func_name == 'scratchpad_write':
-                if len(args) == 3:
-                    return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
-                raise SyntaxError("scratchpad_write(id, index, value)")
-            if func_name == 'signal':
-                if len(args) == 2:
-                    return f"signal_enqueue(int({args[0]}), {args[1]})"
-                raise SyntaxError("signal(agent_id, payload)")
 
             # ---- Derivative ----
             if func_name == 'diff':
@@ -1604,7 +1836,6 @@ float fbm(vec2 p, int octaves) {
         else:
             raise NotImplementedError(f"Unsupported expression: {type(node)}")
 
-    # Extended GLSL function mapping (includes new built-ins)
     _glsl_func_map = {
         'sin': 'sin', 'cos': 'cos', 'tan': 'tan',
         'asin': 'asin', 'acos': 'acos', 'atan': 'atan',
@@ -1620,7 +1851,7 @@ float fbm(vec2 p, int octaves) {
         'normalize': 'normalize', 'reflect': 'reflect', 'refract': 'refract', 'faceforward': 'faceforward',
         'mix': 'mix', 'smoothstep': 'smoothstep',
         'radians': 'radians', 'degrees': 'degrees',
-        'noise': 'noise', 'rand': 'rand', 'random': 'rand',  # random alias
+        'noise': 'noise', 'rand': 'rand', 'random': 'rand',
         'conjugate': 'conj',
         'transpose': 'transpose', 'inverse': 'inverse', 'determinant': 'determinant',
         'outerProduct': 'outerProduct', 'matrixCompMult': 'matrixCompMult',
@@ -1696,7 +1927,7 @@ float fbm(vec2 p, int octaves) {
         if isinstance(op, ast.Mult): return "*"
         if isinstance(op, ast.Div): return "/"
         if isinstance(op, ast.FloorDiv): return "/"
-        if isinstance(op, ast.MatMult): return "*"  # matrix multiply
+        if isinstance(op, ast.MatMult): return "*"
         raise SyntaxError("Unsupported binary operator")
 
     def _aug_op(self, op: ast.AST) -> str:
@@ -1754,7 +1985,7 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
 
     Args:
         sim: The Simulation instance (used to register the compiled shader).
-        debug: If True, prints the generated shader source.
+        debug: If True, prints the generated shader source and enables warnings.
         mode: One of 'object' (default), 'paint', or 'agent'.
 
     Usage:

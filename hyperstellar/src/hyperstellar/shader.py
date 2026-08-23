@@ -53,6 +53,19 @@ def _wrap_object_shader(body: str, header: str, sdf_defs: str,
                         assigned_vars: Set[str], var_types: Dict[str, str],
                         user_handles_collisions: bool,
                         user_applies_constraints: bool) -> str:
+    """
+    Produce the full GLSL shader for an 'object' script.
+    It includes:
+      - Object SSBOs (read input, write output)
+      - Index buffer for group dispatch
+      - Constraint SSBOs (if not handled by user)
+      - Collision properties and contact buffer (if not handled by user)
+      - Scratchpad read (objects only read)
+      - Signal queue enqueue (objects can signal)
+      - Full collision detection and response (optional)
+      - Constraint solvers (optional)
+      - Symplectic Euler integration
+    """
     decls = []
     for v in sorted(assigned_vars):
         typ = var_types.get(v, "float")
@@ -970,6 +983,14 @@ void main() {{
 # -----------------------------------------------------------------------------
 def _wrap_paint_shader(body: str, header: str, sdf_defs: str,
                        assigned_vars: Set[str], var_types: Dict[str, str]) -> str:
+    """
+    Produce the full GLSL shader for a 'paint' script.
+    This shader runs per pixel, reads the previous frame texture,
+    writes to a target image (double-buffered), and provides access
+    to object data (read-only) and scratchpad (read-only).
+    It now also includes the signal queue, allowing paint scripts
+    to enqueue signals.
+    """
     decls = []
     for v in sorted(assigned_vars):
         if v == 'color':
@@ -1026,6 +1047,28 @@ uniform int uScratchpadOffsets[16];
 
 float scratchpad_read(int id, int idx) {{
     return scratchpadData[uScratchpadOffsets[id] + idx];
+}}
+
+// Signal queue – paint scripts can enqueue signals
+struct Signal {{
+    uint agentID;
+    uint objectIdx;
+    float payload;
+}};
+layout(std430, binding = 11) buffer SignalQueue {{
+    uint count;
+    Signal signals[];
+}};
+uniform uint uSignalQueueCapacity;
+uniform int  uSignalQueueOverflowPolicy;
+
+void signal_enqueue(uint agentID, float payload) {{
+    uint idx = atomicAdd(count, 1u);
+    if (idx < uSignalQueueCapacity) {{
+        signals[idx].agentID = agentID;
+        signals[idx].objectIdx = 0; // paint does not associate with a specific object
+        signals[idx].payload = payload;
+    }}
 }}
 
 const float EPSILON = 1e-6;
@@ -1228,6 +1271,12 @@ void main() {{
 # -----------------------------------------------------------------------------
 def _wrap_agent_shader(body: str, header: str, sdf_defs: str,
                        assigned_vars: Set[str], var_types: Dict[str, str]) -> str:
+    """
+    Produce the full GLSL shader for an 'agent' script.
+    Agents run over each pending signal in the queue.
+    They can read the object SSBO, read and write scratchpads,
+    and read the signal queue (but not enqueue).
+    """
     decls = []
     for v in sorted(assigned_vars):
         typ = var_types.get(v, "float")
