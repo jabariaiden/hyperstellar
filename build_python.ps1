@@ -1,4 +1,4 @@
-# build_python.ps1
+﻿# build_python.ps1
 # Run from: C:\Users\user\hyperstellar-public
 
 Write-Host "=== Building hyperstellar Python package ===" -ForegroundColor Cyan
@@ -96,10 +96,18 @@ cd $originalDir
 
 # 6. BUILD WHEEL
 Write-Host "6. Building Python wheel..." -ForegroundColor Yellow
-Remove-Item dist, build -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item dist, build, _wheel_build -Recurse -Force -ErrorAction SilentlyContinue
 
-# Use the permanent setup.py with bdist_wheel
-python setup.py bdist_wheel --plat-name=win_amd64
+python -m build --wheel --outdir _wheel_build .
+
+$rawWheel = Get-ChildItem _wheel_build\*.whl | Select-Object -First 1
+if (-not $rawWheel) {
+    Write-Host "   ERROR: build produced no wheel" -ForegroundColor Red
+    exit 1
+}
+
+mkdir dist -Force | Out-Null
+wheel tags --python-tag py3 --abi-tag none --platform-tag win_amd64 -o dist --remove $rawWheel.FullName
 
 $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
 Write-Host "   ✓ Built: $($wheel.Name)" -ForegroundColor Green

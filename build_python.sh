@@ -92,10 +92,18 @@ cd "$ORIGINAL_DIR"
 # 6. BUILD WHEEL
 # ============================================================================
 echo "6. Building Python wheel..."
-rm -rf dist build
+rm -rf dist build _wheel_build
 
-# Use the permanent setup.py with bdist_wheel
-python setup.py bdist_wheel --plat-name=linux_x86_64
+python -m build --wheel --outdir _wheel_build .
+
+RAW_WHEEL=$(find _wheel_build -name "*.whl" | head -1)
+if [ -z "$RAW_WHEEL" ]; then
+    echo "   ERROR: build produced no wheel"
+    exit 1
+fi
+
+mkdir -p dist
+wheel tags --python-tag py3 --abi-tag none --platform-tag linux_x86_64 -o dist --remove "$RAW_WHEEL"
 
 WHEEL=$(find dist -name "*.whl" | head -1)
 echo "   ✓ Built: $(basename $WHEEL)"
