@@ -31,14 +31,14 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_ARCHS_WINDOWS: AMD64
 
-          # Linux: only install X11 and OpenGL headers – GLFW will be built from source
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
           CIBW_BEFORE_BUILD_LINUX: |
-            yum install -y mesa-libGL-devel libX11-devel
+            yum install -y mesa-libGL-devel libX11-devel \
+              libXrandr-devel libXi-devel libXxf86vm-devel \
+              libXinerama-devel libXcursor-devel wget cmake gcc-c++ make
             bash ./build_python.sh
 
-          # Windows: uses your pre‑placed lib/glfw/glfw3.lib
           CIBW_BEFORE_BUILD_WINDOWS: |
             powershell -File ./build_python.ps1
 

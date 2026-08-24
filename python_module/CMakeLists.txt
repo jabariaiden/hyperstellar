@@ -1,16 +1,9 @@
-﻿# python_module/CMakeLists.txt
-cmake_minimum_required(VERSION 3.15)
+﻿cmake_minimum_required(VERSION 3.15)
 project(stellar_python)
 
-# ============================================================================
-# FIND PYTHON
-# ============================================================================
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
 message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
-# ============================================================================
-# DOWNLOAD PYBIND11
-# ============================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
     message(STATUS "Downloading pybind11...")
     file(DOWNLOAD
@@ -28,9 +21,6 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
 endif()
 add_subdirectory(pybind11)
 
-# ============================================================================
-# PLATFORM DETECTION
-# ============================================================================
 if(WIN32)
     set(PLATFORM_NAME "windows-x64")
 elseif(UNIX AND NOT APPLE)
@@ -43,9 +33,6 @@ set(NATIVE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_na
 message(STATUS "Platform: ${PLATFORM_NAME}")
 message(STATUS "Native output dir: ${NATIVE_DIR}")
 
-# ============================================================================
-# GLFW
-# ============================================================================
 set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 if(WIN32)
@@ -56,12 +43,13 @@ if(WIN32)
     endif()
     message(STATUS "Using GLFW: ${GLFW_LIBRARY}")
 else()
-    # On Linux/macOS, allow overriding via -DGLFW_LIBRARY and -DGLFW_INCLUDE_DIR
+    # On Linux, we expect GLFW_LIBRARY and GLFW_INCLUDE_DIR to be passed via -D
     if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
         message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIR})
         set(GLFW_LIBRARY ${GLFW_LIBRARY})
     else()
+        # Fallback to pkg-config (should not happen in our setup)
         find_package(PkgConfig REQUIRED)
         pkg_search_module(GLFW REQUIRED glfw3)
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
@@ -70,9 +58,6 @@ else()
     endif()
 endif()
 
-# ============================================================================
-# COMPILER SETTINGS
-# ============================================================================
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -87,9 +72,6 @@ else()
     add_compile_options(-Wall -Wextra -Wno-unused-parameter -O2)
 endif()
 
-# ============================================================================
-# SOURCES
-# ============================================================================
 set(CORE_SOURCES
     ../src/axis.cpp
     ../src/camera.cpp
@@ -115,9 +97,6 @@ file(GLOB IMGUI_SOURCES
     ../lib/imgui/backends/imgui_impl_opengl3.cpp
 )
 
-# ============================================================================
-# CREATE MODULE
-# ============================================================================
 pybind11_add_module(stellar
     ${CORE_SOURCES}
     ${PYTHON_SOURCES}
@@ -133,14 +112,10 @@ target_compile_definitions(stellar PRIVATE
     $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>
 )
 
-# Strip platform suffix on Linux/Mac so it's just stellar.so
 if(UNIX)
     set_target_properties(stellar PROPERTIES SUFFIX ".so")
 endif()
 
-# ============================================================================
-# INCLUDES
-# ============================================================================
 target_include_directories(stellar PRIVATE
     ${GLFW_INCLUDE_DIR}
     ../include
@@ -151,9 +126,6 @@ target_include_directories(stellar PRIVATE
     ${Python3_INCLUDE_DIRS}
 )
 
-# ============================================================================
-# LINK
-# ============================================================================
 if(WIN32)
     target_link_libraries(stellar PRIVATE
         ${Python3_LIBRARIES}
@@ -163,21 +135,22 @@ if(WIN32)
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
+    # Linux: link GLFW static + X11 libraries; do NOT link Python3_LIBRARIES
     target_link_libraries(stellar PRIVATE
-        ${Python3_LIBRARIES}
         ${GLFW_LIBRARY}
         GL
         dl
         pthread
         X11
+        Xrandr
+        Xi
+        Xxf86vm
+        Xinerama
+        Xcursor
     )
 endif()
 
-# ============================================================================
-# POST BUILD: COPY BINARY + SHADERS (already handled by build_python.sh)
-# ============================================================================
-# We keep this as a safety net; the script already does the copy.
-# But to be sure, we still copy during build.
+# Post-build copy (ensures binaries and shaders land in the package tree)
 if(WIN32)
     set(NATIVE_FILENAME "stellar.pyd")
 else()
