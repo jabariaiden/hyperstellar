@@ -103,8 +103,9 @@ if [ -z "$RAW_WHEEL" ]; then
 fi
 
 mkdir -p dist
-NEW_WHEEL=$(wheel tags --python-tag py3 --abi-tag none --platform-tag linux_x86_64 --remove "$RAW_WHEEL" | tail -n 1)
-mv "$NEW_WHEEL" dist/
+RAW_WHEEL_DIR=$(dirname "$RAW_WHEEL")
+NEW_WHEEL_NAME=$(wheel tags --python-tag py3 --abi-tag none --platform-tag linux_x86_64 --remove "$RAW_WHEEL" | tail -n 1)
+mv "$RAW_WHEEL_DIR/$NEW_WHEEL_NAME" dist/
 
 WHEEL=$(find dist -name "*.whl" | head -1)
 echo "   ✓ Built: $(basename "$WHEEL")"
