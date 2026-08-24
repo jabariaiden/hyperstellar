@@ -2,10 +2,11 @@
 project(stellar_python)
 
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+message(STATUS "Python interpreter: ${Python3_EXECUTABLE}")
 message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================
-# PYBIND11 (v2.13.6 for Python 3.13/3.14 compatibility)
+# PYBIND11 (v2.13.6 required for CPython 3.13/3.14 ABI compatibility)
 # ============================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
     message(STATUS "Downloading pybind11...")
@@ -33,8 +34,6 @@ elseif(APPLE)
 endif()
 
 set(NATIVE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/${PLATFORM_NAME}")
-message(STATUS "Platform: ${PLATFORM_NAME}")
-message(STATUS "Native output dir: ${NATIVE_DIR}")
 
 set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
@@ -44,7 +43,6 @@ if(WIN32)
     if(NOT EXISTS "${GLFW_LIBRARY}")
         message(FATAL_ERROR "GLFW not found at: ${GLFW_LIBRARY}")
     endif()
-    message(STATUS "Using GLFW: ${GLFW_LIBRARY}")
 else()
     if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
         message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
@@ -53,7 +51,6 @@ else()
         pkg_search_module(GLFW REQUIRED glfw3)
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
         set(GLFW_LIBRARY ${GLFW_LIBRARIES})
-        message(STATUS "Using system GLFW: ${GLFW_LIBRARY}")
     endif()
 endif()
 
@@ -125,7 +122,6 @@ target_include_directories(stellar PRIVATE
     ${Python3_INCLUDE_DIRS}
 )
 
-# Windows linking
 if(WIN32)
     target_link_libraries(stellar PRIVATE
         ${Python3_LIBRARIES}
@@ -136,8 +132,8 @@ if(WIN32)
     )
 else()
     # Linux: Do NOT link Python3_LIBRARIES dynamically.
-    # GLFW is linked statically, while system X11/GL libs are linked dynamically.
-    # auditwheel permits standard system dependencies (libX11.so, libGL.so, etc.).
+    # Link GLFW statically, and standard X11/GL system libs dynamically.
+    # auditwheel allows standard X11 and OpenGL libraries on manylinux.
     target_link_libraries(stellar PRIVATE
         ${GLFW_LIBRARY}
         X11
@@ -150,7 +146,6 @@ else()
         Xext
         Xdamage
         xcb
-        X11-xcb
         GL
         dl
         pthread

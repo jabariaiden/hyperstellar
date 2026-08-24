@@ -34,15 +34,15 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
 
-          # Enable powertools repo so yum can find all X11/GL development headers
-          CIBW_BEFORE_BUILD_LINUX: >
+          # Run system package installs ONCE per container
+          CIBW_BEFORE_ALL_LINUX: >
             yum install -y --enablerepo=powertools
             mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel
             libXxf86vm-devel libXinerama-devel libXcursor-devel libXrender-devel
-            libXext-devel libXdamage-devel libX11-xcb-devel libxcb-devel
-            wget cmake gcc-c++ make &&
-            bash ./build_python.sh
+            libXext-devel libXdamage-devel libxcb-devel
+            wget cmake gcc-c++ make
 
+          CIBW_BEFORE_BUILD_LINUX: bash ./build_python.sh
           CIBW_BEFORE_BUILD_WINDOWS: powershell -File ./build_python.ps1
 
           CIBW_BUILD_VERBOSITY: 1
