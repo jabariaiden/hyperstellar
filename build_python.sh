@@ -15,7 +15,8 @@ if [ -f "include/glad/glad.c" ]; then cp "include/glad/glad.c" "src/"; fi
 
 echo "2. Building GLFW static library..."
 if [ ! -f "glfw-build/src/libglfw3.a" ]; then
-    wget -q "https://github.com/glfw/glfw/releases/download/${GLFW_VERSION}/glfw-${GLFW_VERSION}.tar.gz"
+    # FIXED: Correct GitHub archive URL for the source code and explicitly output to a named file
+    wget -q "https://github.com/glfw/glfw/archive/refs/tags/${GLFW_VERSION}.tar.gz" -O glfw-${GLFW_VERSION}.tar.gz
     tar -xzf glfw-${GLFW_VERSION}.tar.gz
     mkdir -p glfw-build
     cd glfw-build
