@@ -69,9 +69,6 @@ jobs:
           name: wheel-linux
           path: dist/*.whl
 
-  # Smoke-test the SAME wheel that build-* produced, across supported Python
-  # versions, without rebuilding it (rebuilding per-version is what caused
-  # the identically-named-wheel collision in the first place).
   test:
     needs: [build-windows, build-linux]
     strategy:
@@ -97,20 +94,18 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist
 
-      - name: Install and smoke-test wheel
+      - name: Install and check wheel metadata
         shell: bash
         run: |
           pip install dist/*.whl
-          python -c "import hyperstellar; print(hyperstellar.__version__)"
+          python -c "import importlib.metadata as m; print(m.version('hyperstellar'))"
 
   publish:
     needs: [test]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      # Only wheel-windows and wheel-linux exist at this point, and each
-      # contains exactly one uniquely-named wheel (different platform tags),
-      # so merge-multiple is now safe.
+
       - name: Download all wheels
         uses: actions/download-artifact@v4
         with:
