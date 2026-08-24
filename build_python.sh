@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-echo "=== Building hyperstellar native module (Linux) ==="
+echo "=== Building hyperstellar Python package (Linux) ==="
 
 ORIGINAL_DIR=$(pwd)
 BUILD_DIR="_build_linux"
@@ -62,7 +62,60 @@ TARGET_DIR="../hyperstellar/src/hyperstellar/_native/linux-x64"
 mkdir -p "$TARGET_DIR/shaders"
 cp "$SO_FILE" "$TARGET_DIR/stellar.so"
 cp -r "../python_module/shaders/." "$TARGET_DIR/shaders/"
-echo "Native module built and copied."
+echo "   Native module built and copied."
 
 cd "$ORIGINAL_DIR"
+
+# ============================================================================
+# 7. BUILD WHEEL
+#
+# THIS WHOLE STEP WAS MISSING from the version you last uploaded -- the
+# script stopped after copying the .so, so unless your CI workflow builds
+# the wheel itself in a separate step, nothing was being produced to
+# upload to PyPI at all. Restored here.
+#
+# IMPORTANT FIX vs the old script:
+# The old script force-relabeled every wheel as:
+#     py3-none-<platform>
+# claiming it is pure-Python and ABI-independent. But stellar.so is a
+# compiled pybind11 extension linked against a *specific* CPython's C
+# API (not the stable/limited ABI) -- it only works with the exact
+# Python version + ABI it was built against. Forcing "py3-none" makes
+# every matrix job (3.10, 3.11, 3.12, 3.13, 3.14) produce a wheel with
+# the SAME filename, so:
+#   - only one of them survives being uploaded to PyPI (the others get
+#     skipped as duplicates, or overwrite/clobber each other)
+#   - pip has no way to pick the right one per interpreter, so users on
+#     a different Python version than whichever wheel "won" get an
+#     ImportError like: undefined symbol: _PyThreadState_UncheckedGet
+#
+# Fix: let `build` auto-detect the correct interpreter/ABI tag
+# (e.g. cp313-cp313) and only override the platform tag, so each
+# matrix job uploads a distinctly-named, version-correct wheel.
+# ============================================================================
+echo "7. Building Python wheel..."
+rm -rf dist build _wheel_build
+
+python -m build --wheel --outdir _wheel_build .
+
+RAW_WHEEL=$(find _wheel_build -name "*.whl" | head -1)
+if [ -z "$RAW_WHEEL" ]; then
+    echo "   ERROR: build produced no wheel"
+    exit 1
+fi
+
+mkdir -p dist
+RAW_WHEEL_DIR=$(dirname "$RAW_WHEEL")
+
+# Only rewrite the platform tag (for manylinux-style naming). Leave the
+# python-tag and abi-tag exactly as `build` detected them (e.g. cp313-cp313)
+# since those reflect the real, version-specific ABI of stellar.so.
+NEW_WHEEL_NAME=$(wheel tags --platform-tag linux_x86_64 --remove "$RAW_WHEEL" | tail -n 1)
+mv "$RAW_WHEEL_DIR/$NEW_WHEEL_NAME" dist/
+
+WHEEL=$(find dist -name "*.whl" | head -1)
+echo "   Built: $(basename "$WHEEL")"
+
+echo ""
 echo "=== Done ==="
+echo "Wheel: $WHEEL"
