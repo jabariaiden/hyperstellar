@@ -1,116 +1,111 @@
+# GitHub Actions workflow to build and publish hyperstellar wheels.
+# Uses cibuildwheel to build the native extension for each Python version
+# (3.10–3.14) on Linux and Windows, producing ABI‑specific wheels.
 name: Build Wheels
 
 on:
   push:
     branches: [main]
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*'          # Trigger on version tags like v1.5.7
+  workflow_dispatch:  # Allow manual trigger
 
 env:
   CMAKE_BUILD_TYPE: Release
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  # ----------------------------------------------------------------------
+  # Build wheels for each platform and Python version
+  # ----------------------------------------------------------------------
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # Add macos-latest if you support macOS
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          fetch-depth: 0   # Required if using setuptools-scm for version
 
-      - name: Install Python build dependencies
-        run: pip install build pybind11 wheel setuptools
+      # cibuildwheel:
+      # - Uses manylinux containers (Linux) or the Windows VM.
+      # - Builds the wheel for each Python version in CIBW_BUILD.
+      # - Runs the CIBW_BEFORE_BUILD commands (your native build scripts).
+      # - Runs the test command (smoke test).
+      # - Repairs the wheel (auditwheel on Linux, delocate on macOS).
+      # - Produces correctly tagged wheels, e.g., cp313-abi3-manylinux...
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.21.3
+        env:
+          # Python versions to build (matching your test matrix)
+          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
+          CIBW_SKIP: "*-win32"          # Skip 32-bit Windows
+          CIBW_ARCHS_LINUX: x86_64
+          CIBW_ARCHS_WINDOWS: AMD64
 
-      - name: Build
-        run: .\build_python.ps1
-        shell: pwsh
+          # Linux: install system dependencies, then run your native build script
+          CIBW_BEFORE_BUILD_LINUX: |
+            dnf install -y glfw-devel mesa-libGL-devel libX11-devel
+            bash ./build_python.sh
 
-      - name: Upload wheel
+          # Windows: run your PowerShell build script (GLFW is already in lib/glfw)
+          CIBW_BEFORE_BUILD_WINDOWS: |
+            powershell -File ./build_python.ps1
+
+          CIBW_BUILD_VERBOSITY: 1
+          # Quick import test after each wheel is built
+          CIBW_TEST_COMMAND: "python -c \"import hyperstellar; print('OK')\""
+
+      # Upload the built wheels as artifacts (for later testing or inspection)
+      - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-windows
-          path: dist/*.whl
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
 
-  build-linux:
-    runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux_2_28_x86_64
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          dnf install -y epel-release
-          dnf install -y glfw-devel mesa-libGL-devel libX11-devel pkgconfig cmake gcc-c++ make
-
-      - name: Select Python
-        run: echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
-
-      - name: Install Python build dependencies
-        run: pip install build pybind11 wheel setuptools auditwheel patchelf
-
-      - name: Build
-        run: |
-          chmod +x build_python.sh
-          ./build_python.sh
-
-      - name: Repair wheel (bundle GLFW, verify manylinux compliance)
-        run: |
-          auditwheel repair dist/*.whl -w dist_repaired --plat manylinux_2_28_x86_64
-          rm -rf dist
-          mv dist_repaired dist
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-linux
-          path: dist/*.whl
-
+  # ----------------------------------------------------------------------
+  # Test the wheels on each Python version (keeps your original flow)
+  # ----------------------------------------------------------------------
   test:
-    needs: [build-windows, build-linux]
+    needs: build-wheels
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
-        include:
-          - os: ubuntu-latest
-            artifact: wheel-linux
-          - os: windows-latest
-            artifact: wheel-windows
-    runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Download wheel
+      - name: Download Linux wheels
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: wheels-ubuntu-latest
           path: dist
 
-      - name: Install and check wheel metadata
-        shell: bash
+      - name: Install and test
         run: |
           pip install dist/*.whl
-          python -c "import importlib.metadata as m; print(m.version('hyperstellar'))"
+          python -c "import hyperstellar; print('OK')"
+          # Add your full test suite here if you have one
 
+  # ----------------------------------------------------------------------
+  # Publish to PyPI when a version tag is pushed
+  # ----------------------------------------------------------------------
   publish:
-    needs: [test]
+    needs: test
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-
-      - name: Download all wheels
+      - name: Download all built wheels
         uses: actions/download-artifact@v4
         with:
-          pattern: wheel-*
+          pattern: wheels-*
           path: dist
           merge-multiple: true
 

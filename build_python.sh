@@ -1,14 +1,16 @@
 #!/bin/bash
-# build_python.sh
-# Run from: ~/hyperstellar-public (WSL path: /mnt/c/Users/user/hyperstellar-public)
+# build_python.sh - Builds the native C++ module for Linux.
+# It copies shaders, prepares sources, runs CMake, and places the final
+# stellar.so and shaders into the Python package source tree.
+# This script does NOT build the wheel; that is handled by cibuildwheel.
 
 set -e
 
-echo "=== Building hyperstellar Python package (Linux) ==="
+echo "=== Building hyperstellar native module (Linux) ==="
 
-# ============================================================================
-# 1. ACTIVATE ENVIRONMENT (optional, skipped in CI)
-# ============================================================================
+# ------------------------------------------------------------------------
+# 1. Activate environment (optional, skipped in CI)
+# ------------------------------------------------------------------------
 echo "1. Activating Python environment..."
 ENV_SCRIPT="$HOME/hyperstellar_env/bin/activate"
 if [ -f "$ENV_SCRIPT" ]; then
@@ -22,16 +24,16 @@ ORIGINAL_DIR=$(pwd)
 BUILD_DIR="_build_linux"
 echo "   Working from: $ORIGINAL_DIR"
 
-# ============================================================================
-# 2. CLEAN
-# ============================================================================
+# ------------------------------------------------------------------------
+# 2. Clean
+# ------------------------------------------------------------------------
 echo "2. Cleaning..."
 rm -rf "$BUILD_DIR"
 echo "   ✓ Cleaned"
 
-# ============================================================================
-# 3. COPY SHADERS
-# ============================================================================
+# ------------------------------------------------------------------------
+# 3. Copy shaders into python_module/shaders (CMake will copy them later)
+# ------------------------------------------------------------------------
 echo "3. Copying shaders..."
 if [ -d "shaders" ]; then
     rm -rf "python_module/shaders"
@@ -44,9 +46,9 @@ else
     exit 1
 fi
 
-# ============================================================================
-# 4. FIX GLAD.C
-# ============================================================================
+# ------------------------------------------------------------------------
+# 4. Ensure glad.c is in src/
+# ------------------------------------------------------------------------
 echo "4. Fixing source paths..."
 if [ -f "include/glad/glad.c" ]; then
     cp "include/glad/glad.c" "src/"
@@ -57,9 +59,9 @@ else
     echo "   WARNING: glad.c not found — build may fail"
 fi
 
-# ============================================================================
-# 5. BUILD C++ MODULE
-# ============================================================================
+# ------------------------------------------------------------------------
+# 5. Build the native module with CMake
+# ------------------------------------------------------------------------
 echo "5. Building C++ module..."
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -72,6 +74,7 @@ cmake ../python_module \
 echo "   Compiling ($(nproc) cores)..."
 cmake --build . -- -j$(nproc)
 
+# Locate the produced shared library
 SO_FILE=$(find . -name "stellar*.so" | head -1)
 if [ -z "$SO_FILE" ]; then
     echo "   ERROR: No .so produced"
@@ -79,6 +82,7 @@ if [ -z "$SO_FILE" ]; then
     exit 1
 fi
 
+# Copy it and the shaders into the Python package source tree
 TARGET_DIR="../hyperstellar/src/hyperstellar/_native/linux-x64"
 mkdir -p "$TARGET_DIR/shaders"
 cp "$SO_FILE" "$TARGET_DIR/stellar.so"
@@ -87,29 +91,4 @@ echo "   ✓ $(basename $SO_FILE) → linux-x64/stellar.so"
 echo "   ✓ Shaders copied"
 
 cd "$ORIGINAL_DIR"
-
-# ============================================================================
-# 6. BUILD WHEEL
-# ============================================================================
-echo "6. Building Python wheel..."
-rm -rf dist build _wheel_build
-
-python -m build --wheel --outdir _wheel_build .
-
-RAW_WHEEL=$(find _wheel_build -name "*.whl" | head -1)
-if [ -z "$RAW_WHEEL" ]; then
-    echo "   ERROR: build produced no wheel"
-    exit 1
-fi
-
-mkdir -p dist
-RAW_WHEEL_DIR=$(dirname "$RAW_WHEEL")
-NEW_WHEEL_NAME=$(wheel tags --python-tag py3 --abi-tag none --platform-tag linux_x86_64 --remove "$RAW_WHEEL" | tail -n 1)
-mv "$RAW_WHEEL_DIR/$NEW_WHEEL_NAME" dist/
-
-WHEEL=$(find dist -name "*.whl" | head -1)
-echo "   ✓ Built: $(basename "$WHEEL")"
-
-echo ""
-echo "=== Done ==="
-echo "Wheel: $WHEEL"
+echo "=== Native module built successfully ==="

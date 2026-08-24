@@ -1,9 +1,13 @@
-﻿# build_python.ps1
-# Run from: C:\Users\user\hyperstellar-public
+﻿# build_python.ps1 - Builds the native C++ module for Windows.
+# It copies shaders, prepares sources, runs CMake, and places the final
+# stellar.pyd and shaders into the Python package source tree.
+# This script does NOT build the wheel; that is handled by cibuildwheel.
 
-Write-Host "=== Building hyperstellar Python package ===" -ForegroundColor Cyan
+Write-Host "=== Building hyperstellar native module (Windows) ===" -ForegroundColor Cyan
 
-# 1. ACTIVATE ENVIRONMENT (optional, skipped in CI)
+# ------------------------------------------------------------------------
+# 1. Activate environment (optional, skipped in CI)
+# ------------------------------------------------------------------------
 Write-Host "1. Activating Python environment..." -ForegroundColor Yellow
 $envScript = "C:\Users\user\jabariaiden-ProjStellar-main\hyperstellar_env\Scripts\Activate.ps1"
 if (Test-Path $envScript) {
@@ -14,15 +18,19 @@ if (Test-Path $envScript) {
 }
 
 $originalDir = Get-Location
-$BUILD_DIR = "_build"
+$BUILD_DIR = "_build_windows"
 Write-Host "   Working from: $originalDir" -ForegroundColor Gray
 
-# 2. CLEAN
+# ------------------------------------------------------------------------
+# 2. Clean
+# ------------------------------------------------------------------------
 Write-Host "2. Cleaning..." -ForegroundColor Yellow
-Remove-Item dist, build, $BUILD_DIR -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force $BUILD_DIR -ErrorAction SilentlyContinue
 Write-Host "   ✓ Cleaned" -ForegroundColor Green
 
-# 3. COPY SHADERS
+# ------------------------------------------------------------------------
+# 3. Copy shaders into python_module/shaders (CMake will copy them later)
+# ------------------------------------------------------------------------
 Write-Host "3. Copying shaders..." -ForegroundColor Yellow
 $rootShaders = "shaders"
 $cmakeShaders = "python_module\shaders"
@@ -43,7 +51,9 @@ if (Test-Path $rootShaders) {
     exit 1
 }
 
-# 4. FIX GLAD.C
+# ------------------------------------------------------------------------
+# 4. Ensure glad.c is in src/
+# ------------------------------------------------------------------------
 Write-Host "4. Fixing source paths..." -ForegroundColor Yellow
 if (Test-Path "include\glad\glad.c") {
     Copy-Item "include\glad\glad.c" "src\" -Force
@@ -54,7 +64,9 @@ if (Test-Path "include\glad\glad.c") {
     Write-Host "   WARNING: glad.c not found" -ForegroundColor Yellow
 }
 
-# 5. BUILD C++ MODULE
+# ------------------------------------------------------------------------
+# 5. Build the native module with CMake
+# ------------------------------------------------------------------------
 Write-Host "5. Building C++ module..." -ForegroundColor Yellow
 mkdir $BUILD_DIR -Force
 cd $BUILD_DIR
@@ -93,23 +105,4 @@ try {
 }
 
 cd $originalDir
-Write-Host "6. Building Python wheel..." -ForegroundColor Yellow
-Remove-Item dist, build, _wheel_build -Recurse -Force -ErrorAction SilentlyContinue
-
-python -m build --wheel --outdir _wheel_build .
-
-$rawWheel = Get-ChildItem _wheel_build\*.whl | Select-Object -First 1
-if (-not $rawWheel) {
-    Write-Host "   ERROR: build produced no wheel" -ForegroundColor Red
-    exit 1
-}
-
-mkdir dist -Force | Out-Null
-$newWheelName = (wheel tags --python-tag py3 --abi-tag none --platform-tag win_amd64 --remove $rawWheel.FullName | Select-Object -Last 1).Trim()
-$newWheelPath = Join-Path $rawWheel.DirectoryName $newWheelName
-Move-Item $newWheelPath dist\ -Force
-
-$wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
-Write-Host "   ✓ Built: $($wheel.Name)" -ForegroundColor Green
-
-Write-Host "`n=== Done ===" -ForegroundColor Cyan
+Write-Host "=== Native module built successfully ===" -ForegroundColor Cyan
