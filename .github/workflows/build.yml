@@ -34,16 +34,13 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
 
-          # This is the only line you need to get right – no backslashes, no multi‑line surprises.
-          CIBW_BEFORE_BUILD_LINUX: |
-            yum install -y mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel libXxf86vm-devel libXinerama-devel libXcursor-devel wget cmake gcc-c++ make
-            bash ./build_python.sh
+          # Single‑line install of all dependencies, then build script.
+          CIBW_BEFORE_BUILD_LINUX: yum install -y mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel libXxf86vm-devel libXinerama-devel libXcursor-devel libXrender-devel libXext-devel libXdamage-devel libX11-xcb-devel libxcb-devel wget cmake gcc-c++ make && bash ./build_python.sh
 
-          CIBW_BEFORE_BUILD_WINDOWS: |
-            powershell -File ./build_python.ps1
+          CIBW_BEFORE_BUILD_WINDOWS: powershell -File ./build_python.ps1
 
           CIBW_BUILD_VERBOSITY: 1
-          CIBW_TEST_COMMAND: "python -c \"import hyperstellar; print('OK')\""
+          CIBW_TEST_COMMAND: python -c "import hyperstellar; print('OK')"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4

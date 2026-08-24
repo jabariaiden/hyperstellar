@@ -36,15 +36,16 @@ cmake ../glfw-${GLFW_VERSION} \
     -DGLFW_BUILD_EXAMPLES=OFF \
     -DGLFW_BUILD_TESTS=OFF \
     -DGLFW_BUILD_DOCS=OFF \
-    -DGLFW_USE_OSMESA=OFF \
-    -DGLFW_BUILD_WAYLAND=OFF
+    -DGLFW_BUILD_WAYLAND=OFF \
+    -DGLFW_BUILD_OSMESA=OFF \
+    -DGLFW_BUILD_X11=ON
 make -j$(nproc)
 cd ..
 GLFW_ROOT="$(pwd)/glfw-build"
 GLFW_INCLUDE_DIR="$(pwd)/glfw-${GLFW_VERSION}/include"
 GLFW_LIBRARY="${GLFW_ROOT}/src/libglfw3.a"
 
-echo "6. Building C++ module with static GLFW and static X11 libraries..."
+echo "6. Building C++ module with static GLFW..."
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 cmake ../python_module \

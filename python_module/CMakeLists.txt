@@ -135,14 +135,17 @@ if(WIN32)
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
-    # Linux: do NOT link Python3_LIBRARIES (interpreter provides symbols)
-    # Link GLFW static and all X11 libraries statically to avoid auditwheel issues
+    # Linux: do NOT link Python3_LIBRARIES – interpreter provides symbols.
+    # Find static X11 libraries and link them statically.
     find_library(X11_STATIC NAMES X11.a PATHS /usr/lib64 /usr/lib)
     find_library(XRANDR_STATIC NAMES Xrandr.a PATHS /usr/lib64 /usr/lib)
     find_library(XI_STATIC NAMES Xi.a PATHS /usr/lib64 /usr/lib)
     find_library(XXF86VM_STATIC NAMES Xxf86vm.a PATHS /usr/lib64 /usr/lib)
     find_library(XINERAMA_STATIC NAMES Xinerama.a PATHS /usr/lib64 /usr/lib)
     find_library(XCURSOR_STATIC NAMES Xcursor.a PATHS /usr/lib64 /usr/lib)
+    find_library(XRENDER_STATIC NAMES Xrender.a PATHS /usr/lib64 /usr/lib)
+    find_library(XEXT_STATIC NAMES Xext.a PATHS /usr/lib64 /usr/lib)
+    find_library(XDAMAGE_STATIC NAMES Xdamage.a PATHS /usr/lib64 /usr/lib)
     find_library(XCB_STATIC NAMES xcb.a PATHS /usr/lib64 /usr/lib)
     find_library(X11_XCB_STATIC NAMES X11-xcb.a PATHS /usr/lib64 /usr/lib)
 
@@ -154,6 +157,9 @@ else()
         ${XXF86VM_STATIC}
         ${XINERAMA_STATIC}
         ${XCURSOR_STATIC}
+        ${XRENDER_STATIC}
+        ${XEXT_STATIC}
+        ${XDAMAGE_STATIC}
         ${XCB_STATIC}
         ${X11_XCB_STATIC}
         GL
@@ -162,7 +168,7 @@ else()
     )
 endif()
 
-# Post-build copy (ensures binaries and shaders land in the package tree)
+# Post‑build copy (ensures binaries and shaders land in the package tree)
 if(WIN32)
     set(NATIVE_FILENAME "stellar.pyd")
 else()
