@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hyperstellar"
-version = "1.5.2"
+version = "1.5.3"
 description = "GPU-accelerated physics simulation engine"
 readme = "README.md"
 authors = [{name = "Aiden Jabari", email = "Jabariaiden15@email.com"}]

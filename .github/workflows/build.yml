@@ -48,8 +48,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path ..\hyperstellar\src\hyperstellar\_native\windows-x64\shaders
           Copy-Item ..\python_module\shaders\* ..\hyperstellar\src\hyperstellar\_native\windows-x64\shaders\ -Recurse -Force
 
-      - name: Build wheel
-        run: python -m build
+      - name: Build wheel (Windows)
+        env:
+          SETUPTOOLS_PLATFORM_NAME: win_amd64
+        run: python -m build --wheel
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
@@ -102,8 +104,10 @@ jobs:
           cp $SO ../hyperstellar/src/hyperstellar/_native/linux-x64/stellar.so
           cp -r ../python_module/shaders/. ../hyperstellar/src/hyperstellar/_native/linux-x64/shaders/
 
-      - name: Build wheel
-        run: python -m build
+      - name: Build wheel (Linux)
+        env:
+          SETUPTOOLS_PLATFORM_NAME: linux_x86_64
+        run: python -m build --wheel
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
