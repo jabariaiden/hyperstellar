@@ -3,10 +3,9 @@ project(stellar_python)
 
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
 message(STATUS "Python interpreter: ${Python3_EXECUTABLE}")
-message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================
-# PYBIND11 (v2.13.6 required for CPython 3.13/3.14 ABI compatibility)
+# PYBIND11 (v2.13.6 required for CPython 3.13/3.14 ABI support)
 # ============================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
     message(STATUS "Downloading pybind11...")
@@ -34,7 +33,6 @@ elseif(APPLE)
 endif()
 
 set(NATIVE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/${PLATFORM_NAME}")
-
 set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 if(WIN32)
@@ -124,31 +122,15 @@ target_include_directories(stellar PRIVATE
 
 if(WIN32)
     target_link_libraries(stellar PRIVATE
-        ${Python3_LIBRARIES}
         opengl32.lib
         gdi32.lib
         "${GLFW_LIBRARY}"
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
-    # Linux: Do NOT link Python3_LIBRARIES dynamically.
-    # Link GLFW statically, and standard X11/GL system libs dynamically.
-    # auditwheel allows standard X11 and OpenGL libraries on manylinux.
     target_link_libraries(stellar PRIVATE
         ${GLFW_LIBRARY}
-        X11
-        Xrandr
-        Xi
-        Xxf86vm
-        Xinerama
-        Xcursor
-        Xrender
-        Xext
-        Xdamage
-        xcb
-        GL
-        dl
-        pthread
+        X11 Xrandr Xi Xxf86vm Xinerama Xcursor Xrender Xext Xdamage xcb GL dl pthread
     )
 endif()
 
@@ -165,14 +147,14 @@ add_custom_command(TARGET stellar POST_BUILD
         "$<TARGET_FILE:stellar>"
         "${NATIVE_DIR}/${NATIVE_FILENAME}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/math.comp"   "${NATIVE_DIR}/shaders/math.comp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/math.comp"   "${NATIVE_DIR}/shaders/math.comp"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/paint.comp"  "${NATIVE_DIR}/shaders/paint.comp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/paint.comp"  "${NATIVE_DIR}/shaders/paint.comp"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.vert"   "${NATIVE_DIR}/shaders/quad.vert"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.vert"   "${NATIVE_DIR}/shaders/quad.vert"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.geom"   "${NATIVE_DIR}/shaders/quad.geom"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.geom"   "${NATIVE_DIR}/shaders/quad.geom"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.frag"   "${NATIVE_DIR}/shaders/quad.frag"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.frag"   "${NATIVE_DIR}/shaders/quad.frag"
     COMMENT "Copying ${NATIVE_FILENAME} and shaders to ${NATIVE_DIR}"
 )

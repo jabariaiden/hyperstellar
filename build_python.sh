@@ -6,19 +6,11 @@ ORIGINAL_DIR=$(pwd)
 BUILD_DIR="_build_linux"
 GLFW_VERSION="3.4"
 
-# Clean build directory and opposite platform native binaries to prevent wheel contamination
+# Clean build directory and Windows binaries
 rm -rf "$BUILD_DIR"
 rm -rf "hyperstellar/src/hyperstellar/_native/windows-x64"
 
 echo "1. Preparing source files..."
-if [ -d "shaders" ]; then
-    rm -rf "python_module/shaders"
-    mkdir -p "python_module/shaders"
-    cp -r shaders/. python_module/shaders/
-else
-    echo "ERROR: shaders/ directory not found"; exit 1
-fi
-
 if [ -f "include/glad/glad.c" ]; then cp "include/glad/glad.c" "src/"; fi
 
 echo "2. Building GLFW static library..."
@@ -44,7 +36,7 @@ GLFW_ROOT="$(pwd)/glfw-build"
 GLFW_INCLUDE_DIR="$(pwd)/glfw-${GLFW_VERSION}/include"
 GLFW_LIBRARY="${GLFW_ROOT}/src/libglfw3.a"
 
-CURRENT_PYTHON=$(which python)
+CURRENT_PYTHON=$(python -c "import sys; print(sys.executable)")
 echo "3. Building C++ extension for active Python: ${CURRENT_PYTHON}..."
 
 mkdir -p "$BUILD_DIR"
@@ -57,15 +49,16 @@ cmake ../python_module \
     -DGLFW_LIBRARY="${GLFW_LIBRARY}" \
     -DGLFW_INCLUDE_DIR="${GLFW_INCLUDE_DIR}"
 
+# Build CMake (POST_BUILD automatically copies the .so and shaders)
 cmake --build . -- -j$(nproc)
 
-SO_FILE=$(find . -name "stellar*.so" | head -1)
-if [ -z "$SO_FILE" ]; then echo "ERROR: No .so file produced"; cd "$ORIGINAL_DIR"; exit 1; fi
-
-TARGET_DIR="../hyperstellar/src/hyperstellar/_native/linux-x64"
-mkdir -p "$TARGET_DIR/shaders"
-cp "$SO_FILE" "$TARGET_DIR/stellar.so"
-cp -r "../python_module/shaders/." "$TARGET_DIR/shaders/"
-
 cd "$ORIGINAL_DIR"
+
+echo "4. Verifying CMake POST_BUILD copied files..."
+TARGET_FILE="hyperstellar/src/hyperstellar/_native/linux-x64/stellar.so"
+if [ ! -f "$TARGET_FILE" ]; then
+    echo "ERROR: stellar.so was not placed in $TARGET_FILE"
+    exit 1
+fi
+
 echo "=== Native Linux module compiled successfully ==="

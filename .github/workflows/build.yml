@@ -15,6 +15,7 @@ jobs:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
 
@@ -34,16 +35,15 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
 
-          # Run system package installs ONCE per container
           CIBW_BEFORE_ALL_LINUX: >
+            yum install -y epel-release &&
             yum install -y --enablerepo=powertools
             mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel
             libXxf86vm-devel libXinerama-devel libXcursor-devel libXrender-devel
-            libXext-devel libXdamage-devel libxcb-devel
-            wget cmake gcc-c++ make
+            libXext-devel libXdamage-devel libxcb-devel wget cmake gcc-c++ make
 
           CIBW_BEFORE_BUILD_LINUX: bash ./build_python.sh
-          CIBW_BEFORE_BUILD_WINDOWS: powershell -File ./build_python.ps1
+          CIBW_BEFORE_BUILD_WINDOWS: powershell -ExecutionPolicy Bypass -File ./build_python.ps1
 
           CIBW_BUILD_VERBOSITY: 1
           CIBW_TEST_COMMAND: python -c "import hyperstellar; print('OK')"
@@ -53,36 +53,3 @@ jobs:
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
-
-  test:
-    needs: build-wheels
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
-    steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: wheels-ubuntu-latest
-          path: dist
-      - run: |
-          pip install dist/*.whl
-          python -c "import hyperstellar; print('OK')"
-
-  publish:
-    needs: test
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*
-          path: dist
-          merge-multiple: true
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
