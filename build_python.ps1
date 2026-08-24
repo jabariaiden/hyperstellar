@@ -95,7 +95,6 @@ try {
 cd $originalDir
 
 # 6. BUILD WHEEL
-Write-Host "6. Building Python wheel..." -ForegroundColor Yellow
 Remove-Item dist, build, _wheel_build -Recurse -Force -ErrorAction SilentlyContinue
 
 python -m build --wheel --outdir _wheel_build .
@@ -107,7 +106,8 @@ if (-not $rawWheel) {
 }
 
 mkdir dist -Force | Out-Null
-wheel tags --python-tag py3 --abi-tag none --platform-tag win_amd64 -o dist --remove $rawWheel.FullName
+$newWheelPath = (wheel tags --python-tag py3 --abi-tag none --platform-tag win_amd64 --remove $rawWheel.FullName | Select-Object -Last 1).Trim()
+Move-Item $newWheelPath dist\ -Force
 
 $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
 Write-Host "   ✓ Built: $($wheel.Name)" -ForegroundColor Green
