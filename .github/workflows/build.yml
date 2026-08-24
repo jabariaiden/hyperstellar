@@ -1,14 +1,11 @@
-# GitHub Actions workflow to build and publish hyperstellar wheels.
-# Uses cibuildwheel to produce ABI‑specific wheels for each Python version,
-# ensuring the native extension is linked against the correct Python ABI.
 name: Build Wheels
 
 on:
   push:
     branches: [main]
     tags:
-      - 'v*'          # trigger on version tags like v1.5.7
-  workflow_dispatch:  # allow manual trigger
+      - 'v*'
+  workflow_dispatch:
 
 env:
   CMAKE_BUILD_TYPE: Release
@@ -22,8 +19,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -35,15 +31,14 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_ARCHS_WINDOWS: AMD64
 
-          # ----- Linux -----
+          # Linux: only install X11 and OpenGL headers – GLFW will be built from source
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
           CIBW_BEFORE_BUILD_LINUX: |
-            yum install -y glfw-devel mesa-libGL-devel libX11-devel
+            yum install -y mesa-libGL-devel libX11-devel
             bash ./build_python.sh
 
-          # ----- Windows -----
-          # GLFW is expected at lib/glfw/glfw3.lib (your existing setup)
+          # Windows: uses your pre‑placed lib/glfw/glfw3.lib
           CIBW_BEFORE_BUILD_WINDOWS: |
             powershell -File ./build_python.ps1
 

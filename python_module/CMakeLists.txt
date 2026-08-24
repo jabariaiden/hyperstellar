@@ -56,11 +56,18 @@ if(WIN32)
     endif()
     message(STATUS "Using GLFW: ${GLFW_LIBRARY}")
 else()
-    find_package(PkgConfig REQUIRED)
-    pkg_search_module(GLFW REQUIRED glfw3)
-    set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
-    set(GLFW_LIBRARY ${GLFW_LIBRARIES})
-    message(STATUS "Using system GLFW: ${GLFW_LIBRARY}")
+    # On Linux/macOS, allow overriding via -DGLFW_LIBRARY and -DGLFW_INCLUDE_DIR
+    if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
+        message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
+        set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIR})
+        set(GLFW_LIBRARY ${GLFW_LIBRARY})
+    else()
+        find_package(PkgConfig REQUIRED)
+        pkg_search_module(GLFW REQUIRED glfw3)
+        set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
+        set(GLFW_LIBRARY ${GLFW_LIBRARIES})
+        message(STATUS "Using system GLFW: ${GLFW_LIBRARY}")
+    endif()
 endif()
 
 # ============================================================================
@@ -167,9 +174,10 @@ else()
 endif()
 
 # ============================================================================
-# POST BUILD: COPY BINARY + SHADERS
+# POST BUILD: COPY BINARY + SHADERS (already handled by build_python.sh)
 # ============================================================================
-# Determine output filename
+# We keep this as a safety net; the script already does the copy.
+# But to be sure, we still copy during build.
 if(WIN32)
     set(NATIVE_FILENAME "stellar.pyd")
 else()

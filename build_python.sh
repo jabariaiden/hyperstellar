@@ -1,48 +1,42 @@
 #!/bin/bash
-# build_python.sh - Builds the native C++ module for Linux.
-# It copies shaders, prepares sources, runs CMake, and places the final
-# stellar.so and shaders into the Python package source tree.
-# This script does NOT build the wheel; that is handled by cibuildwheel.
+# Builds the native C++ module for Linux.
+# Downloads and statically links GLFW, so auditwheel passes.
 
 set -e
-
 echo "=== Building hyperstellar native module (Linux) ==="
-
-# ------------------------------------------------------------------------
-# 1. Activate environment (optional, skipped in CI)
-# ------------------------------------------------------------------------
-echo "1. Activating Python environment..."
-ENV_SCRIPT="$HOME/hyperstellar_env/bin/activate"
-if [ -f "$ENV_SCRIPT" ]; then
-    source "$ENV_SCRIPT"
-    echo "   ✓ Activated hyperstellar_env"
-else
-    echo "   ✓ Running without venv (CI mode)"
-fi
 
 ORIGINAL_DIR=$(pwd)
 BUILD_DIR="_build_linux"
-echo "   Working from: $ORIGINAL_DIR"
+GLFW_VERSION="3.4"
+
+# ------------------------------------------------------------------------
+# 1. Environment (optional)
+# ------------------------------------------------------------------------
+echo "1. Activating environment..."
+ENV_SCRIPT="$HOME/hyperstellar_env/bin/activate"
+if [ -f "$ENV_SCRIPT" ]; then
+    source "$ENV_SCRIPT"
+else
+    echo "Running without venv (CI mode)"
+fi
 
 # ------------------------------------------------------------------------
 # 2. Clean
 # ------------------------------------------------------------------------
 echo "2. Cleaning..."
 rm -rf "$BUILD_DIR"
-echo "   ✓ Cleaned"
 
 # ------------------------------------------------------------------------
-# 3. Copy shaders into python_module/shaders (CMake will copy them later)
+# 3. Copy shaders
 # ------------------------------------------------------------------------
 echo "3. Copying shaders..."
 if [ -d "shaders" ]; then
     rm -rf "python_module/shaders"
     mkdir -p "python_module/shaders"
     cp -r shaders/. python_module/shaders/
-    COUNT=$(find shaders -type f | wc -l)
-    echo "   ✓ Copied $COUNT shader files"
+    echo "Copied shaders"
 else
-    echo "   ERROR: shaders/ directory not found"
+    echo "ERROR: shaders/ not found"
     exit 1
 fi
 
@@ -52,43 +46,55 @@ fi
 echo "4. Fixing source paths..."
 if [ -f "include/glad/glad.c" ]; then
     cp "include/glad/glad.c" "src/"
-    echo "   ✓ Copied glad.c to src/"
-elif [ -f "src/glad.c" ]; then
-    echo "   ✓ glad.c already in src/"
-else
-    echo "   WARNING: glad.c not found — build may fail"
 fi
 
 # ------------------------------------------------------------------------
-# 5. Build the native module with CMake
+# 5. Build GLFW as a static library
 # ------------------------------------------------------------------------
-echo "5. Building C++ module..."
+echo "5. Building GLFW static library..."
+wget -q "https://github.com/glfw/glfw/releases/download/${GLFW_VERSION}/glfw-${GLFW_VERSION}.tar.gz"
+tar -xzf glfw-${GLFW_VERSION}.tar.gz
+mkdir -p glfw-build
+cd glfw-build
+cmake ../glfw-${GLFW_VERSION} \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DGLFW_BUILD_EXAMPLES=OFF \
+    -DGLFW_BUILD_TESTS=OFF \
+    -DGLFW_BUILD_DOCS=OFF
+make -j$(nproc)
+cd ..
+GLFW_ROOT="$(pwd)/glfw-build"
+GLFW_INCLUDE_DIR="$(pwd)/glfw-${GLFW_VERSION}/include"
+GLFW_LIBRARY="${GLFW_ROOT}/src/libglfw3.a"
+
+# ------------------------------------------------------------------------
+# 6. Build the C++ module with CMake, passing GLFW paths
+# ------------------------------------------------------------------------
+echo "6. Building C++ module..."
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
-
-echo "   Configuring..."
 cmake ../python_module \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_FLAGS="-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
-
-echo "   Compiling ($(nproc) cores)..."
+    -DCMAKE_CXX_FLAGS="-DNO_TEXT_RENDERING -DPYTHON_MODULE=1" \
+    -DGLFW_LIBRARY="${GLFW_LIBRARY}" \
+    -DGLFW_INCLUDE_DIR="${GLFW_INCLUDE_DIR}"
 cmake --build . -- -j$(nproc)
 
 # Locate the produced shared library
 SO_FILE=$(find . -name "stellar*.so" | head -1)
 if [ -z "$SO_FILE" ]; then
-    echo "   ERROR: No .so produced"
+    echo "ERROR: No .so produced"
     cd "$ORIGINAL_DIR"
     exit 1
 fi
 
-# Copy it and the shaders into the Python package source tree
+# Copy it and shaders into the Python package source tree
 TARGET_DIR="../hyperstellar/src/hyperstellar/_native/linux-x64"
 mkdir -p "$TARGET_DIR/shaders"
 cp "$SO_FILE" "$TARGET_DIR/stellar.so"
 cp -r "../python_module/shaders/." "$TARGET_DIR/shaders/"
-echo "   ✓ $(basename $SO_FILE) → linux-x64/stellar.so"
-echo "   ✓ Shaders copied"
+echo "Native module built and copied."
 
 cd "$ORIGINAL_DIR"
-echo "=== Native module built successfully ==="
+echo "=== Done ==="
