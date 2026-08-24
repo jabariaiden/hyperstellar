@@ -1,74 +1,61 @@
 # GitHub Actions workflow to build and publish hyperstellar wheels.
-# Uses cibuildwheel to build the native extension for each Python version
-# (3.10–3.14) on Linux and Windows, producing ABI‑specific wheels.
+# Uses cibuildwheel to produce ABI‑specific wheels for each Python version,
+# ensuring the native extension is linked against the correct Python ABI.
 name: Build Wheels
 
 on:
   push:
     branches: [main]
     tags:
-      - 'v*'          # Trigger on version tags like v1.5.7
-  workflow_dispatch:  # Allow manual trigger
+      - 'v*'          # trigger on version tags like v1.5.7
+  workflow_dispatch:  # allow manual trigger
 
 env:
   CMAKE_BUILD_TYPE: Release
 
 jobs:
-  # ----------------------------------------------------------------------
-  # Build wheels for each platform and Python version
-  # ----------------------------------------------------------------------
   build-wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        # Add macos-latest if you support macOS
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Required if using setuptools-scm for version
+          fetch-depth: 0
 
-      # cibuildwheel:
-      # - Uses manylinux containers (Linux) or the Windows VM.
-      # - Builds the wheel for each Python version in CIBW_BUILD.
-      # - Runs the CIBW_BEFORE_BUILD commands (your native build scripts).
-      # - Runs the test command (smoke test).
-      # - Repairs the wheel (auditwheel on Linux, delocate on macOS).
-      # - Produces correctly tagged wheels, e.g., cp313-abi3-manylinux...
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.21.3
         env:
-          # Python versions to build (matching your test matrix)
           CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
-          CIBW_SKIP: "*-win32"          # Skip 32-bit Windows
+          CIBW_SKIP: "*-win32"
           CIBW_ARCHS_LINUX: x86_64
           CIBW_ARCHS_WINDOWS: AMD64
 
-          # Linux: install system dependencies, then run your native build script
+          # ----- Linux -----
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_PRERELEASE_PYTHONS: True
           CIBW_BEFORE_BUILD_LINUX: |
             dnf install -y glfw-devel mesa-libGL-devel libX11-devel
             bash ./build_python.sh
 
-          # Windows: run your PowerShell build script (GLFW is already in lib/glfw)
+          # ----- Windows -----
+          # GLFW is expected at lib/glfw/glfw3.lib (your existing setup)
           CIBW_BEFORE_BUILD_WINDOWS: |
             powershell -File ./build_python.ps1
 
           CIBW_BUILD_VERBOSITY: 1
-          # Quick import test after each wheel is built
           CIBW_TEST_COMMAND: "python -c \"import hyperstellar; print('OK')\""
 
-      # Upload the built wheels as artifacts (for later testing or inspection)
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
 
-  # ----------------------------------------------------------------------
-  # Test the wheels on each Python version (keeps your original flow)
-  # ----------------------------------------------------------------------
   test:
     needs: build-wheels
     runs-on: ubuntu-latest
@@ -77,39 +64,27 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Download Linux wheels
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: wheels-ubuntu-latest
           path: dist
-
-      - name: Install and test
-        run: |
+      - run: |
           pip install dist/*.whl
           python -c "import hyperstellar; print('OK')"
-          # Add your full test suite here if you have one
 
-  # ----------------------------------------------------------------------
-  # Publish to PyPI when a version tag is pushed
-  # ----------------------------------------------------------------------
   publish:
     needs: test
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download all built wheels
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           path: dist
           merge-multiple: true
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
