@@ -1,4 +1,4 @@
-﻿# build_python.ps1
+﻿﻿# build_python.ps1
 # Run from: C:\Users\user\hyperstellar-public
 
 Write-Host "=== Building hyperstellar Python package ===" -ForegroundColor Cyan
@@ -96,16 +96,10 @@ cd $originalDir
 
 # 6. BUILD WHEEL
 Write-Host "6. Building Python wheel..." -ForegroundColor Yellow
-python -m build
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "   ERROR: Python build failed" -ForegroundColor Red
-    exit 1
-}
+Remove-Item dist, build -Recurse -Force -ErrorAction SilentlyContinue
 
-$wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
-$newName = $wheel.Name -replace "py3-none-any", "cp313-cp313-win_amd64"
-Rename-Item $wheel.FullName $newName
-Write-Host "   ✓ Renamed to $newName" -ForegroundColor Green
+# Use the permanent setup.py with bdist_wheel
+python setup.py bdist_wheel --plat-name=win_amd64
 
 $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
 Write-Host "   ✓ Built: $($wheel.Name)" -ForegroundColor Green

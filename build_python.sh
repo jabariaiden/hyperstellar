@@ -93,14 +93,9 @@ cd "$ORIGINAL_DIR"
 # ============================================================================
 echo "6. Building Python wheel..."
 rm -rf dist build
-python -m build
 
-cd dist
-for f in *.whl; do
-    mv "$f" "${f/py3-none-any/cp313-cp313-manylinux_2_39_x86_64}"
-done
-cd ..
-echo "   ✓ Renamed wheel for Linux"
+# Use the permanent setup.py with bdist_wheel
+python setup.py bdist_wheel --plat-name=linux_x86_64
 
 WHEEL=$(find dist -name "*.whl" | head -1)
 echo "   ✓ Built: $(basename $WHEEL)"
