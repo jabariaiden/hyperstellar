@@ -5,10 +5,7 @@ find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
 message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================
-# PYBIND11 -- bumped from 2.11.1 -> 2.13.6.
-# 2.11.1 predates CPython 3.13 and can emit calls to CPython-internal
-# symbols (e.g. _PyThreadState_UncheckedGet) that were removed in 3.13,
-# causing "undefined symbol" ImportErrors at runtime on 3.13/3.14.
+# PYBIND11 (v2.13.6 for Python 3.13/3.14 compatibility)
 # ============================================================================
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
     message(STATUS "Downloading pybind11...")
@@ -51,8 +48,6 @@ if(WIN32)
 else()
     if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
         message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
-        set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIR})
-        set(GLFW_LIBRARY ${GLFW_LIBRARY})
     else()
         find_package(PkgConfig REQUIRED)
         pkg_search_module(GLFW REQUIRED glfw3)
@@ -140,69 +135,29 @@ if(WIN32)
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
-    # Linux: do NOT link Python3_LIBRARIES - interpreter provides symbols.
-    #
-    # FIX: find_library(NAMES X11.a ...) is invalid -- CMake already
-    # appends the platform's static suffix (.a) to whatever is in NAMES,
-    # so "X11.a" was being searched for as "libX11.a.a" and always
-    # resolved to X11_STATIC-NOTFOUND, breaking the link step.
-    # Correct usage: pass the bare library name and force the static
-    # suffix via CMAKE_FIND_LIBRARY_SUFFIXES instead.
-    #
-    # NOTE: this also requires *static* .a archives (e.g. libX11.a) to
-    # actually be present on the build machine. Standard Ubuntu -dev
-    # packages (libx11-dev, libxrandr-dev, etc.) usually only ship
-    # shared .so files. If these find_library() calls come back
-    # NOTFOUND on your CI runner, either:
-    #   (a) apt-get install the static variants if available, or
-    #   (b) switch back to linking the shared libraries (drop "_STATIC"
-    #       and use pkg-config / plain -lX11 etc. instead).
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-    find_library(X11_STATIC     NAMES X11     PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XRANDR_STATIC  NAMES Xrandr  PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XI_STATIC      NAMES Xi      PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XXF86VM_STATIC NAMES Xxf86vm PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XINERAMA_STATIC NAMES Xinerama PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XCURSOR_STATIC NAMES Xcursor PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XRENDER_STATIC NAMES Xrender PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XEXT_STATIC    NAMES Xext    PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XDAMAGE_STATIC NAMES Xdamage PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(XCB_STATIC     NAMES xcb     PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    find_library(X11_XCB_STATIC NAMES X11-xcb PATHS /usr/lib64 /usr/lib /usr/lib/x86_64-linux-gnu)
-    unset(CMAKE_FIND_LIBRARY_SUFFIXES)
-
-    foreach(LIBVAR X11_STATIC XRANDR_STATIC XI_STATIC XXF86VM_STATIC
-                   XINERAMA_STATIC XCURSOR_STATIC XRENDER_STATIC
-                   XEXT_STATIC XDAMAGE_STATIC XCB_STATIC X11_XCB_STATIC)
-        if(NOT ${LIBVAR})
-            message(FATAL_ERROR
-                "${LIBVAR} not found. Static X11 libraries (.a) are required "
-                "by this build but were not found on this machine. Install "
-                "the static dev packages, or switch this CMakeLists.txt to "
-                "link the shared (.so) X11 libraries instead.")
-        endif()
-    endforeach()
-
+    # Linux: Do NOT link Python3_LIBRARIES dynamically.
+    # GLFW is linked statically, while system X11/GL libs are linked dynamically.
+    # auditwheel permits standard system dependencies (libX11.so, libGL.so, etc.).
     target_link_libraries(stellar PRIVATE
         ${GLFW_LIBRARY}
-        ${X11_STATIC}
-        ${XRANDR_STATIC}
-        ${XI_STATIC}
-        ${XXF86VM_STATIC}
-        ${XINERAMA_STATIC}
-        ${XCURSOR_STATIC}
-        ${XRENDER_STATIC}
-        ${XEXT_STATIC}
-        ${XDAMAGE_STATIC}
-        ${XCB_STATIC}
-        ${X11_XCB_STATIC}
+        X11
+        Xrandr
+        Xi
+        Xxf86vm
+        Xinerama
+        Xcursor
+        Xrender
+        Xext
+        Xdamage
+        xcb
+        X11-xcb
         GL
         dl
         pthread
     )
 endif()
 
-# Post-build copy (ensures binaries and shaders land in the package tree)
+# Post-build copy
 if(WIN32)
     set(NATIVE_FILENAME "stellar.pyd")
 else()
