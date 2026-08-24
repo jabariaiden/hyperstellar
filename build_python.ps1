@@ -1,4 +1,4 @@
-﻿﻿# build_python.ps1
+# build_python.ps1
 # Run from: C:\Users\user\hyperstellar-public
 
 Write-Host "=== Building hyperstellar Python package ===" -ForegroundColor Cyan
