@@ -39,7 +39,7 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_PRERELEASE_PYTHONS: True
           CIBW_BEFORE_BUILD_LINUX: |
-            dnf install -y glfw-devel mesa-libGL-devel libX11-devel
+            yum install -y glfw-devel mesa-libGL-devel libX11-devel
             bash ./build_python.sh
 
           # ----- Windows -----
