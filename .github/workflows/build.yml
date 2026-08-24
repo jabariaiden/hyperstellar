@@ -38,30 +38,31 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
-            build-essential cmake pkg-config \
-            libglfw3-dev libgl1-mesa-dev libx11-dev
+          dnf install -y epel-release
+          dnf install -y glfw-devel mesa-libGL-devel libX11-devel pkgconfig cmake gcc-c++ make
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: pyproject.toml
+      - name: Select Python
+        run: echo "/opt/python/cp312-cp312/bin" >> "$GITHUB_PATH"
 
       - name: Install Python build dependencies
-        run: pip install build pybind11 wheel setuptools
+        run: pip install build pybind11 wheel setuptools auditwheel patchelf
 
       - name: Build
         run: |
           chmod +x build_python.sh
           ./build_python.sh
+
+      - name: Repair wheel (bundle GLFW, verify manylinux compliance)
+        run: |
+          auditwheel repair dist/*.whl -w dist_repaired --plat manylinux_2_28_x86_64
+          rm -rf dist
+          mv dist_repaired dist
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
@@ -69,9 +70,6 @@ jobs:
           name: wheel-linux
           path: dist/*.whl
 
-  # Smoke-test the SAME wheel that build-* produced, across supported Python
-  # versions, without rebuilding it (rebuilding per-version is what caused
-  # the identically-named-wheel collision in the first place).
   test:
     needs: [build-windows, build-linux]
     strategy:
