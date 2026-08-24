@@ -43,13 +43,12 @@ if(WIN32)
     endif()
     message(STATUS "Using GLFW: ${GLFW_LIBRARY}")
 else()
-    # On Linux, we expect GLFW_LIBRARY and GLFW_INCLUDE_DIR to be passed via -D
+    # Linux: expect GLFW_LIBRARY and GLFW_INCLUDE_DIR to be passed via -D
     if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
         message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIR})
         set(GLFW_LIBRARY ${GLFW_LIBRARY})
     else()
-        # Fallback to pkg-config (should not happen in our setup)
         find_package(PkgConfig REQUIRED)
         pkg_search_module(GLFW REQUIRED glfw3)
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
@@ -126,6 +125,7 @@ target_include_directories(stellar PRIVATE
     ${Python3_INCLUDE_DIRS}
 )
 
+# Windows linking
 if(WIN32)
     target_link_libraries(stellar PRIVATE
         ${Python3_LIBRARIES}
@@ -135,18 +135,30 @@ if(WIN32)
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
-    # Linux: link GLFW static + X11 libraries; do NOT link Python3_LIBRARIES
+    # Linux: do NOT link Python3_LIBRARIES (interpreter provides symbols)
+    # Link GLFW static and all X11 libraries statically to avoid auditwheel issues
+    find_library(X11_STATIC NAMES X11.a PATHS /usr/lib64 /usr/lib)
+    find_library(XRANDR_STATIC NAMES Xrandr.a PATHS /usr/lib64 /usr/lib)
+    find_library(XI_STATIC NAMES Xi.a PATHS /usr/lib64 /usr/lib)
+    find_library(XXF86VM_STATIC NAMES Xxf86vm.a PATHS /usr/lib64 /usr/lib)
+    find_library(XINERAMA_STATIC NAMES Xinerama.a PATHS /usr/lib64 /usr/lib)
+    find_library(XCURSOR_STATIC NAMES Xcursor.a PATHS /usr/lib64 /usr/lib)
+    find_library(XCB_STATIC NAMES xcb.a PATHS /usr/lib64 /usr/lib)
+    find_library(X11_XCB_STATIC NAMES X11-xcb.a PATHS /usr/lib64 /usr/lib)
+
     target_link_libraries(stellar PRIVATE
         ${GLFW_LIBRARY}
+        ${X11_STATIC}
+        ${XRANDR_STATIC}
+        ${XI_STATIC}
+        ${XXF86VM_STATIC}
+        ${XINERAMA_STATIC}
+        ${XCURSOR_STATIC}
+        ${XCB_STATIC}
+        ${X11_XCB_STATIC}
         GL
         dl
         pthread
-        X11
-        Xrandr
-        Xi
-        Xxf86vm
-        Xinerama
-        Xcursor
     )
 endif()
 

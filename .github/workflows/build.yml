@@ -36,7 +36,9 @@ jobs:
           CIBW_BEFORE_BUILD_LINUX: |
             yum install -y mesa-libGL-devel libX11-devel \
               libXrandr-devel libXi-devel libXxf86vm-devel \
-              libXinerama-devel libXcursor-devel wget cmake gcc-c++ make
+              libXinerama-devel libXcursor-devel \
+              libX11-xcb-devel libxcb-devel \
+              wget cmake gcc-c++ make
             bash ./build_python.sh
 
           CIBW_BEFORE_BUILD_WINDOWS: |
