@@ -40,4 +40,4 @@ Thumbs.db
 
 # Build artifacts (keep native binaries for packaging)
 *.exe
-/.vs
+/.vshyperstellar-0.1.136/
