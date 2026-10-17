@@ -27,21 +27,39 @@ jobs:
       # All cibuildwheel settings live in pyproject.toml. Do NOT add CIBW_* env
       # vars here: they silently override pyproject.toml.
       #
-      # EXCEPTION: the CIBW_BUILD / CIBW_ARCHS_WINDOWS / CIBW_SKIP trio below
-      # is the *only* intentional override:
+      # EXCEPTION: the CIBW_BUILD / CIBW_ARCHS_WINDOWS / CIBW_SKIP /
+      # CIBW_ENVIRONMENT quartet below is the *only* intentional override:
       #   - CIBW_BUILD extends the matrix to CPython 3.15 (opt-in upstream).
       #   - CIBW_ARCHS_WINDOWS pins win_amd64 so cibuildwheel does not also
       #     produce 32-bit (win32) wheels, which the MSVC build cannot link.
       #   - CIBW_SKIP drops musllinux: Alpine uses apk, not dnf, and the
       #     pre-build dependency installation would fail there. GLFW/OpenGL
       #     wheels are not distributed for musl anyway.
+      #   - CIBW_ENVIRONMENT passes SETUPTOOLS_SCM_PRETEND_VERSION so the
+      #     version is deterministic regardless of what git state the
+      #     manylinux container can see.
       # Every other setting (before-build commands, test command, manylinux
       # image, etc.) continues to come from pyproject.toml unchanged.
+
+      # Derive the package version from the tag (v1.5.8 -> 1.5.8). On
+      # non-tag refs, fall back to 0.0.0.dev0 so PR builds still produce
+      # installable wheels. This value is consumed by the cibuildwheel
+      # step below via SETUPTOOLS_SCM_PRETEND_VERSION.
+      - name: Compute version from tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "PKG_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "PKG_VERSION=0.0.0.dev0" >> "$GITHUB_ENV"
+          fi
+
       - uses: pypa/cibuildwheel@v4.2.0
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-* cp315-*"
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_SKIP: "*-musllinux_*"
+          CIBW_ENVIRONMENT: "SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.PKG_VERSION }}"
         with:
           output-dir: wheelhouse
 
@@ -55,6 +73,8 @@ jobs:
           done
           ! ls wheelhouse | grep -E 'none-any|py3-none'
           ! ls wheelhouse | grep -E 'musllinux|win32'
+          # Version must match what we computed (no local-version suffix, no dev guess)
+          ls wheelhouse | grep -q "hyperstellar-${PKG_VERSION}-" || { echo "wrong version in wheel name (expected ${PKG_VERSION})"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

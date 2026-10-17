@@ -46,6 +46,8 @@ where = ["hyperstellar/src"]
 
 [tool.setuptools_scm]
 version_file = "hyperstellar/src/hyperstellar/_version.py"
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
 
 # ----------------------------------------------------------------------------
 # cibuildwheel. NOTE: CIBW_* environment variables set in the workflow override
