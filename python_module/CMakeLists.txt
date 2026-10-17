@@ -1,7 +1,7 @@
 ﻿cmake_minimum_required(VERSION 3.15)
 project(stellar_python)
 
-find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development)
 message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================
