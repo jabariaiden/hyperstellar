@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,14 +8,19 @@ version = "1.5.7"
 description = "GPU-accelerated physics simulation engine"
 readme = "README.md"
 authors = [{name = "Aiden Jabari", email = "Jabariaiden15@email.com"}]
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
 ]
 keywords = ["physics", "simulation", "gpu", "opengl"]
@@ -31,8 +36,49 @@ where = ["hyperstellar/src"]
 
 [tool.setuptools.package-data]
 "hyperstellar" = [
+    "*.pyi",
+    "py.typed",
     "_native/windows-x64/*.pyd",
     "_native/windows-x64/shaders/*",
     "_native/linux-x64/*.so",
     "_native/linux-x64/shaders/*",
 ]
+
+# ----------------------------------------------------------------------------
+# cibuildwheel. NOTE: CIBW_* environment variables set in the workflow override
+# everything in this section -- the provided workflow sets none.
+# ----------------------------------------------------------------------------
+[tool.cibuildwheel]
+# Explicit list (cibuildwheel only looks at the entries for the OS it runs on):
+# no musllinux (Alpine has no dnf -> would crash the job), no free-threaded
+# (cp313t/cp314t), no 32-bit, no PyPy.
+build = [
+    "cp310-manylinux_x86_64",
+    "cp311-manylinux_x86_64",
+    "cp312-manylinux_x86_64",
+    "cp313-manylinux_x86_64",
+    "cp314-manylinux_x86_64",
+    "cp310-win_amd64",
+    "cp311-win_amd64",
+    "cp312-win_amd64",
+    "cp313-win_amd64",
+    "cp314-win_amd64",
+]
+build-verbosity = 1
+test-command = "python -c \"import hyperstellar; print('OK')\""
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+# Runs ONCE per job. strict=0 -> a wrong/missing package name is skipped instead of
+# aborting the whole install (CMake then reports exactly what is really missing).
+# libX11-xcb-devel does not exist on RHEL-family distros; its headers are in libX11-devel.
+before-all = """
+(dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled crb || true)
+dnf install -y --setopt=strict=0 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXi-devel mesa-libGL-devel cmake gcc-c++ make curl
+"""
+# Runs once PER Python version (the extension must be compiled against each one).
+before-build = "sed -i 's/\\r$//' build_python.sh && bash ./build_python.sh"
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.windows]
+before-build = "powershell -NoProfile -ExecutionPolicy Bypass -File build_python.ps1"

@@ -412,7 +412,7 @@ PYBIND11_MODULE(stellar, m)
     // =========================================================================
     // MAIN SIMULATION CLASS
     // =========================================================================
-    py::class_<SimulationWrapper>(m, "Simulation", R"pbdoc(
+    py::class_<SimulationWrapper>(m, "Simulation", py::dynamic_attr(), R"pbdoc(
         Main physics simulation class.
         
         Provides real-time physics simulation with GPU acceleration.

@@ -2,27 +2,39 @@
 project(stellar_python)
 
 find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter Development.Module)
-message(STATUS "Python interpreter: ${Python3_EXECUTABLE}")
+message(STATUS "Python include dirs: ${Python3_INCLUDE_DIRS}")
 
 # ============================================================================
-# PYBIND11 (v2.13.6 required for CPython 3.13/3.14 ABI support)
+# PYBIND11
+# Preferred: the pip-installed copy (build_python.sh passes -Dpybind11_DIR).
+# Fallback: download. 3.0.x is required for CPython 3.14; 2.11.1 (old) also
+# references internal symbols removed in 3.13 (_PyThreadState_UncheckedGet).
 # ============================================================================
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11")
-    message(STATUS "Downloading pybind11...")
-    file(DOWNLOAD
-        https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.zip
-        ${CMAKE_CURRENT_BINARY_DIR}/pybind11.zip
-    )
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar xzf pybind11.zip
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    file(RENAME
-        ${CMAKE_CURRENT_BINARY_DIR}/pybind11-2.13.6
-        ${CMAKE_CURRENT_SOURCE_DIR}/pybind11
-    )
+find_package(pybind11 CONFIG QUIET)
+if(NOT pybind11_FOUND)
+    set(PYBIND11_VERSION "3.0.1")
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pybind11/CMakeLists.txt")
+        message(STATUS "Downloading pybind11 ${PYBIND11_VERSION}...")
+        file(DOWNLOAD
+            https://github.com/pybind/pybind11/archive/refs/tags/v${PYBIND11_VERSION}.tar.gz
+            ${CMAKE_CURRENT_BINARY_DIR}/pybind11.tar.gz
+            STATUS _pb_status TLS_VERIFY ON)
+        list(GET _pb_status 0 _pb_code)
+        if(NOT _pb_code EQUAL 0)
+            message(FATAL_ERROR "pybind11 download failed: ${_pb_status}")
+        endif()
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xzf pybind11.tar.gz
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        )
+        file(REMOVE_RECURSE ${CMAKE_CURRENT_SOURCE_DIR}/pybind11)
+        file(RENAME
+            ${CMAKE_CURRENT_BINARY_DIR}/pybind11-${PYBIND11_VERSION}
+            ${CMAKE_CURRENT_SOURCE_DIR}/pybind11
+        )
+    endif()
+    add_subdirectory(pybind11)
 endif()
-add_subdirectory(pybind11)
 
 if(WIN32)
     set(PLATFORM_NAME "windows-x64")
@@ -33,6 +45,9 @@ elseif(APPLE)
 endif()
 
 set(NATIVE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../hyperstellar/src/hyperstellar/_native/${PLATFORM_NAME}")
+message(STATUS "Platform: ${PLATFORM_NAME}")
+message(STATUS "Native output dir: ${NATIVE_DIR}")
+
 set(GLFW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 if(WIN32)
@@ -41,6 +56,7 @@ if(WIN32)
     if(NOT EXISTS "${GLFW_LIBRARY}")
         message(FATAL_ERROR "GLFW not found at: ${GLFW_LIBRARY}")
     endif()
+    message(STATUS "Using GLFW: ${GLFW_LIBRARY}")
 else()
     if(DEFINED GLFW_LIBRARY AND DEFINED GLFW_INCLUDE_DIR)
         message(STATUS "Using provided GLFW: ${GLFW_LIBRARY}")
@@ -49,6 +65,7 @@ else()
         pkg_search_module(GLFW REQUIRED glfw3)
         set(GLFW_INCLUDE_DIR ${GLFW_INCLUDE_DIRS})
         set(GLFW_LIBRARY ${GLFW_LIBRARIES})
+        message(STATUS "Using system GLFW: ${GLFW_LIBRARY}")
     endif()
 endif()
 
@@ -120,41 +137,66 @@ target_include_directories(stellar PRIVATE
     ${Python3_INCLUDE_DIRS}
 )
 
+# ============================================================================
+# LINK
+# ============================================================================
 if(WIN32)
     target_link_libraries(stellar PRIVATE
+        ${Python3_LIBRARIES}
         opengl32.lib
         gdi32.lib
         "${GLFW_LIBRARY}"
         user32.lib shell32.lib advapi32.lib kernel32.lib comdlg32.lib
     )
 else()
-    target_link_libraries(stellar PRIVATE
-        ${GLFW_LIBRARY}
-        X11 Xrandr Xi Xxf86vm Xinerama Xcursor Xrender Xext Xdamage xcb GL dl pthread
-    )
+    # Linux: never link libpython (the interpreter provides those symbols).
+    # GLFW is a static, PIC archive built from source by build_python.sh.
+    #
+    # X11 libs: GLFW 3.4 loads most X extension libs with dlopen at runtime, so
+    # they should not be hard dependencies. We still list them, wrapped in
+    # --as-needed, so the linker only records a DT_NEEDED entry for a lib that is
+    # actually referenced. This matters for auditwheel: only libX11/libXext/
+    # libXrender/libGL are on the manylinux allow-list; any OTHER needed lib
+    # (Xrandr, Xi, xcb...) would be copied INTO the wheel.
+    set(X_LIBS "")
+    foreach(_x X11 Xrandr Xi Xinerama Xcursor)
+        find_library(${_x}_LIB NAMES ${_x})
+        if(${_x}_LIB)
+            list(APPEND X_LIBS ${${_x}_LIB})
+        else()
+            message(WARNING "lib${_x}.so not found (install lib${_x}-devel); continuing")
+        endif()
+    endforeach()
+
+    target_link_libraries(stellar PRIVATE ${GLFW_LIBRARY})
+    if(X_LIBS)
+        target_link_libraries(stellar PRIVATE
+            -Wl,--push-state,--as-needed ${X_LIBS} -Wl,--pop-state)
+    endif()
+    target_link_libraries(stellar PRIVATE GL dl pthread m rt)
 endif()
 
-# Post-build copy
+# ============================================================================
+# POST BUILD: copy binary + ALL shaders (directory copy: adding a shader file
+# no longer breaks the build the way the hard-coded per-file list did)
+# ============================================================================
 if(WIN32)
     set(NATIVE_FILENAME "stellar.pyd")
 else()
     set(NATIVE_FILENAME "stellar.so")
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+    set(SHADER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+else()
+    set(SHADER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../shaders")
+endif()
+
 add_custom_command(TARGET stellar POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${NATIVE_DIR}/shaders"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:stellar>"
-        "${NATIVE_DIR}/${NATIVE_FILENAME}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/math.comp"   "${NATIVE_DIR}/shaders/math.comp"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/paint.comp"  "${NATIVE_DIR}/shaders/paint.comp"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.vert"   "${NATIVE_DIR}/shaders/quad.vert"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.geom"   "${NATIVE_DIR}/shaders/quad.geom"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/quad.frag"   "${NATIVE_DIR}/shaders/quad.frag"
+        "$<TARGET_FILE:stellar>" "${NATIVE_DIR}/${NATIVE_FILENAME}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${SHADER_SRC}" "${NATIVE_DIR}/shaders"
     COMMENT "Copying ${NATIVE_FILENAME} and shaders to ${NATIVE_DIR}"
 )

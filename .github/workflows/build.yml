@@ -1,55 +1,64 @@
-name: Build Wheels
+name: Build wheels
 
 on:
   push:
-    branches: [main]
-    tags:
-      - 'v*'
+    tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
-env:
-  CMAKE_BUILD_TYPE: Release
-
 jobs:
-  build-wheels:
-    name: Build wheels on ${{ matrix.os }}
+  build:
+    name: wheels (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-
+        include:
+          - os: ubuntu-latest
+            plat: manylinux
+          - os: windows-latest
+            plat: win_amd64
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          submodules: recursive   # lib/imgui, lib/glm etc. 
 
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
-        env:
-          CIBW_BUILD: cp310-* cp311-* cp312-* cp313-* cp314-*
-          CIBW_SKIP: "*-win32"
-          CIBW_ARCHS_LINUX: x86_64
-          CIBW_ARCHS_WINDOWS: AMD64
+      # All cibuildwheel settings live in pyproject.toml. Do NOT add CIBW_* env
+      # vars here: they silently override pyproject.toml.
+      - uses: pypa/cibuildwheel@v3.4.0
+        with:
+          output-dir: wheelhouse
 
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_PRERELEASE_PYTHONS: True
+      - name: Verify the wheel set (blocks the publish if tags are wrong)
+        shell: bash
+        run: |
+          ls -l wheelhouse
+          test "$(ls wheelhouse/*.whl | wc -l)" -eq 5 || { echo "expected 5 wheels"; exit 1; }
+          for v in cp310 cp311 cp312 cp313 cp314; do
+            ls wheelhouse | grep -q "${v}-${v}-${{ matrix.plat }}" || { echo "missing $v wheel"; exit 1; }
+          done
+          ! ls wheelhouse | grep -E 'none-any|py3-none'
 
-          CIBW_BEFORE_ALL_LINUX: >
-            yum install -y epel-release &&
-            yum install -y --enablerepo=powertools
-            mesa-libGL-devel libX11-devel libXrandr-devel libXi-devel
-            libXxf86vm-devel libXinerama-devel libXcursor-devel libXrender-devel
-            libXext-devel libXdamage-devel libxcb-devel wget cmake gcc-c++ make
-
-          CIBW_BEFORE_BUILD_LINUX: bash ./build_python.sh
-          CIBW_BEFORE_BUILD_WINDOWS: powershell -ExecutionPolicy Bypass -File ./build_python.ps1
-
-          CIBW_BUILD_VERBOSITY: 1
-          CIBW_TEST_COMMAND: python -c "import hyperstellar; print('OK')"
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
+
+  publish:
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write          
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - run: ls -l dist && test "$(ls dist/*.whl | wc -l)" -eq 10
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          skip-existing: true
+          password: ${{ secrets.PYPI_API_TOKEN }}   
