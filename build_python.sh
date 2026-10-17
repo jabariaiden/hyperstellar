@@ -81,9 +81,12 @@ mkdir -p "$TARGET_DIR/shaders"
 cp "$SO_FILE" "$TARGET_DIR/stellar.so"
 cp -r "$ROOT/python_module/shaders/." "$TARGET_DIR/shaders/"
 
-if command -v nm >/dev/null 2>&1; then
-    nm -D --defined-only "$TARGET_DIR/stellar.so" | grep -q PyInit_stellar \
-        || { echo "ERROR: stellar.so does not export PyInit_stellar"; exit 1; }
-fi
-echo "   needed libs:"; (readelf -d "$TARGET_DIR/stellar.so" | grep NEEDED) || true
-echo "=== Native module built for $($PYTHON --version 2>&1) ==="
+# Verify the module can actually be imported by the target Python.
+# This is the real test — nm-based symbol checks give false negatives.
+echo "   Verifying module import..."
+"$PYTHON" -c "
+import sys
+sys.path.insert(0, '$TARGET_DIR')
+import stellar
+print('   Module imports OK')
+" || { echo "ERROR: stellar.so failed to import"; exit 1; }
