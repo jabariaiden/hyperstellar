@@ -25,7 +25,19 @@ jobs:
 
       # All cibuildwheel settings live in pyproject.toml. Do NOT add CIBW_* env
       # vars here: they silently override pyproject.toml.
+      #
+      # EXCEPTION: The CIBW_BUILD / CIBW_ENABLE pair below is the *only*
+      # intentional override. It extends the wheel matrix to CPython
+      # 3.10-3.15 (3.15 is opt-in per cibuildwheel and requires a
+      # cibuildwheel release that recognises cp315; if the verify step
+      # reports "missing cp315 wheel", bump the pypa/cibuildwheel@ tag
+      # below to a newer release). All other cibuildwheel settings —
+      # before-build commands, test command, manylinux image, etc. —
+      # continue to come from pyproject.toml unchanged.
       - uses: pypa/cibuildwheel@v3.4.0
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-* cp315-*"
+          CIBW_ENABLE: "cp315-*"
         with:
           output-dir: wheelhouse
 
@@ -33,8 +45,8 @@ jobs:
         shell: bash
         run: |
           ls -l wheelhouse
-          test "$(ls wheelhouse/*.whl | wc -l)" -eq 5 || { echo "expected 5 wheels"; exit 1; }
-          for v in cp310 cp311 cp312 cp313 cp314; do
+          test "$(ls wheelhouse/*.whl | wc -l)" -eq 6 || { echo "expected 6 wheels"; exit 1; }
+          for v in cp310 cp311 cp312 cp313 cp314 cp315; do
             ls wheelhouse | grep -q "${v}-${v}-${{ matrix.plat }}" || { echo "missing $v wheel"; exit 1; }
           done
           ! ls wheelhouse | grep -E 'none-any|py3-none'
@@ -56,9 +68,9 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
           path: dist
-      - run: ls -l dist && test "$(ls dist/*.whl | wc -l)" -eq 10
+      - run: ls -l dist && test "$(ls dist/*.whl | wc -l)" -eq 12
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
           skip-existing: true
-          password: ${{ secrets.PYPI_API_TOKEN }}   
+          password: ${{ secrets.PYPI_API_TOKEN }}

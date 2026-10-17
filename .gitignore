@@ -41,3 +41,7 @@ Thumbs.db
 # Build artifacts (keep native binaries for packaging)
 *.exe
 /.vshyperstellar-0.1.136/
+git-*/
+_deps_linux/
+_build_linux/
+_build_windows/
