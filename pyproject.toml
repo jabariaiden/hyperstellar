@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = ["setuptools>=77", "setuptools-scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "hyperstellar"
-version = "1.5.7"
+dynamic = ["version"]
 description = "GPU-accelerated physics simulation engine"
 readme = "README.md"
 authors = [{name = "Aiden Jabari", email = "Jabariaiden15@email.com"}]
@@ -43,6 +43,9 @@ where = ["hyperstellar/src"]
     "_native/linux-x64/*.so",
     "_native/linux-x64/shaders/*",
 ]
+
+[tool.setuptools_scm]
+version_file = "hyperstellar/src/hyperstellar/_version.py"
 
 # ----------------------------------------------------------------------------
 # cibuildwheel. NOTE: CIBW_* environment variables set in the workflow override

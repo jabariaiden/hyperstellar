@@ -9,7 +9,10 @@ from typing import List, Dict, Any, Iterator, Optional, Union
 # Import the decorator function from jit.py (module-level)
 from .jit import script as _script_func
 
-__version__ = "1.5.7"
+try:
+    from ._version import __version__
+except ImportError:
+    __version__ = "0.0.0+unknown"
 
 # Platform detection
 system = platform.system().lower()
