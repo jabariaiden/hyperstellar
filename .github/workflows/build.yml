@@ -34,7 +34,7 @@ jobs:
       # below to a newer release). All other cibuildwheel settings —
       # before-build commands, test command, manylinux image, etc. —
       # continue to come from pyproject.toml unchanged.
-      - uses: pypa/cibuildwheel@v3.4.0
+      - uses: pypa/cibuildwheel@v4.2.0
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-* cp315-*"
         with:
