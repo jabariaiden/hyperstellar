@@ -37,7 +37,6 @@ jobs:
       - uses: pypa/cibuildwheel@v3.4.0
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-* cp315-*"
-          CIBW_ENABLE: "cp315-*"
         with:
           output-dir: wheelhouse
 
