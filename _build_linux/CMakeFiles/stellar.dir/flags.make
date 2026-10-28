@@ -5,13 +5,13 @@
 # compile CXX with /usr/bin/c++
 C_DEFINES = -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS
 
-C_INCLUDES = -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include
+C_INCLUDES = -I/home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/include
 
 C_FLAGS = -O3 -DNDEBUG -fPIC -Wall -Wextra -Wno-unused-parameter -O2
 
 CXX_DEFINES = -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS
 
-CXX_INCLUDES = -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include
+CXX_INCLUDES = -I/home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/include
 
-CXX_FLAGS = -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -O3 -DNDEBUG -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects
+CXX_FLAGS = -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -O3 -DNDEBUG -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto=auto -fno-fat-lto-objects
 

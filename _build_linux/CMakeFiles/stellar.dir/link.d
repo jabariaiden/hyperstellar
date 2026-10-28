@@ -21,11 +21,16 @@ stellar.so: \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.o \
-  /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libglfw.so \
+  /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-build/src/libglfw3.a \
+  /usr/lib64/libX11.so \
+  /usr/lib64/libXrandr.so \
+  /usr/lib64/libXi.so \
+  /usr/lib64/libXinerama.so \
+  /usr/lib64/libXcursor.so \
   /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libGL.so \
   /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libdl.a \
   /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libpthread.a \
-  /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libX11.so \
+  /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/librt.a \
   /usr/lib/gcc/x86_64-redhat-linux/16/libgcc_s_asneeded.so \
   /usr/lib/gcc/x86_64-redhat-linux/16/libgcc_s_asneeded.so \
   /usr/lib/gcc/x86_64-redhat-linux/16/libgcc_s_asneeded.so \
@@ -118,7 +123,17 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/i
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.o:
 
-/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libglfw.so:
+/home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-build/src/libglfw3.a:
+
+/usr/lib64/libX11.so:
+
+/usr/lib64/libXrandr.so:
+
+/usr/lib64/libXi.so:
+
+/usr/lib64/libXinerama.so:
+
+/usr/lib64/libXcursor.so:
 
 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libGL.so:
 
@@ -126,7 +141,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/i
 
 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libpthread.a:
 
-/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/libX11.so:
+/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/librt.a:
 
 /usr/lib/gcc/x86_64-redhat-linux/16/libgcc_s_asneeded.so:
 

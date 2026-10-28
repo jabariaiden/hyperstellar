@@ -395,7 +395,7 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /usr/include/c++/16/pstl/execution_defs.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/GLFW/glfw3.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/quaternion.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_relational.hpp \

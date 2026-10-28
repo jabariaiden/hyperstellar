@@ -47,18 +47,18 @@ class NameChecker(ast.NodeVisitor):
       - undefined functions (with "did you mean?" suggestions)
       - unsupported syntax (yield, lambda, async, with, etc.)
       - chained comparisons (a < b < c) – not yet supported
-      - invalid function arguments (future)
 
     It collects all assigned and referenced names, function calls, and then
     validates them against the known built-ins, user-defined functions,
-    and imported names.
+    module globals, and imported names.
     """
 
-    def __init__(self, mode: str, debug: bool, source: str, func_node: ast.FunctionDef):
+    def __init__(self, mode: str, debug: bool, source: str, func_node: ast.FunctionDef, globals_dict: dict):
         self.mode = mode
         self.debug = debug
         self.source = source
         self.func_node = func_node
+        self.globals = set(globals_dict.keys())  # Track module-level constants (e.g., CAM = 0)
 
         # --- Sets to be populated during AST traversal ---
         self.assigned: Set[str] = set()          # variables assigned (including parameters)
@@ -114,12 +114,11 @@ class NameChecker(ast.NodeVisitor):
             # Ray-tracing
             'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
             'look_at', 'camera_ray', 'camera_ray_ndc', 'offset_ray_origin',
-            'reflect', 'refract',
             # Complex
             'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
             'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
             # Other
-            'int', 'float', 'len', 'sum', 'diff',
+            'int', 'float', 'len', 'sum', 'diff', 'range',
             # Paint helpers
             'sample_prev_r', 'sample_prev_g', 'sample_prev_b', 'sample_prev_a',
             'avg_prev_r', 'avg_prev_g', 'avg_prev_b', 'avg_prev_a',
@@ -135,8 +134,6 @@ class NameChecker(ast.NodeVisitor):
 
         # Visit the function body (and nested definitions)
         self.visit(self.func_node)
-
-        # After the visit, we have all sets populated.
 
     # ---- Visitor methods to collect data ----
 
@@ -160,8 +157,9 @@ class NameChecker(ast.NodeVisitor):
         for arg in node.args.args:
             self.param_names.add(arg.arg)
             self.assigned.add(arg.arg)
-        # Visit the body (but don't treat the function definition itself as a call)
-        self.generic_visit(node)
+        # ONLY visit the body, not the decorators (fixes @sim.script)
+        for stmt in node.body:
+            self.visit(stmt)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == 'hyperstellar.glsl':
@@ -195,8 +193,13 @@ class NameChecker(ast.NodeVisitor):
             self.called_functions.add(func_name)
             # Also record this as a function call context for the Name node
             self.name_nodes.append((func_name, node.lineno, node.col_offset, True))
-        # Visit arguments
-        self.generic_visit(node)
+        
+        # Do NOT call self.generic_visit(node) here, because it marks the function
+        # name as a variable. Instead, manually visit only the arguments.
+        for arg in node.args:
+            self.visit(arg)
+        for kw in node.keywords:
+            self.visit(kw.value)
 
     # ---- Unsupported syntax detection ----
 
@@ -257,15 +260,17 @@ class NameChecker(ast.NodeVisitor):
         Perform all validation checks and return (errors, warnings).
         Errors are fatal; warnings are informational.
         """
-        # Clear any previous errors/warnings (but we already collected during visit)
-        # We'll now validate the collected data.
 
         # 1. Check undefined variables (names that are referenced but not assigned/imported/built-in)
         for name, lineno, col, is_call in self.name_nodes:
             if is_call:
                 # This name is used as a function call; we check functions separately.
                 continue
-            if name not in self.assigned and name not in self.builtin_vars and name not in self.param_names:
+            if (name not in self.assigned and 
+                name not in self.builtin_vars and 
+                name not in self.param_names and
+                name not in self.globals and
+                name not in self.builtin_funcs):
                 suggestion = self._suggest_variable(name)
                 self.errors.append(
                     (f"Undefined variable '{name}'", lineno, col, suggestion)
@@ -285,7 +290,6 @@ class NameChecker(ast.NodeVisitor):
         for var in self.assigned:
             if var not in self.referenced and var not in self.builtin_vars:
                 if var in self.param_names:
-                    # Parameters are not required to be used, but we issue a warning.
                     self.warnings.append(
                         (f"Parameter '{var}' is never used.", None, None, None)
                     )
@@ -294,9 +298,6 @@ class NameChecker(ast.NodeVisitor):
                         (f"Variable '{var}' is assigned but never used.", None, None, None)
                     )
 
-        # 4. Check for function arguments count? (future)
-
-        # Return collected errors and warnings
         return self.errors, self.warnings
 
 
@@ -306,40 +307,7 @@ class NameChecker(ast.NodeVisitor):
 class GLSLGenerator(ast.NodeVisitor):
     """
     Translates a decorated Python function into a GLSL compute shader.
-    Supports three modes:
-      - 'object' (default): runs per particle, updates Object SSBOs.
-      - 'paint': runs per pixel, reads/writes textures (double‑buffered).
-      - 'agent': runs over the signal queue (one workgroup per signal).
-
-    Features:
-      - All arithmetic, comparisons, logical ops
-      - if/else, for/while, continue/break, ternary
-      - Tensor literals and indexing (vec/mat)
-      - Derivatives, noise, rand (unique seed)
-      - Complex numbers (i, real/imag/conj/arg, cAdd, etc.)
-      - sum(), min(), max() for vectors and binary scalars
-      - pow(), int(), float() mapped to GLSL
-      - p.x / p[index].property access
-      - len() for vectors/matrices
-      - Full physics: constraints (inline and SSBO‑based), collisions, warm starting
-      - Inline constraints: spring, distance, boundary, angle (direct code generation)
-      - SSBO‑based constraints: apply_constraints() reads pre‑defined constraints
-      - Paint mode with pan/zoom compensation
-      - Scratchpad read/write (objects read only, agents read/write)
-      - Signal queue enqueue (objects) and dequeue (agents)
-      - 3D ray‑tracing primitives: sphere, plane, intersect, camera_ray, raymarch, etc.
-      - Tuple unpacking: x, y, z = expr
-      - Tuple literals as vector constructors: (x, y, z) → vec3(x, y, z)
-      - SDF function inlining for raymarch
-      - Extended math functions: asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, exp2, log2, inversesqrt, faceforward, outerProduct, matrixCompMult, transpose, inverse, determinant
-      - Utility functions: saturate, lerp, fbm, random (alias for rand)
-      - elif chains
-      - @ operator for matrix multiplication
-      - Swizzling with rgba and stpq sets
-      - pass statement (no‑op)
-      - Function parameters: declare your function with parameters (e.g., def gravity(x, y):) and they are automatically mapped to the object's state.
-      - Explicit return: return (ax, ay, angular) or (ax, ay, angular, color) instead of assigning to magic variables.
-      - Explicit imports: from hyperstellar.glsl import sin, cos, sqrt, ...  – these are mapped to GLSL built‑ins and are linter‑friendly.
+    Supports three modes: 'object' (default), 'paint', and 'agent'.
     """
 
     def __init__(self, debug: bool = False, mode: str = 'object') -> None:
@@ -348,21 +316,21 @@ class GLSLGenerator(ast.NodeVisitor):
         self.lines: List[str] = []
         self.indent: int = 0
         self.globals: Dict[str, Any] = {}                   # user's global namespace
-        self.assigned_vars: Set[str] = set()               # variables that need declaration
-        self.var_types: Dict[str, str] = {}                # variable -> GLSL type
-        self.complex_vars: Set[str] = set()                # names known to be complex
+        self.assigned_vars: Set[str] = set()                # variables that need declaration
+        self.var_types: Dict[str, str] = {}                 # variable -> GLSL type
+        self.complex_vars: Set[str] = set()                 # names known to be complex
         self.inline_depth: int = 0
         self.max_inline_depth: int = 10
         self.inlined_functions: Set[str] = set()
-        self.rand_call_counter: int = 0                    # unique seed for each rand()
+        self.rand_call_counter: int = 0                     # unique seed for each rand()
         self.user_handles_collisions: bool = False
         self.user_applies_constraints: bool = False
         self.sdf_functions: Dict[str, Tuple[ast.FunctionDef, List[str]]] = {}
         self.raymarch_functions: Dict[str, str] = {}
-        self.has_return: bool = False                      # whether function uses return
-        self.return_expr: Optional[ast.AST] = None         # captured return expression
-        self.param_names: List[str] = []                   # function parameter names
-        self.imported_names: Set[str] = set()              # names imported from hyperstellar.glsl
+        self.has_return: bool = False                       # whether function uses return
+        self.return_expr: Optional[ast.AST] = None          # captured return expression
+        self.param_names: List[str] = []                    # function parameter names
+        self.imported_names: Set[str] = set()               # names imported from hyperstellar.glsl
 
     def indent_str(self) -> str:
         return "    " * self.indent
@@ -371,10 +339,7 @@ class GLSLGenerator(ast.NodeVisitor):
     # Main entry point
     # ------------------------------------------------------------------------
     def generate(self, func: Callable) -> str:
-        """
-        Parse the given Python function, visit its AST, and produce the
-        complete GLSL shader source.
-        """
+        """Parse the given Python function, visit its AST, and produce GLSL."""
         self.globals = func.__globals__
         self.lines = []
         self.assigned_vars.clear()
@@ -400,7 +365,8 @@ class GLSLGenerator(ast.NodeVisitor):
         func_node = tree.body[0]
 
         # ---- LINTER STAGE ----
-        linter = NameChecker(self.mode, self.debug, source, func_node)
+        # Pass self.globals to the linter so it knows about module-level constants like CAM
+        linter = NameChecker(self.mode, self.debug, source, func_node, self.globals)
         errors, warnings = linter.check()
 
         # Report warnings if debug is enabled
@@ -414,14 +380,12 @@ class GLSLGenerator(ast.NodeVisitor):
             raise SyntaxError(f"JIT compilation failed due to the following errors:\n{error_summary}")
 
         # ---- Proceed with generation ----
-        # Extract parameter names
         self.param_names = [arg.arg for arg in func_node.args.args]
 
         collector = AssignCollector()
         collector.visit(func_node)
 
         # Detect if user calls collision or SSBO‑constraint functions
-        special_funcs = {'detect_collision', 'resolve_collision', 'apply_constraints'}
         for node in ast.walk(func_node):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 if node.func.id == 'apply_constraints':
@@ -444,6 +408,7 @@ class GLSLGenerator(ast.NodeVisitor):
             predefined = {'x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
                           'color', 'pos', 'vel', 'num_objects', 'dt', 'time', 'idx',
                           'group_count', 'i', 'ax', 'ay', 'angular'}
+        
         self.assigned_vars = collector.vars - predefined
         if self.mode == 'paint':
             self.assigned_vars.add('color')
@@ -495,15 +460,7 @@ class GLSLGenerator(ast.NodeVisitor):
     # Build parameter mapping prologue
     # ------------------------------------------------------------------------
     def _build_parameter_prologue(self) -> str:
-        """
-        Generate GLSL code that assigns the function parameters to the
-        corresponding object state variables. For example, if the user wrote:
-            def gravity(x, y):
-                ...
-        we will generate:
-            float x = pos.x;
-            float y = pos.y;
-        """
+        """Generate GLSL code that assigns the function parameters to state variables."""
         if not self.param_names:
             return ""
 
@@ -528,7 +485,7 @@ class GLSLGenerator(ast.NodeVisitor):
                     typ = 'float'
                 lines.append(f"    {typ} {pname} = {expr};")
             else:
-                lines.append(f"    // WARNING: parameter '{pname}' is not a known object property; defaulting to 0.0")
+                lines.append(f"    // WARNING: parameter '{pname}' is not a known property; defaulting to 0.0")
                 lines.append(f"    float {pname} = 0.0;")
         return "\n".join(lines)
 
@@ -625,7 +582,7 @@ Hit {func_name}(Ray r, float t_min, float t_max, int steps, float eps) {{
         return sdf_defs + raymarch_defs
 
     # ------------------------------------------------------------------------
-    # Ray‑tracing GLSL header (extended with additional utilities)
+    # Ray‑tracing GLSL header
     # ------------------------------------------------------------------------
     def _ray_tracing_header(self) -> str:
         return """
@@ -710,7 +667,6 @@ CameraBasis look_at(vec3 eye, vec3 target, vec3 up) {
     return cb;
 }
 
-// ---- Explicit version for custom NDC (jitter, DOF, secondary rays, etc.) ----
 Ray camera_ray_ndc(float ndcX, float ndcY, vec3 eye, vec3 target, vec3 up, float fov, float aspect) {
     CameraBasis cb = look_at(eye, target, up);
     float tanFov = tan(radians(fov) * 0.5);
@@ -718,7 +674,6 @@ Ray camera_ray_ndc(float ndcX, float ndcY, vec3 eye, vec3 target, vec3 up, float
     Ray r; r.origin = eye; r.direction = dir; return r;
 }
 
-// ---- Helper that uses px/py to integrate with 2D camera ----
 Ray camera_ray_pxpy(vec3 eye, vec3 target, vec3 up, float fov, float px, float py) {
     vec3 fwd = normalize(target - eye);
     vec3 right = normalize(vec3(fwd.z, 0.0, -fwd.x));
@@ -728,22 +683,10 @@ Ray camera_ray_pxpy(vec3 eye, vec3 target, vec3 up, float fov, float px, float p
     Ray r; r.origin = eye; r.direction = dir; return r;
 }
 
-// Macro forwards to the helper, passing px and py from the calling scope.
 #define camera_ray(eye, target, up, fov) camera_ray_pxpy(eye, target, up, fov, px, py)
 
 vec3 offset_ray_origin(vec3 pos, vec3 normal) {
     return pos + normal * 1e-4;
-}
-
-vec3 reflect(vec3 v, vec3 n) {
-    return v - 2.0 * dot(v, n) * n;
-}
-
-vec3 refract(vec3 v, vec3 n, float eta) {
-    float cosi = -dot(v, n);
-    float cost2 = 1.0 - eta*eta * (1.0 - cosi*cosi);
-    if (cost2 < 0.0) return vec3(0.0);
-    return eta * v + (eta * cosi - sqrt(cost2)) * n;
 }
 
 // ---- Random and noise functions ----
@@ -806,17 +749,14 @@ float fbm(vec2 p, int octaves) {
             self.visit(stmt)
 
     def visit_Pass(self, node: ast.Pass) -> None:
-        # Do nothing; pass is a no-op in GLSL
         pass
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == 'hyperstellar.glsl':
             for alias in node.names:
                 self.imported_names.add(alias.name)
-        # No GLSL code emitted for imports
 
     def visit_Import(self, node: ast.Import) -> None:
-        # Ignore regular imports
         pass
 
     def visit_Expr(self, node: ast.Expr) -> None:
@@ -1085,6 +1025,8 @@ float fbm(vec2 p, int octaves) {
         else:
             loop = f"for (int {var} = int({start}); {var} < int({stop}); {var} += int({step}))"
 
+        # Tell the GLSL compiler not to aggressively unroll this loop
+        self.lines.append(self.indent_str() + "#pragma unroll 1")
         self.lines.append(self.indent_str() + loop + " {")
         self.indent += 1
         for stmt in node.body:
@@ -1094,6 +1036,8 @@ float fbm(vec2 p, int octaves) {
 
     def visit_While(self, node: ast.While) -> None:
         cond = self._expr_to_glsl(node.test)
+        # Tell the GLSL compiler not to aggressively unroll this loop
+        self.lines.append(self.indent_str() + "#pragma unroll 1")
         self.lines.append(self.indent_str() + f"while ({cond}) {{")
         self.indent += 1
         for stmt in node.body:
@@ -1615,8 +1559,6 @@ float fbm(vec2 p, int octaves) {
             if func_name in ('apply_constraints', 'detect_collision', 'resolve_collision'):
                 if self.mode != 'object':
                     raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
-                # these are handled elsewhere, but we still need to return something
-                # The calls are handled in visit_Expr, so they will not appear here.
 
             # ---- Ray‑tracing ----
             if func_name == 'sphere':
@@ -1982,19 +1924,6 @@ class AssignCollector(ast.NodeVisitor):
 def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
     """
     Decorator that compiles a Python function into a GPU compute shader.
-
-    Args:
-        sim: The Simulation instance (used to register the compiled shader).
-        debug: If True, prints the generated shader source and enables warnings.
-        mode: One of 'object' (default), 'paint', or 'agent'.
-
-    Usage:
-        @sim.script(mode='paint')
-        def my_paint():
-            color.r = 0.5
-            color.g = 0.3
-            color.b = 0.8
-            color.a = 1.0
     """
     def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)

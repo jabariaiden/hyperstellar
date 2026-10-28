@@ -5,7 +5,7 @@ events:
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake:12 (find_program)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_UNAME"
     description: "Path to a program."
@@ -21,20 +21,18 @@ events:
       - "uname"
     candidate_directories:
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/usr/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/home/jaybird/hyperstellar_env/bin/uname"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/uname"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/uname"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/uname"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/uname"
       - "/home/jaybird/.local/bin/uname"
       - "/home/jaybird/bin/uname"
       - "/usr/local/bin/uname"
@@ -42,27 +40,29 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "message-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake:212 (message)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
-      The system is: Linux - 7.1.8-200.fc44.x86_64 - x86_64
+      The system is: Linux - 7.2.10-200.fc44.x86_64 - x86_64
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeUnixFindMake.cmake:5 (find_program)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_MAKE_PROGRAM"
     description: "Path to a program."
@@ -80,20 +80,18 @@ events:
       - "smake"
     candidate_directories:
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/usr/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/home/jaybird/hyperstellar_env/bin/gmake"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gmake"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gmake"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gmake"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gmake"
       - "/home/jaybird/.local/bin/gmake"
       - "/home/jaybird/bin/gmake"
       - "/usr/local/bin/gmake"
@@ -101,21 +99,23 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompiler.cmake:73 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:64 (_cmake_find_compiler)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_C_COMPILER"
     description: "C compiler"
@@ -137,20 +137,18 @@ events:
       - "clang"
     candidate_directories:
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/usr/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/home/jaybird/hyperstellar_env/bin/cc"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/cc"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/cc"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/cc"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/cc"
       - "/home/jaybird/.local/bin/cc"
       - "/home/jaybird/bin/cc"
       - "/usr/local/bin/cc"
@@ -158,15 +156,17 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
@@ -175,7 +175,7 @@ events:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:122 (CMAKE_DETERMINE_COMPILER_ID)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "file"
     variable: "src_in"
     description: "Path to a file."
@@ -195,22 +195,24 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "message-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:122 (CMAKE_DETERMINE_COMPILER_ID)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
       Compiler: /usr/bin/cc 
@@ -231,7 +233,7 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_AR"
     description: "Path to a program."
@@ -248,33 +250,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/ar"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_RANLIB"
     description: "Path to a program."
@@ -291,33 +295,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/ranlib"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_STRIP"
     description: "Path to a program."
@@ -334,33 +340,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/strip"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_LINKER"
     description: "Path to a program."
@@ -377,33 +385,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/ld"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_NM"
     description: "Path to a program."
@@ -420,33 +430,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/nm"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_OBJDUMP"
     description: "Path to a program."
@@ -463,33 +475,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/objdump"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_OBJCOPY"
     description: "Path to a program."
@@ -506,33 +520,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/objcopy"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_READELF"
     description: "Path to a program."
@@ -549,33 +565,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/readelf"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_DLLTOOL"
     description: "Path to a program."
@@ -592,44 +610,46 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/dlltool"
       - "/home/jaybird/hyperstellar_env/bin/dlltool"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/dlltool"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/dlltool"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/dlltool"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/dlltool"
       - "/home/jaybird/.local/bin/dlltool"
       - "/home/jaybird/bin/dlltool"
       - "/usr/local/bin/dlltool"
       - "/bin/dlltool"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/dlltool"
+      - "/var/lib/snapd/snap/bin/dlltool"
+      - "/home/jaybird/Android/Sdk/emulator/dlltool"
+      - "/home/jaybird/Android/Sdk/platform-tools/dlltool"
     found: false
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_ADDR2LINE"
     description: "Path to a program."
@@ -646,33 +666,35 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     found: "/usr/bin/addr2line"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeFindBinUtils.cmake:243 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:200 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_TAPI"
     description: "Path to a program."
@@ -689,44 +711,46 @@ events:
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/tapi"
       - "/home/jaybird/hyperstellar_env/bin/tapi"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/tapi"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/tapi"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/tapi"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/tapi"
       - "/home/jaybird/.local/bin/tapi"
       - "/home/jaybird/bin/tapi"
       - "/usr/local/bin/tapi"
       - "/bin/tapi"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/tapi"
+      - "/var/lib/snapd/snap/bin/tapi"
+      - "/home/jaybird/Android/Sdk/emulator/tapi"
+      - "/home/jaybird/Android/Sdk/platform-tools/tapi"
     found: false
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:18 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:201 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_C_COMPILER_AR"
     description: "A wrapper around 'ar' adding the appropriate '--plugin' option for the GCC compiler"
@@ -739,71 +763,73 @@ events:
       CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
       CMAKE_FIND_USE_INSTALL_PREFIX: true
     names:
-      - "gcc-ar-16.1"
+      - "gcc-ar-16.2"
       - "gcc-ar-16"
       - "gcc-ar16"
       - "gcc-ar"
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/usr/bin/gcc-ar-16.1"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.1"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar-16.1"
-      - "/home/jaybird/.local/bin/gcc-ar-16.1"
-      - "/home/jaybird/bin/gcc-ar-16.1"
-      - "/usr/local/bin/gcc-ar-16.1"
-      - "/bin/gcc-ar-16.1"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar-16.1"
+      - "/usr/bin/gcc-ar-16.2"
+      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.2"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16.2"
+      - "/home/jaybird/.local/bin/gcc-ar-16.2"
+      - "/home/jaybird/bin/gcc-ar-16.2"
+      - "/usr/local/bin/gcc-ar-16.2"
+      - "/bin/gcc-ar-16.2"
+      - "/var/lib/snapd/snap/bin/gcc-ar-16.2"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16.2"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16.2"
       - "/usr/bin/gcc-ar-16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar-16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16"
       - "/home/jaybird/.local/bin/gcc-ar-16"
       - "/home/jaybird/bin/gcc-ar-16"
       - "/usr/local/bin/gcc-ar-16"
       - "/bin/gcc-ar-16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar-16"
+      - "/var/lib/snapd/snap/bin/gcc-ar-16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16"
       - "/usr/bin/gcc-ar16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ar16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar16"
       - "/home/jaybird/.local/bin/gcc-ar16"
       - "/home/jaybird/bin/gcc-ar16"
       - "/usr/local/bin/gcc-ar16"
       - "/bin/gcc-ar16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar16"
+      - "/var/lib/snapd/snap/bin/gcc-ar16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar16"
     found: "/usr/bin/gcc-ar"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:30 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCCompiler.cmake:201 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_C_COMPILER_RANLIB"
     description: "A wrapper around 'ranlib' adding the appropriate '--plugin' option for the GCC compiler"
@@ -816,71 +842,73 @@ events:
       CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
       CMAKE_FIND_USE_INSTALL_PREFIX: true
     names:
-      - "gcc-ranlib-16.1"
+      - "gcc-ranlib-16.2"
       - "gcc-ranlib-16"
       - "gcc-ranlib16"
       - "gcc-ranlib"
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/usr/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib-16.1"
-      - "/home/jaybird/.local/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/bin/gcc-ranlib-16.1"
-      - "/usr/local/bin/gcc-ranlib-16.1"
-      - "/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib-16.1"
+      - "/usr/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/.local/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/bin/gcc-ranlib-16.2"
+      - "/usr/local/bin/gcc-ranlib-16.2"
+      - "/bin/gcc-ranlib-16.2"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16.2"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16.2"
       - "/usr/bin/gcc-ranlib-16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib-16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16"
       - "/home/jaybird/.local/bin/gcc-ranlib-16"
       - "/home/jaybird/bin/gcc-ranlib-16"
       - "/usr/local/bin/gcc-ranlib-16"
       - "/bin/gcc-ranlib-16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib-16"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib-16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16"
       - "/usr/bin/gcc-ranlib16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib16"
       - "/home/jaybird/.local/bin/gcc-ranlib16"
       - "/home/jaybird/bin/gcc-ranlib16"
       - "/usr/local/bin/gcc-ranlib16"
       - "/bin/gcc-ranlib16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib16"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib16"
     found: "/usr/bin/gcc-ranlib"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompiler.cmake:54 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:69 (_cmake_find_compiler)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_CXX_COMPILER"
     description: "CXX compiler"
@@ -909,15 +937,17 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
@@ -926,7 +956,7 @@ events:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:8 (CMAKE_DETERMINE_COMPILER_ID_BUILD)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
       - "/usr/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "file"
     variable: "src_in"
     description: "Path to a file."
@@ -946,22 +976,24 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "message-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
       - "/usr/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:125 (CMAKE_DETERMINE_COMPILER_ID)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
       Compiler: /usr/bin/c++ 
@@ -982,7 +1014,7 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:18 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:207 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_CXX_COMPILER_AR"
     description: "A wrapper around 'ar' adding the appropriate '--plugin' option for the GCC compiler"
@@ -995,71 +1027,73 @@ events:
       CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
       CMAKE_FIND_USE_INSTALL_PREFIX: true
     names:
-      - "gcc-ar-16.1"
+      - "gcc-ar-16.2"
       - "gcc-ar-16"
       - "gcc-ar16"
       - "gcc-ar"
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/usr/bin/gcc-ar-16.1"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.1"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar-16.1"
-      - "/home/jaybird/.local/bin/gcc-ar-16.1"
-      - "/home/jaybird/bin/gcc-ar-16.1"
-      - "/usr/local/bin/gcc-ar-16.1"
-      - "/bin/gcc-ar-16.1"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar-16.1"
+      - "/usr/bin/gcc-ar-16.2"
+      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.2"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16.2"
+      - "/home/jaybird/.local/bin/gcc-ar-16.2"
+      - "/home/jaybird/bin/gcc-ar-16.2"
+      - "/usr/local/bin/gcc-ar-16.2"
+      - "/bin/gcc-ar-16.2"
+      - "/var/lib/snapd/snap/bin/gcc-ar-16.2"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16.2"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16.2"
       - "/usr/bin/gcc-ar-16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar-16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16"
       - "/home/jaybird/.local/bin/gcc-ar-16"
       - "/home/jaybird/bin/gcc-ar-16"
       - "/usr/local/bin/gcc-ar-16"
       - "/bin/gcc-ar-16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar-16"
+      - "/var/lib/snapd/snap/bin/gcc-ar-16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16"
       - "/usr/bin/gcc-ar16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ar16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ar16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ar16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ar16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar16"
       - "/home/jaybird/.local/bin/gcc-ar16"
       - "/home/jaybird/bin/gcc-ar16"
       - "/usr/local/bin/gcc-ar16"
       - "/bin/gcc-ar16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ar16"
+      - "/var/lib/snapd/snap/bin/gcc-ar16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ar16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar16"
     found: "/usr/bin/gcc-ar"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "find-v1"
     backtrace:
       - "/usr/share/cmake/Modules/Compiler/GNU-FindBinUtils.cmake:30 (find_program)"
       - "/usr/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:207 (include)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     mode: "program"
     variable: "CMAKE_CXX_COMPILER_RANLIB"
     description: "A wrapper around 'ranlib' adding the appropriate '--plugin' option for the GCC compiler"
@@ -1072,76 +1106,78 @@ events:
       CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
       CMAKE_FIND_USE_INSTALL_PREFIX: true
     names:
-      - "gcc-ranlib-16.1"
+      - "gcc-ranlib-16.2"
       - "gcc-ranlib-16"
       - "gcc-ranlib16"
       - "gcc-ranlib"
     candidate_directories:
       - "/usr/bin/"
       - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
       - "/usr/local/bin/"
       - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/usr/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib-16.1"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib-16.1"
-      - "/home/jaybird/.local/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/bin/gcc-ranlib-16.1"
-      - "/usr/local/bin/gcc-ranlib-16.1"
-      - "/bin/gcc-ranlib-16.1"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib-16.1"
+      - "/usr/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/.local/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/bin/gcc-ranlib-16.2"
+      - "/usr/local/bin/gcc-ranlib-16.2"
+      - "/bin/gcc-ranlib-16.2"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16.2"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16.2"
       - "/usr/bin/gcc-ranlib-16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib-16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib-16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16"
       - "/home/jaybird/.local/bin/gcc-ranlib-16"
       - "/home/jaybird/bin/gcc-ranlib-16"
       - "/usr/local/bin/gcc-ranlib-16"
       - "/bin/gcc-ranlib-16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib-16"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib-16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16"
       - "/usr/bin/gcc-ranlib16"
       - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib16"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/gcc-ranlib16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/gcc-ranlib16"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/gcc-ranlib16"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib16"
       - "/home/jaybird/.local/bin/gcc-ranlib16"
       - "/home/jaybird/bin/gcc-ranlib16"
       - "/usr/local/bin/gcc-ranlib16"
       - "/bin/gcc-ranlib16"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/gcc-ranlib16"
+      - "/var/lib/snapd/snap/bin/gcc-ranlib16"
+      - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib16"
+      - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib16"
     found: "/usr/bin/gcc-ranlib"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
   -
     kind: "try_compile-v1"
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:83 (try_compile)"
       - "/usr/share/cmake/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae"
     cmakeVariables:
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_C_FLAGS: ""
@@ -1151,26 +1187,26 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_43801/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_43801.dir/build.make CMakeFiles/cmTC_43801.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73'
-        Building C object CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o
-        /usr/bin/cc   -v -o CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_211e7/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_211e7.dir/build.make CMakeFiles/cmTC_211e7.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae'
+        Building C object CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o
+        /usr/bin/cc   -v -o CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
         OFFLOAD_TARGET_DEFAULT=1
         Target: x86_64-redhat-linux
-        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
+        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
-        gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) 
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_43801.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccJcs02q.s
-        GNU C23 (GCC) version 16.1.1 20260515 (Red Hat 16.1.1-2) (x86_64-redhat-linux)
-        	compiled by GNU C version 16.1.1 20260515 (Red Hat 16.1.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
+        gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_211e7.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccbb0pZh.s
+        GNU C23 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)
+        	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
         
         GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
         ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/16/include-fixed"
@@ -1181,35 +1217,35 @@ events:
          /usr/local/include
          /usr/include
         End of search list.
-        Compiler executable checksum: 02fd4c3bc0302122b50e730803efc7d8
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/'
-         as -v --64 -o CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o /tmp/ccJcs02q.s
+        Compiler executable checksum: 9bab69ee039b57e5d63c6dcf5d331ec2
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/'
+         as -v --64 -o CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o /tmp/ccbb0pZh.s
         GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.'
-        Linking C executable cmTC_43801
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_43801.dir/link.txt --verbose=1
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.'
+        Linking C executable cmTC_211e7
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_211e7.dir/link.txt --verbose=1
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
         OFFLOAD_TARGET_DEFAULT=1
         Target: x86_64-redhat-linux
-        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
+        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
-        gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) 
+        gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_43801' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_43801.'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccUmRjSx.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_43801 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
-        collect2 version 16.1.1 20260515 (Red Hat 16.1.1-2)
-        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccUmRjSx.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_43801 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_211e7' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_211e7.'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc3HsTyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_211e7 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)
+        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc3HsTyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_211e7 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         GNU ld version 2.46.1-1.fc44
-        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_43801' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_43801.'
-        /usr/bin/cc  -v -Wl,-v CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -o cmTC_43801
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73'
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_211e7' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_211e7.'
+        /usr/bin/cc  -v -Wl,-v CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -o cmTC_211e7
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae'
         
       exitCode: 0
   -
@@ -1217,7 +1253,7 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:217 (message)"
       - "/usr/share/cmake/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Parsed C implicit include dir info: rv=done
         found start of include info
@@ -1237,31 +1273,31 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:253 (message)"
       - "/usr/share/cmake/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73']
+        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_43801/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_43801.dir/build.make CMakeFiles/cmTC_43801.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-OhnS73']
-        ignore line: [Building C object CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o]
-        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_211e7/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_211e7.dir/build.make CMakeFiles/cmTC_211e7.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-UKaHae']
+        ignore line: [Building C object CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
         ignore line: [OFFLOAD_TARGET_DEFAULT=1]
         ignore line: [Target: x86_64-redhat-linux]
-        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
+        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
-        ignore line: [gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/']
-        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_43801.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccJcs02q.s]
-        ignore line: [GNU C23 (GCC) version 16.1.1 20260515 (Red Hat 16.1.1-2) (x86_64-redhat-linux)]
-        ignore line: [	compiled by GNU C version 16.1.1 20260515 (Red Hat 16.1.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
+        ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/']
+        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_211e7.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccbb0pZh.s]
+        ignore line: [GNU C23 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)]
+        ignore line: [	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
         ignore line: []
         ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
         ignore line: [ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/16/include-fixed"]
@@ -1272,34 +1308,34 @@ events:
         ignore line: [ /usr/local/include]
         ignore line: [ /usr/include]
         ignore line: [End of search list.]
-        ignore line: [Compiler executable checksum: 02fd4c3bc0302122b50e730803efc7d8]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o /tmp/ccJcs02q.s]
+        ignore line: [Compiler executable checksum: 9bab69ee039b57e5d63c6dcf5d331ec2]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o /tmp/ccbb0pZh.s]
         ignore line: [GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.']
-        ignore line: [Linking C executable cmTC_43801]
-        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_43801.dir/link.txt --verbose=1]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.']
+        ignore line: [Linking C executable cmTC_211e7]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_211e7.dir/link.txt --verbose=1]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
         ignore line: [OFFLOAD_TARGET_DEFAULT=1]
         ignore line: [Target: x86_64-redhat-linux]
-        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
+        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
-        ignore line: [gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) ]
+        ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_43801' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_43801.']
-        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccUmRjSx.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_43801 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_211e7' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_211e7.']
+        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc3HsTyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_211e7 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/ccUmRjSx.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/cc3HsTyW.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s_asneeded] ==> ignore
           arg [-plugin-opt=-pass-through=-latomic_asneeded] ==> ignore
@@ -1315,7 +1351,7 @@ events:
           arg [-dynamic-linker] ==> ignore
           arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_43801] ==> ignore
+          arg [cmTC_211e7] ==> ignore
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o]
@@ -1327,7 +1363,7 @@ events:
           arg [-L/lib] ==> dir [/lib]
           arg [-L/usr/lib] ==> dir [/usr/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o] ==> ignore
           arg [-lgcc] ==> lib [gcc]
           arg [-lgcc_s_asneeded] ==> lib [gcc_s_asneeded]
           arg [-latomic_asneeded] ==> lib [atomic_asneeded]
@@ -1336,8 +1372,8 @@ events:
           arg [-lgcc_s_asneeded] ==> lib [gcc_s_asneeded]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
-        ignore line: [collect2 version 16.1.1 20260515 (Red Hat 16.1.1-2)]
-        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccUmRjSx.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_43801 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_43801.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)]
+        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc3HsTyW.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_211e7 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_211e7.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         linker tool for 'C': /usr/bin/ld
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
@@ -1361,7 +1397,7 @@ events:
       - "/usr/share/cmake/Modules/Internal/CMakeDetermineLinkerId.cmake:38 (message)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:299 (cmake_determine_linker_id)"
       - "/usr/share/cmake/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Running the C compiler's linker: "/usr/bin/ld" "-v"
       GNU ld version 2.46.1-1.fc44
@@ -1370,12 +1406,12 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:83 (try_compile)"
       - "/usr/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -1386,26 +1422,26 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_a4b10/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_a4b10.dir/build.make CMakeFiles/cmTC_a4b10.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ'
-        Building CXX object CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o
-        /usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_bca94/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_bca94.dir/build.make CMakeFiles/cmTC_bca94.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq'
+        Building CXX object CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o
+        /usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
         OFFLOAD_TARGET_DEFAULT=1
         Target: x86_64-redhat-linux
-        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
+        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
-        gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) 
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_a4b10.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccAwA87a.s
-        GNU C++20 (GCC) version 16.1.1 20260515 (Red Hat 16.1.1-2) (x86_64-redhat-linux)
-        	compiled by GNU C version 16.1.1 20260515 (Red Hat 16.1.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
+        gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_bca94.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/cctj5izC.s
+        GNU C++20 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)
+        	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
         
         GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
         ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/16/include-fixed"
@@ -1419,35 +1455,35 @@ events:
          /usr/local/include
          /usr/include
         End of search list.
-        Compiler executable checksum: f7f3cb99b253d13f382d2bbd7f6c1fbf
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/'
-         as -v --64 -o CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o /tmp/ccAwA87a.s
+        Compiler executable checksum: 65ab9aa42e0ee60985a3e473fe6610c4
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/'
+         as -v --64 -o CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o /tmp/cctj5izC.s
         GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.'
-        Linking CXX executable cmTC_a4b10
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a4b10.dir/link.txt --verbose=1
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.'
+        Linking CXX executable cmTC_bca94
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bca94.dir/link.txt --verbose=1
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
         OFFLOAD_TARGET_DEFAULT=1
         Target: x86_64-redhat-linux
-        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
+        Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,algol68,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
-        gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) 
+        gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_a4b10' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_a4b10.'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc0PuLhf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_a4b10 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
-        collect2 version 16.1.1 20260515 (Red Hat 16.1.1-2)
-        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc0PuLhf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_a4b10 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_bca94' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_bca94.'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccS5GDKA.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_bca94 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)
+        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccS5GDKA.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_bca94 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         GNU ld version 2.46.1-1.fc44
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_a4b10' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_a4b10.'
-        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1   -v -Wl,-v CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_a4b10
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ'
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_bca94' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_bca94.'
+        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1   -v -Wl,-v CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_bca94
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq'
         
       exitCode: 0
   -
@@ -1455,7 +1491,7 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:217 (message)"
       - "/usr/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Parsed CXX implicit include dir info: rv=done
         found start of include info
@@ -1481,31 +1517,31 @@ events:
     backtrace:
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:253 (message)"
       - "/usr/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Parsed CXX implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ']
+        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_a4b10/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_a4b10.dir/build.make CMakeFiles/cmTC_a4b10.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-jAKcWZ']
-        ignore line: [Building CXX object CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o]
-        ignore line: [/usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_bca94/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_bca94.dir/build.make CMakeFiles/cmTC_bca94.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-kMPAlq']
+        ignore line: [Building CXX object CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o]
+        ignore line: [/usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
         ignore line: [OFFLOAD_TARGET_DEFAULT=1]
         ignore line: [Target: x86_64-redhat-linux]
-        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
+        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
-        ignore line: [gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/']
-        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_a4b10.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccAwA87a.s]
-        ignore line: [GNU C++20 (GCC) version 16.1.1 20260515 (Red Hat 16.1.1-2) (x86_64-redhat-linux)]
-        ignore line: [	compiled by GNU C version 16.1.1 20260515 (Red Hat 16.1.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
+        ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/']
+        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_bca94.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/cctj5izC.s]
+        ignore line: [GNU C++20 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)]
+        ignore line: [	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
         ignore line: []
         ignore line: [GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072]
         ignore line: [ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/16/include-fixed"]
@@ -1519,34 +1555,34 @@ events:
         ignore line: [ /usr/local/include]
         ignore line: [ /usr/include]
         ignore line: [End of search list.]
-        ignore line: [Compiler executable checksum: f7f3cb99b253d13f382d2bbd7f6c1fbf]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o /tmp/ccAwA87a.s]
+        ignore line: [Compiler executable checksum: 65ab9aa42e0ee60985a3e473fe6610c4]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o /tmp/cctj5izC.s]
         ignore line: [GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.']
-        ignore line: [Linking CXX executable cmTC_a4b10]
-        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a4b10.dir/link.txt --verbose=1]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [Linking CXX executable cmTC_bca94]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bca94.dir/link.txt --verbose=1]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
         ignore line: [OFFLOAD_TARGET_DEFAULT=1]
         ignore line: [Target: x86_64-redhat-linux]
-        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.1.1-build/gcc-16.1.1-20260515/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
+        ignore line: [Configured with: ../configure --enable-bootstrap --enable-languages=c c++ fortran objc obj-c++ ada go d m2 cobol algol68 lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-16.2.1-build/gcc-16.2.1-20260819/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-tls=gnu2 --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp]
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
-        ignore line: [gcc version 16.1.1 20260515 (Red Hat 16.1.1-2) (GCC) ]
+        ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_a4b10' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_a4b10.']
-        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc0PuLhf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_a4b10 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_bca94' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_bca94.']
+        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccS5GDKA.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_bca94 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/cc0PuLhf.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccS5GDKA.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-latomic_asneeded] ==> ignore
@@ -1562,7 +1598,7 @@ events:
           arg [-dynamic-linker] ==> ignore
           arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_a4b10] ==> ignore
+          arg [cmTC_bca94] ==> ignore
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o]
@@ -1574,7 +1610,7 @@ events:
           arg [-L/lib] ==> dir [/lib]
           arg [-L/usr/lib] ==> dir [/usr/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
           arg [-lstdc++] ==> lib [stdc++]
           arg [-lm] ==> lib [m]
           arg [-lgcc_s] ==> lib [gcc_s]
@@ -1585,8 +1621,8 @@ events:
           arg [-lgcc] ==> lib [gcc]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
-        ignore line: [collect2 version 16.1.1 20260515 (Red Hat 16.1.1-2)]
-        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/cc0PuLhf.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_a4b10 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_a4b10.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)]
+        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccS5GDKA.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_bca94 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_bca94.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         linker tool for 'CXX': /usr/bin/ld
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
@@ -1610,131 +1646,16 @@ events:
       - "/usr/share/cmake/Modules/Internal/CMakeDetermineLinkerId.cmake:38 (message)"
       - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:299 (cmake_determine_linker_id)"
       - "/usr/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
-      - "CMakeLists.txt:3 (project)"
+      - "CMakeLists.txt:2 (project)"
     message: |
       Running the CXX compiler's linker: "/usr/bin/ld" "-v"
       GNU ld version 2.46.1-1.fc44
   -
     kind: "find-v1"
     backtrace:
-      - "/usr/share/cmake/Modules/FindPython/Support.cmake:2127 (find_program)"
-      - "/usr/share/cmake/Modules/FindPython3.cmake:671 (include)"
-      - "CMakeLists.txt:8 (find_package)"
-    mode: "program"
-    variable: "_Python3_EXECUTABLE"
-    description: "Path to a program."
-    settings:
-      SearchFramework: "NEVER"
-      SearchAppBundle: "NEVER"
-      CMAKE_FIND_USE_CMAKE_PATH: false
-      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: false
-      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: false
-      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: false
-      CMAKE_FIND_USE_INSTALL_PREFIX: true
-    names:
-      - "python3.15mu"
-      - "python3.15m"
-      - "python3.15u"
-      - "python3.15"
-      - "python3.15dmu"
-      - "python3.15dm"
-      - "python3.15du"
-      - "python3.15d"
-      - "python3.14mu"
-      - "python3.14m"
-      - "python3.14u"
-      - "python3.14"
-      - "python3.14dmu"
-      - "python3.14dm"
-      - "python3.14du"
-      - "python3.14d"
-      - "python3.13mu"
-      - "python3.13m"
-      - "python3.13u"
-      - "python3.13"
-      - "python3.13dmu"
-      - "python3.13dm"
-      - "python3.13du"
-      - "python3.13d"
-      - "python3.12mu"
-      - "python3.12m"
-      - "python3.12u"
-      - "python3.12"
-      - "python3.12dmu"
-      - "python3.12dm"
-      - "python3.12du"
-      - "python3.12d"
-      - "python3.11mu"
-      - "python3.11m"
-      - "python3.11u"
-      - "python3.11"
-      - "python3.11dmu"
-      - "python3.11dm"
-      - "python3.11du"
-      - "python3.11d"
-      - "python3.10mu"
-      - "python3.10m"
-      - "python3.10u"
-      - "python3.10"
-      - "python3.10dmu"
-      - "python3.10dm"
-      - "python3.10du"
-      - "python3.10d"
-      - "python3"
-      - "python"
-    candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/hyperstellar_env/Scripts/"
-      - "/home/jaybird/hyperstellar_env/"
-    searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/python3.15mu"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15m"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15u"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15dmu"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15dm"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15du"
-      - "/home/jaybird/hyperstellar_env/bin/python3.15d"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14mu"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14m"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14u"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14dmu"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14dm"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14du"
-      - "/home/jaybird/hyperstellar_env/bin/python3.14d"
-      - "/home/jaybird/hyperstellar_env/bin/python3.13mu"
-      - "/home/jaybird/hyperstellar_env/bin/python3.13m"
-      - "/home/jaybird/hyperstellar_env/bin/python3.13u"
-    found: "/home/jaybird/hyperstellar_env/bin/python3.13"
-    search_context:
-      ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
-        - "/home/jaybird/.local/bin"
-        - "/home/jaybird/bin"
-        - "/usr/local/bin"
-        - "/usr/bin"
-        - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
-      CMAKE_INSTALL_PREFIX: "/usr/local"
-      CMAKE_SYSTEM_PREFIX_PATH:
-        - "/usr/local"
-        - "/usr"
-        - "/"
-        - "/usr"
-        - "/usr/local"
-        - "/usr/X11R6"
-        - "/usr/pkg"
-        - "/opt"
-  -
-    kind: "find-v1"
-    backtrace:
       - "/usr/share/cmake/Modules/FindPython/Support.cmake:3846 (find_path)"
       - "/usr/share/cmake/Modules/FindPython3.cmake:671 (include)"
-      - "CMakeLists.txt:8 (find_package)"
+      - "CMakeLists.txt:11 (find_package)"
     mode: "path"
     variable: "_Python3_INCLUDE_DIR"
     description: "Path to a file."
@@ -1754,15 +1675,17 @@ events:
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
       CMAKE_INSTALL_PREFIX: "/usr/local"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/usr/local"
@@ -1781,132 +1704,44 @@ events:
       - "/usr/share/cmake/Modules/Internal/CheckSourceCompiles.cmake:104 (try_compile)"
       - "/usr/share/cmake/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
       - "/usr/share/cmake/Modules/CheckCXXCompilerFlag.cmake:103 (cmake_check_compiler_flag)"
-      - "pybind11/tools/pybind11Common.cmake:276 (check_cxx_compiler_flag)"
-      - "pybind11/tools/pybind11Common.cmake:318 (_pybind11_return_if_cxx_and_linker_flags_work)"
-      - "pybind11/tools/pybind11Common.cmake:385 (_pybind11_generate_lto)"
-      - "pybind11/CMakeLists.txt:210 (include)"
+      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:338 (check_cxx_compiler_flag)"
+      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:387 (_pybind11_return_if_cxx_and_linker_flags_work)"
+      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:448 (_pybind11_generate_lto)"
+      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Config.cmake:257 (include)"
+      - "CMakeLists.txt:21 (find_package)"
     checks:
-      - "Performing Test HAS_FLTO"
+      - "Performing Test HAS_FLTO_AUTO"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "-g"
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_EXE_LINKER_FLAGS: ""
     buildResult:
-      variable: "HAS_FLTO"
+      variable: "HAS_FLTO_AUTO"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_7f4e7/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_7f4e7.dir/build.make CMakeFiles/cmTC_7f4e7.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep'
-        Building CXX object CMakeFiles/cmTC_7f4e7.dir/src.cxx.o
-        /usr/bin/c++ -DHAS_FLTO  -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -flto -fno-fat-lto-objects -o CMakeFiles/cmTC_7f4e7.dir/src.cxx.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep/src.cxx
-        Linking CXX executable cmTC_7f4e7
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7f4e7.dir/link.txt --verbose=1
-        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1  CMakeFiles/cmTC_7f4e7.dir/src.cxx.o -o cmTC_7f4e7  -flto
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-9sEpep'
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_5d728/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_5d728.dir/build.make CMakeFiles/cmTC_5d728.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0'
+        Building CXX object CMakeFiles/cmTC_5d728.dir/src.cxx.o
+        /usr/bin/c++ -DHAS_FLTO_AUTO  -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -flto=auto -fno-fat-lto-objects -o CMakeFiles/cmTC_5d728.dir/src.cxx.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0/src.cxx
+        Linking CXX executable cmTC_5d728
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5d728.dir/link.txt --verbose=1
+        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1  CMakeFiles/cmTC_5d728.dir/src.cxx.o -o cmTC_5d728  -flto=auto
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-QU5rH0'
         
       exitCode: 0
   -
     kind: "find-v1"
     backtrace:
-      - "/usr/share/cmake/Modules/FindPkgConfig.cmake:517 (find_program)"
-      - "CMakeLists.txt:59 (find_package)"
-    mode: "program"
-    variable: "PKG_CONFIG_EXECUTABLE"
-    description: "pkg-config executable"
-    settings:
-      SearchFramework: "NEVER"
-      SearchAppBundle: "NEVER"
-      CMAKE_FIND_USE_CMAKE_PATH: true
-      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
-      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
-      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
-      CMAKE_FIND_USE_INSTALL_PREFIX: true
-    names:
-      - "pkg-config"
-      - "pkgconf"
-    candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/"
-      - "/home/jaybird/.local/bin/"
-      - "/home/jaybird/bin/"
-      - "/usr/local/bin/"
-      - "/usr/bin/"
-      - "/bin/"
-      - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts/"
-      - "/usr/local/bin/"
-      - "/usr/local/sbin/"
-      - "/usr/local/"
-      - "/usr/bin/"
-      - "/usr/sbin/"
-      - "/usr/"
-      - "/bin/"
-      - "/sbin/"
-      - "/usr/X11R6/bin/"
-      - "/usr/X11R6/sbin/"
-      - "/usr/X11R6/"
-      - "/usr/pkg/bin/"
-      - "/usr/pkg/sbin/"
-      - "/usr/pkg/"
-      - "/opt/bin/"
-      - "/opt/sbin/"
-      - "/opt/"
-    searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/pkg-config"
-      - "/home/jaybird/hyperstellar_env/bin/pkgconf"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/pkg-config"
-      - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin/pkgconf"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/pkg-config"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand/pkgconf"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/pkg-config"
-      - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli/pkgconf"
-      - "/home/jaybird/.local/bin/pkg-config"
-      - "/home/jaybird/.local/bin/pkgconf"
-      - "/home/jaybird/bin/pkg-config"
-      - "/home/jaybird/bin/pkgconf"
-      - "/usr/local/bin/pkg-config"
-      - "/usr/local/bin/pkgconf"
-    found: "/usr/bin/pkg-config"
-    search_context:
-      ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
-        - "/home/jaybird/.local/bin"
-        - "/home/jaybird/bin"
-        - "/usr/local/bin"
-        - "/usr/bin"
-        - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
-      CMAKE_INSTALL_PREFIX: "/usr/local"
-      CMAKE_SYSTEM_PREFIX_PATH:
-        - "/usr/local"
-        - "/usr"
-        - "/"
-        - "/usr"
-        - "/usr/local"
-        - "/usr/X11R6"
-        - "/usr/pkg"
-        - "/opt"
-  -
-    kind: "find-v1"
-    backtrace:
-      - "/usr/share/cmake/Modules/FindPkgConfig.cmake:761 (find_library)"
-      - "/usr/share/cmake/Modules/FindPkgConfig.cmake:811 (_pkg_find_libs)"
-      - "/usr/share/cmake/Modules/FindPkgConfig.cmake:1149 (_pkg_recalculate)"
-      - "/usr/share/cmake/Modules/FindPkgConfig.cmake:1192 (_pkg_check_modules_internal)"
-      - "CMakeLists.txt:60 (pkg_search_module)"
+      - "CMakeLists.txt:171 (find_library)"
     mode: "library"
-    variable: "pkgcfg_lib_GLFW_glfw"
+    variable: "X11_LIB"
     description: "Path to a library."
     settings:
       SearchFramework: "NEVER"
@@ -1917,22 +1752,363 @@ events:
       CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
       CMAKE_FIND_USE_INSTALL_PREFIX: true
     names:
-      - "glfw"
+      - "X11"
     candidate_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
       - "/usr/lib64/"
-    found: "/usr/lib64/libglfw.so"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/lib64/"
+      - "/lib/"
+      - "/opt/"
+      - "/usr/lib64/X11/"
+    searched_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+    found: "/usr/lib64/libX11.so"
     search_context:
       ENV{PATH}:
         - "/home/jaybird/hyperstellar_env/bin"
-        - "/home/jaybird/Aidens_stuff/hyperstellar-public/public_env/bin"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/debugCommand"
-        - "/home/jaybird/.config/Code/User/globalStorage/github.copilot-chat/copilotCli"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
         - "/usr/local/bin"
         - "/usr/bin"
         - "/bin"
-        - "/home/jaybird/.vscode/extensions/ms-python.debugpy-2026.6.0-linux-x64/bundled/scripts/noConfigScripts"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "/usr/lib/X11"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "CMakeLists.txt:171 (find_library)"
+    mode: "library"
+    variable: "Xrandr_LIB"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Xrandr"
+    candidate_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+      - "/usr/lib64/"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/lib64/"
+      - "/lib/"
+      - "/opt/"
+      - "/usr/lib64/X11/"
+    searched_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+    found: "/usr/lib64/libXrandr.so"
+    search_context:
+      ENV{PATH}:
+        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
+        - "/home/jaybird/.local/bin"
+        - "/home/jaybird/bin"
+        - "/usr/local/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "/usr/lib/X11"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "CMakeLists.txt:171 (find_library)"
+    mode: "library"
+    variable: "Xi_LIB"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Xi"
+    candidate_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+      - "/usr/lib64/"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/lib64/"
+      - "/lib/"
+      - "/opt/"
+      - "/usr/lib64/X11/"
+    searched_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+    found: "/usr/lib64/libXi.so"
+    search_context:
+      ENV{PATH}:
+        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
+        - "/home/jaybird/.local/bin"
+        - "/home/jaybird/bin"
+        - "/usr/local/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "/usr/lib/X11"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "CMakeLists.txt:171 (find_library)"
+    mode: "library"
+    variable: "Xinerama_LIB"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Xinerama"
+    candidate_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+      - "/usr/lib64/"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/lib64/"
+      - "/lib/"
+      - "/opt/"
+      - "/usr/lib64/X11/"
+    searched_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+    found: "/usr/lib64/libXinerama.so"
+    search_context:
+      ENV{PATH}:
+        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
+        - "/home/jaybird/.local/bin"
+        - "/home/jaybird/bin"
+        - "/usr/local/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "/usr/lib/X11"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "CMakeLists.txt:171 (find_library)"
+    mode: "library"
+    variable: "Xcursor_LIB"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Xcursor"
+    candidate_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+      - "/usr/lib64/"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/lib64/"
+      - "/lib/"
+      - "/opt/"
+      - "/usr/lib64/X11/"
+    searched_directories:
+      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
+      - "/home/jaybird/.local/bin/"
+      - "/usr/local/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/var/lib/snapd/snap/bin/"
+      - "/home/jaybird/Android/Sdk/emulator/"
+      - "/home/jaybird/Android/Sdk/platform-tools/"
+      - "/usr/local/lib64/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+    found: "/usr/lib64/libXcursor.so"
+    search_context:
+      ENV{PATH}:
+        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
+        - "/home/jaybird/.local/bin"
+        - "/home/jaybird/bin"
+        - "/usr/local/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/var/lib/snapd/snap/bin"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
+        - "/home/jaybird/Android/Sdk/emulator"
+        - "/home/jaybird/Android/Sdk/platform-tools"
       CMAKE_INSTALL_PREFIX: "/usr/local"
       CMAKE_SYSTEM_PREFIX_PATH:
         - "/usr/local"

@@ -397,7 +397,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/script_manager.h \
  /usr/include/c++/16/unordered_set \
  /usr/include/c++/16/bits/unordered_set.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/GLFW/glfw3.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/quaternion.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_relational.hpp \
