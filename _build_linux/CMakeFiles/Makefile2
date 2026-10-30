@@ -85,12 +85,12 @@ clean: CMakeFiles/stellar.dir/clean
 CMakeFiles/stellar.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 "Built target stellar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 "Built target stellar"
 .PHONY : CMakeFiles/stellar.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/stellar.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles 21
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles 22
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/stellar.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles 0
 .PHONY : CMakeFiles/stellar.dir/rule
@@ -102,7 +102,7 @@ stellar: CMakeFiles/stellar.dir/rule
 # codegen rule for target.
 CMakeFiles/stellar.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 "Finished codegen for target stellar"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 "Finished codegen for target stellar"
 .PHONY : CMakeFiles/stellar.dir/codegen
 
 # clean rule for target.

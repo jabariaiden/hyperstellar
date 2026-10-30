@@ -715,23 +715,6 @@ class Simulation:
         """
         ...
 
-    def enable_collision_between(self, obj1: int, obj2: int, enable: bool) -> None:
-        """
-        Enable or disable collision detection between two specific objects.
-
-        Args:
-            obj1 (int): First object ID
-            obj2 (int): Second object ID
-            enable (bool): True to enable, False to disable
-
-        Useful for creating collision layers or groups.
-
-        Example:
-            >>> sim.enable_collision_between(0, 1, False)
-            >>> # Objects 0 and 1 will pass through each other
-        """
-        ...
-
     def is_collision_enabled(self, index: int) -> bool:
         """
         Check if collision detection is enabled for an object.
@@ -972,10 +955,6 @@ class Simulation:
 
     def set_signal_queue_capacity(self, capacity: int) -> None:
         """Set the maximum number of pending signals."""
-        ...
-
-    def set_signal_queue_overflow_policy(self, policy: int) -> None:
-        """Set overflow policy: 0=drop, 1=block."""
         ...
 
     def clear_signal_queue(self) -> None:

@@ -8,6 +8,7 @@
 #include "../include/axis.h"
 #include "../include/camera.h"
 #include "../include/globals.h"
+#include "../include/mesh.h"
 #include "script_manager.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -18,8 +19,9 @@
 #include <algorithm>
 #include <sstream>
 #include <utility>
-#include <functional>   // for std::function
+#include <functional> // for std::function
 #include <vector>
+#include <atomic>
 
 // ----------------------------------------------------------------------------
 // OBJECT HANDLE IMPLEMENTATION
@@ -30,7 +32,10 @@ static std::vector<int> g_objectGenerations(Objects::MAX_OBJECTS, 0);
 static std::vector<bool> g_objectSlotsUsed(Objects::MAX_OBJECTS, false);
 
 // Global collision callback storage
-static std::function<void(const CollisionEvent&)> g_collisionCallback;
+static std::function<void(const CollisionEvent &)> g_collisionCallback;
+
+static std::atomic<int> g_activeSimCount{0};
+bool AnySimulationInitialized() { return g_activeSimCount.load() > 0; }
 
 namespace
 {
@@ -42,20 +47,16 @@ namespace
 GLuint CreateAxisShader()
 {
     const char *vertexShaderSource = R"(
-        #version 330 core
-        layout (location = 0) in vec2 aPos;
-        layout (location = 1) in vec3 aColor;
-        layout (location = 2) in float aWidth;
-        
-        uniform mat4 uProjView;
-        
-        out vec3 Color;
-        
-        void main() {
-            gl_Position = uProjView * vec4(aPos, 0.0, 1.0);
-            Color = aColor;
-        }
-    )";
+    #version 330 core
+    layout (location = 0) in vec3 aPos;
+    layout (location = 1) in vec3 aColor;
+    uniform mat4 uProjView;
+    out vec3 Color;
+    void main() {
+        gl_Position = uProjView * vec4(aPos, 1.0);
+        Color = aColor;
+    }
+)";
 
     const char *fragmentShaderSource = R"(
         #version 330 core
@@ -192,38 +193,46 @@ static int key_name_to_code(const std::string &name)
 // Scratchpad
 // ============================================================================
 
-int SimulationWrapper::create_scratchpad(size_t size) {
+int SimulationWrapper::create_scratchpad(size_t size)
+{
     ensure_initialized();
     return Objects::CreateScratchpad(size);
 }
 
-void SimulationWrapper::destroy_scratchpad(int id) {
+void SimulationWrapper::destroy_scratchpad(int id)
+{
     ensure_initialized();
     Objects::DestroyScratchpad(id);
 }
 
-void SimulationWrapper::upload_scratchpad(int id, const std::vector<float>& data) {
+void SimulationWrapper::upload_scratchpad(int id, const std::vector<float> &data)
+{
     ensure_initialized();
     Objects::UploadScratchpadData(id, data.data(), data.size());
 }
 
-std::vector<float> SimulationWrapper::map_scratchpad(int id) {
+std::vector<float> SimulationWrapper::map_scratchpad(int id)
+{
     ensure_initialized();
-    if (!Objects::IsValidScratchpad(id)) return {};
-    float* ptr = (float*)Objects::MapScratchpad(id, GL_READ_ONLY);
-    if (!ptr) return {};
+    if (!Objects::IsValidScratchpad(id))
+        return {};
+    float *ptr = (float *)Objects::MapScratchpad(id, GL_READ_ONLY);
+    if (!ptr)
+        return {};
     size_t count = Objects::GetScratchpadSize(id);
     std::vector<float> result(ptr, ptr + count);
     Objects::UnmapScratchpad(id);
     return result;
 }
 
-size_t SimulationWrapper::scratchpad_size(int id) {
+size_t SimulationWrapper::scratchpad_size(int id)
+{
     ensure_initialized();
     return Objects::GetScratchpadSize(id);
 }
 
-bool SimulationWrapper::is_valid_scratchpad(int id) {
+bool SimulationWrapper::is_valid_scratchpad(int id)
+{
     ensure_initialized();
     return Objects::IsValidScratchpad(id);
 }
@@ -232,22 +241,20 @@ bool SimulationWrapper::is_valid_scratchpad(int id) {
 // Signal Queue
 // ============================================================================
 
-void SimulationWrapper::set_signal_queue_capacity(size_t capacity) {
+void SimulationWrapper::set_signal_queue_capacity(size_t capacity)
+{
     ensure_initialized();
     Objects::SetSignalQueueCapacity(capacity);
 }
 
-void SimulationWrapper::set_signal_queue_overflow_policy(int policy) {
-    ensure_initialized();
-    Objects::SetSignalQueueOverflowPolicy(policy);
-}
-
-void SimulationWrapper::clear_signal_queue() {
+void SimulationWrapper::clear_signal_queue()
+{
     ensure_initialized();
     Objects::ClearSignalQueue();
 }
 
-size_t SimulationWrapper::get_signal_queue_count() {
+size_t SimulationWrapper::get_signal_queue_count()
+{
     ensure_initialized();
     return Objects::GetSignalQueueCount();
 }
@@ -256,18 +263,22 @@ size_t SimulationWrapper::get_signal_queue_count() {
 // Agent Dispatch
 // ============================================================================
 
-void SimulationWrapper::dispatch_agent(int agent_id, bool clear_after) {
+void SimulationWrapper::dispatch_agent(int agent_id, bool clear_after)
+{
     ensure_initialized();
     Objects::DispatchAgent(agent_id, clear_after);
 }
 
-void SimulationWrapper::dispatch_all_agents(bool clear_after) {
+void SimulationWrapper::dispatch_all_agents(bool clear_after)
+{
     ensure_initialized();
     auto agent_ids = scriptManager.getAgentIDs();
-    for (int id : agent_ids) {
+    for (int id : agent_ids)
+    {
         Objects::DispatchAgent(id, false); // don't clear per agent
     }
-    if (clear_after) {
+    if (clear_after)
+    {
         Objects::ClearSignalQueue();
     }
 }
@@ -276,16 +287,19 @@ void SimulationWrapper::dispatch_all_agents(bool clear_after) {
 // Agent Registration
 // ============================================================================
 
-int SimulationWrapper::register_agent(const std::string& source) {
+int SimulationWrapper::register_agent(const std::string &source)
+{
     ensure_initialized();
     int id = scriptManager.registerScript(source);
-    if (id >= 0) {
+    if (id >= 0)
+    {
         scriptManager.markAsAgent(id);
     }
     return id;
 }
 
-std::vector<int> SimulationWrapper::get_agent_ids() {
+std::vector<int> SimulationWrapper::get_agent_ids()
+{
     ensure_initialized();
     return scriptManager.getAgentIDs();
 }
@@ -317,6 +331,7 @@ SimulationWrapper::SimulationWrapper(bool headless, int width, int height, std::
             if (!init_windowed(width, height, title))
                 throw std::runtime_error("Failed to initialize windowed context");
         }
+        g_activeSimCount.fetch_add(1);
     }
     catch (const std::exception &e)
     {
@@ -490,6 +505,7 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
 
     // Reset camera to default state
     g_camera.Reset();
+    g_camera3d.Reset();
 
     // Initialize axis/grid system if enabled
     if (m_enable_grid)
@@ -567,32 +583,43 @@ void SimulationWrapper::process_input()
 
 void SimulationWrapper::default_input()
 {
-    if (!m_headless && m_window)
-    {
-        GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
-        glfwMakeContextCurrent(glfwWindow);
+    if (m_headless || !m_window)
+        return;
+    process_input();
+    GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
+    glfwMakeContextCurrent(glfwWindow);
 
-        // ---- WASD camera pan ----
-        float speed = 10.0f * g_camera.zoom; // base speed scaled by zoom
-        float dt = 0.016f; // approximate frame time (could be passed, but fixed is fine)
-        if (is_key_pressed(GLFW_KEY_W)) g_camera.position.y += speed * dt;
-        if (is_key_pressed(GLFW_KEY_S)) g_camera.position.y -= speed * dt;
-        if (is_key_pressed(GLFW_KEY_A)) g_camera.position.x -= speed * dt;
-        if (is_key_pressed(GLFW_KEY_D)) g_camera.position.x += speed * dt;
+    const float dt = 0.016f;
+    const float orbitStep = 0.02f;
 
-        // ---- Q/E zoom ----
-        if (is_key_pressed(GLFW_KEY_Q)) g_camera.zoom *= 0.95f;
-        if (is_key_pressed(GLFW_KEY_E)) g_camera.zoom *= 1.05f;
+    // WASD orbits g_camera3d around its target.
+    float dyaw = 0.0f, dpitch = 0.0f;
+    if (is_key_pressed(GLFW_KEY_A))
+        dyaw -= orbitStep;
+    if (is_key_pressed(GLFW_KEY_D))
+        dyaw += orbitStep;
+    if (is_key_pressed(GLFW_KEY_W))
+        dpitch += orbitStep;
+    if (is_key_pressed(GLFW_KEY_S))
+        dpitch -= orbitStep;
+    if (dyaw != 0.0f || dpitch != 0.0f)
+        g_camera3d.Orbit(dyaw, dpitch);
 
-        // ---- ESC to close window ----
-        if (is_key_just_pressed(GLFW_KEY_ESCAPE))
-            glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
-    }
+    // Q/E dollies the eye along the view direction.
+    float dollyStep = g_camera3d.ApparentHalfHeight() * 0.5f * dt * 30.0f;
+    if (is_key_pressed(GLFW_KEY_Q))
+        g_camera3d.Dolly(-dollyStep);
+    if (is_key_pressed(GLFW_KEY_E))
+        g_camera3d.Dolly(+dollyStep);
+
+    if (is_key_just_pressed(GLFW_KEY_ESCAPE))
+        glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
 }
 
 std::pair<float, float> SimulationWrapper::get_mouse_position() const
 {
-    if (!m_window) return {0.0f, 0.0f};
+    if (!m_window)
+        return {0.0f, 0.0f};
     GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
     double x, y;
     glfwGetCursorPos(glfwWindow, &x, &y);
@@ -600,7 +627,8 @@ std::pair<float, float> SimulationWrapper::get_mouse_position() const
     // Convert to world coordinates
     int w, h;
     glfwGetFramebufferSize(glfwWindow, &w, &h);
-    if (w == 0 || h == 0) return {0.0f, 0.0f};
+    if (w == 0 || h == 0)
+        return {0.0f, 0.0f};
 
     float ndcX = (float)x / w * 2.0f - 1.0f;
     float ndcY = 1.0f - (float)y / h * 2.0f;
@@ -617,7 +645,8 @@ std::pair<float, float> SimulationWrapper::get_mouse_position() const
 
 std::pair<float, float> SimulationWrapper::get_mouse_delta() const
 {
-    if (!m_window) return {0.0f, 0.0f};
+    if (!m_window)
+        return {0.0f, 0.0f};
     GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
     double x, y;
     glfwGetCursorPos(glfwWindow, &x, &y);
@@ -678,8 +707,10 @@ KeyState KeyboardMonitor::get_key_state(const std::string &name) const
     return KeyState(pressed, released);
 }
 
-void SimulationWrapper::set_key_state(int key, bool pressed) {
-    if (key < 0 || key >= MAX_KEYS) return;
+void SimulationWrapper::set_key_state(int key, bool pressed)
+{
+    if (key < 0 || key >= MAX_KEYS)
+        return;
     m_previousKeys[key] = m_currentKeys[key];
     m_currentKeys[key] = pressed;
 }
@@ -795,11 +826,11 @@ void SimulationWrapper::update(float dt)
             if (timeLoc != -1)
                 glUniform1f(timeLoc, m_simulationTime);
             if (kLoc != -1)
-                glUniform1f(kLoc, 1.0f);
+                glUniform1f(kLoc, m_stiffness);
             if (bLoc != -1)
-                glUniform1f(bLoc, 0.1f);
+                glUniform1f(bLoc, m_damping);
             if (gLoc != -1)
-                glUniform1f(gLoc, 9.81f);
+                glUniform1f(gLoc, m_gravity);
             if (gravityDirLoc != -1)
                 glUniform2f(gravityDirLoc, 0.0f, -1.0f);
             if (restitutionLoc != -1)
@@ -829,11 +860,14 @@ void SimulationWrapper::update(float dt)
             m_currentBuffer = 1 - m_currentBuffer;
 
             // Fire collision callbacks by reading the contact buffer directly
-            if (g_collisionCallback) {
+            if (g_collisionCallback)
+            {
                 GLuint contactBuffer = Objects::GetContactBuffer();
-                if (contactBuffer) {
+                if (contactBuffer)
+                {
                     // Define the contact point layout matching the shader (48 bytes)
-                    struct ContactPoint {
+                    struct ContactPoint
+                    {
                         float normal[2];
                         float position[2];
                         float penetration;
@@ -845,17 +879,22 @@ void SimulationWrapper::update(float dt)
 
                     glBindBuffer(GL_SHADER_STORAGE_BUFFER, contactBuffer);
                     GLsizeiptr size = Objects::MAX_OBJECTS * 4 * sizeof(ContactPoint);
-                    void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-                    if (data) {
-                    ContactPoint* contacts = static_cast<ContactPoint*>(data);
-                    int numObjects = Objects::GetNumObjects();
-                        for (int obj = 0; obj < numObjects; ++obj) {
+                    void *data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+                    if (data)
+                    {
+                        ContactPoint *contacts = static_cast<ContactPoint *>(data);
+                        int numObjects = Objects::GetNumObjects();
+                        for (int obj = 0; obj < numObjects; ++obj)
+                        {
                             int base = obj * 4;
-                            for (int c = 0; c < 4; ++c) {
+                            for (int c = 0; c < 4; ++c)
+                            {
                                 int idx = base + c;
-                                if (idx * sizeof(ContactPoint) >= size) break;
-                                ContactPoint& cp = contacts[idx];
-                                if (cp.frameCount > 0) {
+                                if (idx * sizeof(ContactPoint) >= size)
+                                    break;
+                                ContactPoint &cp = contacts[idx];
+                                if (cp.frameCount > 0)
+                                {
                                     CollisionEvent ev;
                                     ev.object_a.slot = obj;
                                     ev.object_a.generation = 0; // generation not stored; you could add a getter
@@ -908,7 +947,8 @@ void SimulationWrapper::paint(const std::string &equation)
         gpu.tokenBuffer_b, gpu.constantBuffer_b,
         gpu.tokenBuffer_a, gpu.constantBuffer_a);
 }
-void SimulationWrapper::get_paint_image(std::vector<unsigned char> &jpeg_data, int quality) {
+void SimulationWrapper::get_paint_image(std::vector<unsigned char> &jpeg_data, int quality)
+{
     ensure_initialized();
     Objects::GetPaintImage(jpeg_data, quality);
 }
@@ -919,81 +959,78 @@ void SimulationWrapper::render()
 {
     if (m_headless || !m_window)
         return;
-
-    glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
+    glfwMakeContextCurrent((GLFWwindow *)m_window);
 
     int w, h;
-    glfwGetFramebufferSize(static_cast<GLFWwindow *>(m_window), &w, &h);
-
+    glfwGetFramebufferSize((GLFWwindow *)m_window, &w, &h);
     if (w <= 0 || h <= 0)
         return;
 
-    // Set up viewport and clear screen
     glViewport(0, 0, w, h);
     glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Calculate camera matrices
-    glm::mat4 projection = g_camera.GetProjectionMatrix(w, h);
-    glm::mat4 view = glm::mat4(1.0f); // identity — ortho already encodes camera position
-    glm::mat4 projView = projection;
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
-    while (glGetError() != GL_NO_ERROR)
-        ;
-
-    // Only render axis if grid is enabled
-    if (m_enable_grid && g_axisInitialized && g_axisShaderProgram)
+    // Axis / grid uses the 3D camera's view-projection
+    if (m_enable_grid && g_axisShaderProgram)
     {
+        Camera gridCam;
+        gridCam.position = glm::vec2(g_camera3d.target.x, g_camera3d.target.y);
+        gridCam.zoom = g_camera3d.ApparentHalfHeight();
+
+        Axis::Update(gridCam, (float)w, (float)h);
+
+        glm::mat4 VP = g_camera3d.ViewProj(w, h);
         glUseProgram(g_axisShaderProgram);
-        GLenum err = glGetError();
-        if (err != GL_NO_ERROR)
-            return;
-
-        Axis::Update(g_camera, w, h);
-        Axis::Draw(g_axisShaderProgram, projView);
-        glUseProgram(0);
-    }
-    // Render paint shader
-    Objects::DispatchPaint(w, h, g_camera.position.x, g_camera.position.y, g_camera.zoom, m_currentBuffer);
-    // Render physics objects
-    GLuint objectProgram = Objects::GetQuadProgram();
-    if (objectProgram && Objects::IsQuadShaderReady())
-    {
-        glUseProgram(objectProgram);
-        GLenum err = glGetError();
-        if (err != GL_NO_ERROR)
-        {
-            glUseProgram(0);
-            return;
-        }
-
-        // Pass camera matrices to shader
-        GLint projLoc = glGetUniformLocation(objectProgram, "uProjection");
-        GLint viewLoc = glGetUniformLocation(objectProgram, "uView");
-
-        if (projLoc != -1)
-            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        if (viewLoc != -1)
-            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
-        Objects::Draw(m_currentBuffer);
+        GLint pv = glGetUniformLocation(g_axisShaderProgram, "uProjView");
+        glUniformMatrix4fv(pv, 1, GL_FALSE, glm::value_ptr(VP));
+        Axis::Draw(g_axisShaderProgram, VP);
         glUseProgram(0);
     }
 
-    // Swap buffers and poll events
-    glfwSwapBuffers(static_cast<GLFWwindow *>(m_window));
+    // Object pass: one draw call per mesh kind
+    glm::mat4 P = g_camera3d.Projection(w, h);
+    glm::mat4 V = g_camera3d.View();
+    glm::vec3 camPos = g_camera3d.eye;
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.4f, -0.7f, -0.6f));
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+    Objects::Draw(m_currentBuffer, P, V, camPos, lightDir);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    Objects::DispatchPaint(w, h,
+                           g_camera3d.target.x, g_camera3d.target.y,
+                           g_camera3d.ApparentHalfHeight(),
+                           m_currentBuffer);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+
+    glfwSwapBuffers((GLFWwindow *)m_window);
     glfwPollEvents();
 }
 
-void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, int quality) {
+void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, int quality)
+{
     ensure_initialized();
 
     // Compute projection matrix from camera
     int w = g_width;
     int h = g_height;
-    if (g_paintWidth > 0 && g_paintHeight > 0) {
+    if (g_paintWidth > 0 && g_paintHeight > 0)
+    {
         w = g_paintWidth;
         h = g_paintHeight;
     }
@@ -1022,30 +1059,9 @@ void SimulationWrapper::set_collision_enabled(int index, bool enabled)
 void SimulationWrapper::set_collision_shape(int index, PyCollisionShape shape)
 {
     ensure_initialized();
-
     if (index < 0 || index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
-
-    // Convert Python shape enum to C++ shape type
-    CollisionShape cppShape;
-    switch (shape)
-    {
-    case PyCollisionShape::NONE:
-        cppShape = static_cast<CollisionShape>(0); // COLLISION_NONE
-        break;
-    case PyCollisionShape::CIRCLE:
-        cppShape = static_cast<CollisionShape>(1); // COLLISION_CIRCLE
-        break;
-    case PyCollisionShape::AABB:
-        cppShape = static_cast<CollisionShape>(2); // COLLISION_AABB
-        break;
-    case PyCollisionShape::POLYGON:
-        cppShape = static_cast<CollisionShape>(3); // COLLISION_POLYGON
-        break;
-    default:
-        cppShape = static_cast<CollisionShape>(0); // COLLISION_NONE
-    }
-
+    CollisionShape cppShape = static_cast<CollisionShape>(static_cast<int>(shape));
     Objects::SetCollisionShape(index, cppShape);
 }
 
@@ -1083,42 +1099,12 @@ CollisionConfig SimulationWrapper::get_collision_config(int index)
     config.enabled = (props.enabled == 1);
     config.restitution = props.restitution;
     config.friction = props.friction;
-
-    // Convert shape type to Python enum
-    switch (props.shapeType)
-    {
-    case COLLISION_NONE:
-        config.shape = PyCollisionShape::NONE;
-        break;
-    case COLLISION_CIRCLE:
-        config.shape = PyCollisionShape::CIRCLE;
-        break;
-    case COLLISION_AABB:
-        config.shape = PyCollisionShape::AABB;
-        break;
-    case COLLISION_POLYGON:
-        config.shape = PyCollisionShape::POLYGON;
-        break;
-    default:
-        config.shape = PyCollisionShape::NONE;
-    }
+    config.shape = static_cast<PyCollisionShape>(props.shapeType);
 
     return config;
 }
 
-// Enable or disable collisions between two specific objects
-void SimulationWrapper::enable_collision_between(int obj1, int obj2, bool enable)
-{
-    ensure_initialized();
 
-    if (obj1 < 0 || obj1 >= Objects::GetNumObjects())
-        throw std::runtime_error("Invalid object1 index");
-
-    if (obj2 < 0 || obj2 >= Objects::GetNumObjects())
-        throw std::runtime_error("Invalid object2 index");
-
-    Objects::EnableCollisionBetween(obj1, obj2, enable);
-}
 
 // Check if collisions are enabled for an object
 bool SimulationWrapper::is_collision_enabled(int index)
@@ -1151,79 +1137,64 @@ int SimulationWrapper::add_object_raw(
     if (Objects::GetNumObjects() >= Objects::MAX_OBJECTS)
         throw std::runtime_error("Maximum object limit reached");
 
-    // Step 1: Create the object with CORRECT values in local memory FIRST
-    Object newObject;
-    newObject.position = glm::vec2(x, y);
-    newObject.velocity = glm::vec2(vx, vy);
+    Object newObject{};
+    newObject.position = glm::vec4(x, y, 0.0f, 0.0f);
+    newObject.velocity = glm::vec4(vx, vy, 0.0f, 0.0f);
     newObject.mass = mass;
     newObject.charge = charge;
-    newObject.visualSkinType = static_cast<int>(skin);
-    newObject.collisionShapeType = 0; // COLLISION_NONE (will be auto-assigned)
-    newObject.equationID = 0;         // Default equation
     newObject.color = glm::vec4(r, g, b, a);
     newObject.collisionData = glm::vec4(0.0f);
+    newObject.visualSkinType = static_cast<int>(skin);
+    newObject.equationID = 0;
     newObject.scriptID = -1;
+    memset(newObject._pad, 0, sizeof(newObject._pad));
 
-    // Set visualData based on skin type - WITH INTELLIGENT DEFAULTS
+    // Rotation / angular velocity live in orientation and spin.
+    float halfAngle = rotation * 0.5f;
+    newObject.orientation = glm::vec4(0.0f, 0.0f, std::sin(halfAngle), std::cos(halfAngle));
+    newObject.spin = glm::vec4(0.0f, 0.0f, angular_velocity, 0.0f);
+
+    // Per-skin mesh, visual data, and collision shape.
+    PyCollisionShape collisionShape = PyCollisionShape::NONE;
+    int meshID = -1;
+
     switch (skin)
     {
     case PySkinType::PY_SKIN_CIRCLE:
-        // For circles: size = radius, ignore width/height
-        newObject.visualData = glm::vec4(size, static_cast<float>(polygon_sides), rotation, angular_velocity);
-        newObject.color = glm::vec4(r, g, b, a);
+        newObject.visualData = glm::vec4(size, 0.0f, 0.0f, 0.0f);
+        collisionShape = PyCollisionShape::CIRCLE;
+        meshID = Meshes::RegisterCircle(size, 32);
         break;
+
     case PySkinType::PY_SKIN_RECTANGLE:
-        // For rectangles: use width/height directly, ignore size
-        newObject.visualData = glm::vec4(width, height, rotation, angular_velocity);
-        newObject.color = glm::vec4(r, g, b, a);
+        newObject.visualData = glm::vec4(width, height, 0.0f, 0.0f);
+        collisionShape = PyCollisionShape::AABB;
+        meshID = Meshes::RegisterSquare(width, height);
         break;
+
     case PySkinType::PY_SKIN_POLYGON:
-        // Clamp polygon sides to valid range
-        int minPolySides = 3;
-        int maxPolySides = 12;
-        polygon_sides = (polygon_sides < minPolySides) ? minPolySides : ((polygon_sides > maxPolySides) ? maxPolySides : polygon_sides);
-        // For polygons: size = radius, polygon_sides = number of sides, ignore width/height
-        newObject.visualData = glm::vec4(size, static_cast<float>(polygon_sides), rotation, angular_velocity);
-        newObject.color = glm::vec4(r, g, b, a);
+        polygon_sides = std::max(3, std::min(12, polygon_sides));
+        newObject.visualData = glm::vec4(size, static_cast<float>(polygon_sides), 0.0f, 0.0f);
+        collisionShape = PyCollisionShape::POLYGON;
+        meshID = Meshes::RegisterPolygon(size, polygon_sides);
         break;
     }
 
-    // Step 2: Allocate slot in Objects system
-    Objects::AddObject();
-    int objectID = Objects::GetNumObjects() - 1;
+    newObject.meshID = meshID;
+    newObject.collisionShapeType = static_cast<int>(collisionShape);
 
-    // Step 3: IMMEDIATELY overwrite with correct values
+    Objects::AddObject(meshID);
+    int objectID = Objects::GetNumObjects() - 1;
     Objects::UpdateObjectCPU(objectID, newObject);
 
-    // Step 4: Auto-assign collision shape based on visual skin
-    PyCollisionShape collisionShape;
-    switch (skin)
-    {
-    case PySkinType::PY_SKIN_CIRCLE:
-        collisionShape = PyCollisionShape::CIRCLE;
-        break;
-    case PySkinType::PY_SKIN_RECTANGLE:
-        collisionShape = PyCollisionShape::AABB;
-        break;
-    case PySkinType::PY_SKIN_POLYGON:
-        collisionShape = PyCollisionShape::POLYGON;
-        break;
-    default:
-        collisionShape = PyCollisionShape::NONE;
-    }
-
-    // Apply collision configuration
     set_collision_shape(objectID, collisionShape);
     set_collision_enabled(objectID, true);
-    set_collision_properties(objectID, 0.7f, 0.3f); // Default values
+    set_collision_properties(objectID, 0.7f, 0.3f);
 
-    // Step 5: CRITICAL - Force GPU to finish all pending operations
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glFlush();
 
-    // Step 6: Track slot for handle generation
     g_objectSlotsUsed[objectID] = true;
-    g_objectGenerations[objectID] = 0; // Start at 0
 
     return objectID;
 }
@@ -1251,8 +1222,7 @@ void SimulationWrapper::update_object(
     float vx, float vy,
     float mass, float charge,
     float rotation, float angular_velocity,
-    float size,
-    float width, float height,
+    float size, float width, float height,
     float r, float g, float b, float a,
     int polygon_sides)
 {
@@ -1263,46 +1233,240 @@ void SimulationWrapper::update_object(
 
     std::vector<Object> objects;
     Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
 
-    if (index < static_cast<int>(objects.size()))
+    Object &p = objects[index];
+    p.position = glm::vec4(x, y, p.position.z, 0.0f);
+    p.velocity = glm::vec4(vx, vy, p.velocity.z, 0.0f);
+    p.mass = mass;
+    p.charge = charge;
+    p.color = glm::vec4(r, g, b, a);
+
+    float half = rotation * 0.5f;
+    p.orientation = glm::vec4(0.0f, 0.0f, std::sin(half), std::cos(half));
+    p.spin = glm::vec4(0.0f, 0.0f, angular_velocity, 0.0f);
+
+    if (p.visualSkinType == -1)
     {
-        Object &p = objects[index];
-        int skinType = p.visualSkinType;
-
-        // Update basic properties
-        p.position = glm::vec2(x, y);
-        p.velocity = glm::vec2(vx, vy);
-        p.mass = mass;
-        p.charge = charge;
-        p.color = glm::vec4(r, g, b, a);
-
-        // Update visualData based on current skin type
-        if (skinType == 0) // CIRCLE
-        {
-            p.visualData.x = size; // radius
-            p.visualData.y = 0.0f;
-            p.visualData.z = rotation;
-            p.visualData.w = angular_velocity;
-        }
-        else if (skinType == 1) // RECTANGLE
-        {
-            p.visualData.x = width;
-            p.visualData.y = height;
-            p.visualData.z = rotation;
-            p.visualData.w = angular_velocity;
-        }
-        else if (skinType == 2) // POLYGON
-        {
-            p.visualData.x = size; // circumradius
-            if (polygon_sides > 0)
-                p.visualData.y = static_cast<float>(polygon_sides);
-            // else keep existing sides
-            p.visualData.z = rotation;
-            p.visualData.w = angular_velocity;
-        }
-
-        Objects::UpdateObjectCPU(index, p);
+        throw std::runtime_error(
+            "update_object() is 2D-only; use the *_3d setters "
+            "(set_position_3d, set_velocity_3d, set_orientation_3d, set_spin_3d) "
+            "for 3D objects");
     }
+
+    if (p.visualSkinType == 0)
+    {
+        p.visualData = glm::vec4(size, 0.0f, p.visualData.z, p.visualData.w);
+    }
+    else if (p.visualSkinType == 1)
+    {
+        p.visualData = glm::vec4(width, height, p.visualData.z, p.visualData.w);
+    }
+    else if (p.visualSkinType == 2)
+    {
+        float sides = (polygon_sides > 0) ? static_cast<float>(polygon_sides)
+                                          : p.visualData.y;
+        p.visualData = glm::vec4(size, sides, p.visualData.z, p.visualData.w);
+    }
+
+    Objects::UpdateObjectCPU(index, p);
+}
+
+ObjectHandle SimulationWrapper::add_object_3d(
+    float x, float y, float z,
+    float vx, float vy, float vz,
+    float mass, float charge,
+    int meshID,
+    glm::vec4 orientation,
+    glm::vec3 spin,
+    float r, float g, float b, float a,
+    PyCollisionShape shape)
+{
+    ensure_initialized();
+    if (Objects::GetNumObjects() >= Objects::MAX_OBJECTS)
+        throw std::runtime_error("Maximum object limit reached");
+    const Mesh *mesh = Meshes::Get(meshID);
+    if (!mesh)
+        throw std::runtime_error("Invalid mesh handle");
+
+    float len = glm::length(orientation);
+    if (len < 1e-6f)
+        orientation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    else
+        orientation /= len;
+
+    Object obj;
+    obj.position = glm::vec4(x, y, z, 0.0f);
+    obj.velocity = glm::vec4(vx, vy, vz, 0.0f);
+    obj.orientation = orientation;
+    obj.spin = glm::vec4(spin, 0.0f);
+
+    // AABB-derived size for collisions: xyz = full extents, w = bounding-sphere radius.
+    glm::vec3 ext = mesh->aabbMax - mesh->aabbMin;
+    obj.visualData = glm::vec4(ext, 0.5f * std::max({ext.x, ext.y, ext.z}));
+
+    obj.collisionData = glm::vec4(0.0f);
+    obj.color = glm::vec4(r, g, b, a);
+    obj.mass = mass;
+    obj.charge = charge;
+    obj.visualSkinType = -1;
+    obj.collisionShapeType = static_cast<int>(shape); // was COLLISION_NONE
+    obj.equationID = 0;
+    obj.scriptID = -1;
+    obj.meshID = meshID;
+    memset(obj._pad, 0, sizeof(obj._pad));
+
+    Objects::AddObject(meshID);
+    int slot = Objects::GetNumObjects() - 1;
+    Objects::UpdateObjectCPU(slot, obj);
+
+    set_collision_shape(slot, shape);
+    set_collision_enabled(slot, true);
+    set_collision_properties(slot, 0.7f, 0.3f);
+
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glFlush();
+
+    g_objectSlotsUsed[slot] = true;
+    // Do NOT touch -> g_objectGenerations[slot] = 0;
+
+    return make_handle(slot);
+}
+
+void SimulationWrapper::set_mesh_3d(int index, int meshID)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    if (meshID >= 0 && Meshes::Get(meshID) == nullptr)
+        throw std::runtime_error("Invalid mesh handle");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+    objects[index].meshID = meshID;
+    Objects::UpdateObjectCPU(index, objects[index]);
+}
+
+int SimulationWrapper::get_mesh_3d(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return -1;
+    return objects[index].meshID;
+}
+
+void SimulationWrapper::set_position_3d(int index, float x, float y, float z)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+    objects[index].position = glm::vec4(x, y, z, 0.0f);
+    Objects::UpdateObjectCPU(index, objects[index]);
+}
+
+glm::vec3 SimulationWrapper::get_position_3d(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return glm::vec3(0.0f);
+    return glm::vec3(objects[index].position);
+}
+
+void SimulationWrapper::set_velocity_3d(int index, float vx, float vy, float vz)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+    objects[index].velocity = glm::vec4(vx, vy, vz, 0.0f);
+    Objects::UpdateObjectCPU(index, objects[index]);
+}
+
+glm::vec3 SimulationWrapper::get_velocity_3d(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return glm::vec3(0.0f);
+    return glm::vec3(objects[index].velocity);
+}
+
+void SimulationWrapper::set_orientation_3d(int index, float qx, float qy, float qz, float qw)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+
+    glm::vec4 q(qx, qy, qz, qw);
+    float len = glm::length(q);
+    if (len < 1e-6f)
+        q = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    else
+        q /= len;
+
+    objects[index].orientation = q;
+    Objects::UpdateObjectCPU(index, objects[index]);
+}
+
+glm::vec4 SimulationWrapper::get_orientation_3d(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return glm::vec4(0, 0, 0, 1);
+    return objects[index].orientation;
+}
+
+void SimulationWrapper::set_spin_3d(int index, float sx, float sy, float sz)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+    objects[index].spin = glm::vec4(sx, sy, sz, 0.0f);
+    Objects::UpdateObjectCPU(index, objects[index]);
+}
+
+glm::vec3 SimulationWrapper::get_spin_3d(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return glm::vec3(0.0f);
+    return glm::vec3(objects[index].spin);
 }
 
 // Remove an object from the simulation (raw index, updates generation)
@@ -1315,21 +1479,25 @@ void SimulationWrapper::remove_object(int index)
 
     int lastIdx = Objects::GetNumObjects() - 1;
     bool isLast = (index == lastIdx);
-    
+
     int movedGen = 0;
-    if (!isLast) {
+    if (!isLast)
+    {
         movedGen = g_objectGenerations[lastIdx];
     }
 
     Objects::RemoveObject(index);
-    
+
     int newCount = Objects::GetNumObjects(); // after removal, newCount = oldCount-1
-    
-    if (isLast) {
+
+    if (isLast)
+    {
         g_objectGenerations[index]++;
         g_objectSlotsUsed[index] = false;
-    } else {
-        g_objectGenerations[index] = movedGen;
+    }
+    else
+    {
+        g_objectGenerations[index] = movedGen + 1;
         g_objectSlotsUsed[index] = true;
         g_objectGenerations[newCount]++;
         g_objectSlotsUsed[newCount] = false;
@@ -1337,44 +1505,53 @@ void SimulationWrapper::remove_object(int index)
 }
 
 // Batch removal of objects using handles
-void SimulationWrapper::remove_objects(const std::vector<ObjectHandle>& handles)
+void SimulationWrapper::remove_objects(const std::vector<ObjectHandle> &handles)
 {
     ensure_initialized();
-    
+
     std::vector<int> indices;
     indices.reserve(handles.size());
-    
-    for (const auto& handle : handles) {
-        if (is_handle_valid(handle)) {
+    for (const auto &handle : handles)
+        if (is_handle_valid(handle))
             indices.push_back(handle.slot);
-        }
-    }
-    
+
+    if (indices.empty())
+        return;
+
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
     std::sort(indices.begin(), indices.end(), std::greater<int>());
-    
-    for (int idx : indices) {
+
+    for (int idx : indices)
+    {
+        if (idx < 0 || idx >= Objects::GetNumObjects())
+            continue;
+
         int lastIdx = Objects::GetNumObjects() - 1;
         bool isLast = (idx == lastIdx);
-        int movedGen = 0;
-        if (!isLast) {
-            movedGen = g_objectGenerations[lastIdx];
-        }
+
+        int oldGen = g_objectGenerations[idx];
+        int movedGen = isLast ? 0 : g_objectGenerations[lastIdx];
+
         Objects::RemoveObject(idx);
-        int newCount = Objects::GetNumObjects();
-        if (isLast) {
-            g_objectGenerations[idx]++;
+
+        if (isLast)
+        {
+            g_objectGenerations[idx] = oldGen + 1;
             g_objectSlotsUsed[idx] = false;
-        } else {
-            g_objectGenerations[idx] = movedGen;
+        }
+        else
+        {
+            g_objectGenerations[idx] = std::max(oldGen, movedGen) + 1;
             g_objectSlotsUsed[idx] = true;
-            g_objectGenerations[newCount]++;
-            g_objectSlotsUsed[newCount] = false;
+            g_objectGenerations[lastIdx] = movedGen + 1;
+            g_objectSlotsUsed[lastIdx] = false;
         }
     }
 }
 
 // Remove object using a handle
-void SimulationWrapper::remove_object_handle(const ObjectHandle& handle)
+void SimulationWrapper::remove_object_handle(const ObjectHandle &handle)
 {
     int index = get_slot_index(handle);
     remove_object(index);
@@ -1383,27 +1560,100 @@ void SimulationWrapper::remove_object_handle(const ObjectHandle& handle)
 std::vector<ObjectState> SimulationWrapper::get_all_objects() const
 {
     ensure_initialized();
-    std::vector<ObjectState> result;
-    int count = object_count();
-    result.reserve(count);
-    for (int i = 0; i < count; ++i) {
-        result.push_back(get_object(i));
-    }
-    return result;
+    std::vector<Object> objs;
+    Objects::FetchToCPU(m_currentBuffer, objs);
+    std::vector<ObjectState> out;
+    out.reserve(objs.size());
+    for (const auto &p : objs)
+        out.push_back(object_to_state(p));
+    return out;
 }
-// Get object state by handle
-ObjectState SimulationWrapper::get_object(const ObjectHandle& handle) const
+
+ObjectState SimulationWrapper::object_to_state(const Object &p) const
 {
-    if (!is_handle_valid(handle)) {
-        throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+    ObjectState state{};
+
+    state.x = p.position.x;
+    state.y = p.position.y;
+    state.z = p.position.z;
+    state.vx = p.velocity.x;
+    state.vy = p.velocity.y;
+    state.vz = p.velocity.z;
+
+    state.mass = p.mass;
+    state.charge = p.charge;
+
+    state.qx = p.orientation.x;
+    state.qy = p.orientation.y;
+    state.qz = p.orientation.z;
+    state.qw = p.orientation.w;
+    state.spin_x = p.spin.x;
+    state.spin_y = p.spin.y;
+    state.spin_z = p.spin.z;
+
+    if (p.visualSkinType == -1)
+    {
+        state.rotation = 0.0f;
+        state.angular_velocity = 0.0f;
     }
-    return get_object(handle.slot);
+    else
+    {
+        state.rotation = 2.0f * std::atan2(p.orientation.z, p.orientation.w);
+        state.angular_velocity = p.spin.z;
+    }
+
+    state.skin_type = p.visualSkinType;
+    state.mesh_id = p.meshID;
+
+    if (p.visualSkinType == 0)
+    {
+        state.radius = p.visualData.x;
+        state.width = p.visualData.x * 2.0f;
+        state.height = p.visualData.x * 2.0f;
+        state.polygon_sides = 0;
+    }
+    else if (p.visualSkinType == 1)
+    {
+        state.width = p.visualData.x;
+        state.height = p.visualData.y;
+        state.radius = 0.0f;
+        state.polygon_sides = 0;
+    }
+    else if (p.visualSkinType == 2)
+    {
+        state.radius = p.visualData.x;
+        state.width = p.visualData.x * 2.0f;
+        state.height = p.visualData.x * 2.0f;
+        state.polygon_sides = static_cast<int>(p.visualData.y);
+    }
+
+    state.r = p.color.r;
+    state.g = p.color.g;
+    state.b = p.color.b;
+    state.a = p.color.a;
+
+    return state;
+}
+
+ObjectState SimulationWrapper::get_object(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        throw std::runtime_error("Object data corrupted");
+
+    return object_to_state(objects[index]);
 }
 
 // Follow object by handle
-void SimulationWrapper::follow_object(const ObjectHandle& handle, float smoothing)
+void SimulationWrapper::follow_object(const ObjectHandle &handle, float smoothing)
 {
-    if (!is_handle_valid(handle)) {
+    if (!is_handle_valid(handle))
+    {
         throw std::runtime_error("ObjectHandle is invalid (object was removed)");
     }
     follow_object(handle.slot, smoothing);
@@ -1413,28 +1663,30 @@ void SimulationWrapper::follow_object(const ObjectHandle& handle, float smoothin
 void SimulationWrapper::clear_all()
 {
     ensure_initialized();
-    
+
     // Remove all objects
-    while (object_count() > 0) {
+    while (object_count() > 0)
+    {
         remove_object(0);
     }
-    
+
     // Clear all constraints
     clear_all_constraints();
-    
+
     // Reset script IDs
-    for (int i = 0; i < Objects::MAX_OBJECTS; i++) {
-        g_objectGenerations[i] = 0;
+    for (int i = 0; i < Objects::MAX_OBJECTS; i++)
+    {
+        g_objectGenerations[i]++;
         g_objectSlotsUsed[i] = false;
     }
-    
     // Reset simulation time
     m_simulationTime = 0.0f;
     g_simulationTime = 0.0f;
-    
+
     // Reset camera
     g_camera.Reset();
-    
+    g_camera3d.Reset();
+
     // Reset speed
     m_speed = 1.0f;
 }
@@ -1446,83 +1698,26 @@ int SimulationWrapper::object_count() const
     return Objects::GetNumObjects();
 }
 
-// Get complete state of a specific object
-ObjectState SimulationWrapper::get_object(int index) const
-{
-    ensure_initialized();
-
-    if (index < 0 || index >= Objects::GetNumObjects())
-        throw std::runtime_error("Invalid object index");
-
-    std::vector<Object> objects;
-    Objects::FetchToCPU(m_currentBuffer, objects);
-
-    if (index >= static_cast<int>(objects.size()))
-        throw std::runtime_error("Object data corrupted");
-
-    const Object &p = objects[index];
-    ObjectState state;
-
-    // Extract object properties
-    state.x = p.position.x;
-    state.y = p.position.y;
-    state.vx = p.velocity.x;
-    state.vy = p.velocity.y;
-    state.mass = p.mass;
-    state.charge = p.charge;
-    state.rotation = p.visualData.z;
-    state.angular_velocity = p.visualData.w;
-    state.skin_type = p.visualSkinType;
-
-    // Extract visual properties based on skin type
-    if (p.visualSkinType == 0) // CIRCLE
-    {
-        state.radius = p.visualData.x;
-        state.width = p.visualData.x * 2.0f;  // diameter
-        state.height = p.visualData.x * 2.0f; // diameter
-        state.polygon_sides = 0;
-    }
-    else if (p.visualSkinType == 1) // RECTANGLE
-    {
-        state.width = p.visualData.x;
-        state.height = p.visualData.y;
-        state.radius = 0.0f;
-        state.polygon_sides = 0;
-    }
-    else if (p.visualSkinType == 2) // POLYGON
-    {
-        state.radius = p.visualData.x;
-        state.width = p.visualData.x * 2.0f;  // diameter
-        state.height = p.visualData.x * 2.0f; // diameter
-        state.polygon_sides = static_cast<int>(p.visualData.y);
-    }
-
-    // Extract color
-    state.r = p.color.r;
-    state.g = p.color.g;
-    state.b = p.color.b;
-    state.a = p.color.a;
-
-    return state;
-}
-
 // Set rotation angle of an object
 void SimulationWrapper::set_rotation(int index, float rotation)
 {
     ensure_initialized();
-
     if (index < 0 || index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
 
     std::vector<Object> objects;
     Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
 
-    if (index < static_cast<int>(objects.size()))
-    {
-        Object &p = objects[index];
-        p.visualData.z = rotation;
-        Objects::UpdateObjectCPU(index, p);
-    }
+    Object &p = objects[index];
+    if (p.visualSkinType == -1)
+        throw std::runtime_error(
+            "set_rotation() is 2D-only; use set_orientation_3d() for 3D objects");
+
+    float h = rotation * 0.5f;
+    p.orientation = glm::vec4(0.0f, 0.0f, std::sin(h), std::cos(h));
+    Objects::UpdateObjectCPU(index, p);
 }
 
 // Batch retrieval of multiple objects' states
@@ -1552,6 +1747,18 @@ std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int> &i
         const Object &p = allObjects[index];
         BatchGetData data;
 
+        if (p.visualSkinType == -1)
+        {
+            // 3D object: 2D rotation fields are meaningless, leave at 0
+            data.rotation = 0.0f;
+            data.angular_velocity = 0.0f;
+        }
+        else
+        {
+            data.rotation = 2.0f * std::atan2(p.orientation.z, p.orientation.w);
+            data.angular_velocity = p.spin.z;
+        }
+
         // Extract object properties
         data.x = p.position.x;
         data.y = p.position.y;
@@ -1559,9 +1766,19 @@ std::vector<BatchGetData> SimulationWrapper::batch_get(const std::vector<int> &i
         data.vy = p.velocity.y;
         data.mass = p.mass;
         data.charge = p.charge;
-        data.rotation = p.visualData.z;
-        data.angular_velocity = p.visualData.w;
         data.skin_type = p.visualSkinType;
+
+        // 3D state (populate for all objects; harmless for 2D)
+        data.z = p.position.z;
+        data.vz = p.velocity.z;
+        data.qx = p.orientation.x;
+        data.qy = p.orientation.y;
+        data.qz = p.orientation.z;
+        data.qw = p.orientation.w;
+        data.spin_x = p.spin.x;
+        data.spin_y = p.spin.y;
+        data.spin_z = p.spin.z;
+        data.mesh_id = p.meshID;
 
         // Extract visual properties based on skin type
         if (p.visualSkinType == 0)
@@ -1618,72 +1835,90 @@ void SimulationWrapper::batch_update(const std::vector<BatchUpdateData> &updates
         int index = update.index;
 
         if (index < 0 || index >= static_cast<int>(objects.size()))
-        {
-            throw std::runtime_error("Invalid object index in batch_update: " + std::to_string(index));
-        }
+            throw std::runtime_error(
+                "Invalid object index in batch_update: " + std::to_string(index));
 
         Object &p = objects[index];
-        int skinType = p.visualSkinType;
 
-        // Update basic properties
-        p.position = glm::vec2(update.x, update.y);
-        p.velocity = glm::vec2(update.vx, update.vy);
+        if (p.visualSkinType == -1)
+        {
+            std::cerr << "[batch_update] skipping 3D object at index " << index
+                      << " (BatchUpdateData has no 3D fields; use the *_3d setters)"
+                      << std::endl;
+            continue;
+        }
+
+        p.position = glm::vec4(update.x, update.y, p.position.z, 0.0f);
+        p.velocity = glm::vec4(update.vx, update.vy, p.velocity.z, 0.0f);
         p.mass = update.mass;
         p.charge = update.charge;
         p.color = glm::vec4(update.r, update.g, update.b, update.a);
 
-        if (skinType == 0) // CIRCLE
+        float half = update.rotation * 0.5f;
+        p.orientation = glm::vec4(0.0f, 0.0f, std::sin(half), std::cos(half));
+        p.spin = glm::vec4(0.0f, 0.0f, update.angular_velocity, 0.0f);
+
+        if (p.visualSkinType == 0) // CIRCLE
         {
-            p.visualData.x = update.size;
-            p.visualData.y = 0.0f;
-            p.visualData.z = update.rotation;
-            p.visualData.w = update.angular_velocity;
+            p.visualData = glm::vec4(update.size, 0.0f, 0.0f, 0.0f);
         }
-        else if (skinType == 1) // RECTANGLE
+        else if (p.visualSkinType == 1) // RECTANGLE
         {
-            p.visualData.x = update.width;
-            p.visualData.y = update.height;
-            p.visualData.z = update.rotation;
-            p.visualData.w = update.angular_velocity;
+            p.visualData = glm::vec4(update.width, update.height, 0.0f, 0.0f);
         }
-        else if (skinType == 2) // POLYGON
+        else if (p.visualSkinType == 2) // POLYGON
         {
-            p.visualData.x = update.size;
-            if (update.polygon_sides > 0)
-                p.visualData.y = static_cast<float>(update.polygon_sides);
-            // else keep existing
-            p.visualData.z = update.rotation;
-            p.visualData.w = update.angular_velocity;
+            float sides = (update.polygon_sides > 0)
+                              ? static_cast<float>(update.polygon_sides)
+                              : p.visualData.y;
+            p.visualData = glm::vec4(update.size, sides, 0.0f, 0.0f);
         }
 
-        // Update the object in GPU memory
         Objects::UpdateObjectCPU(index, p);
     }
 
-    // Ensure GPU synchronization
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glFlush();
 }
 
 // Set angular velocity of an object
-void SimulationWrapper::set_angular_velocity(int index, float angular_velocity)
+float SimulationWrapper::get_angular_velocity(int index) const
 {
     ensure_initialized();
-
     if (index < 0 || index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
 
     std::vector<Object> objects;
     Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return 0.0f;
 
-    if (index < static_cast<int>(objects.size()))
-    {
-        Object &p = objects[index];
-        p.visualData.w = angular_velocity;
-        Objects::UpdateObjectCPU(index, p);
-    }
+    const Object &p = objects[index];
+    if (p.visualSkinType == -1)
+        throw std::runtime_error(
+            "get_angular_velocity() is 2D-only; use get_spin_3d() for 3D objects");
+    return p.spin.z;
 }
 
+void SimulationWrapper::set_angular_velocity(int index, float angular_velocity)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+
+    std::vector<Object> objects;
+    Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return;
+
+    Object &p = objects[index];
+    if (p.visualSkinType == -1)
+        throw std::runtime_error(
+            "set_angular_velocity() is 2D-only; use set_spin_3d() for 3D objects");
+
+    p.spin = glm::vec4(p.spin.x, p.spin.y, angular_velocity, 0.0f);
+    Objects::UpdateObjectCPU(index, p);
+}
 // Set dimensions of an object (width/height for rectangles, radius for circles/polygons)
 void SimulationWrapper::set_dimensions(int index, float width, float height)
 {
@@ -1758,34 +1993,19 @@ void SimulationWrapper::set_radius(int index, float radius)
 float SimulationWrapper::get_rotation(int index) const
 {
     ensure_initialized();
-
     if (index < 0 || index >= Objects::GetNumObjects())
         throw std::runtime_error("Invalid object index");
 
     std::vector<Object> objects;
     Objects::FetchToCPU(m_currentBuffer, objects);
+    if (index >= static_cast<int>(objects.size()))
+        return 0.0f;
 
-    if (index < static_cast<int>(objects.size()))
-        return objects[index].visualData.z;
-
-    return 0.0f;
-}
-
-// Get current angular velocity of an object
-float SimulationWrapper::get_angular_velocity(int index) const
-{
-    ensure_initialized();
-
-    if (index < 0 || index >= Objects::GetNumObjects())
-        throw std::runtime_error("Invalid object index");
-
-    std::vector<Object> objects;
-    Objects::FetchToCPU(m_currentBuffer, objects);
-
-    if (index < static_cast<int>(objects.size()))
-        return objects[index].visualData.w;
-
-    return 0.0f;
+    const Object &p = objects[index];
+    if (p.visualSkinType == -1)
+        throw std::runtime_error(
+            "get_rotation() is 2D-only; use get_orientation_3d() for 3D objects");
+    return 2.0f * std::atan2(p.orientation.z, p.orientation.w);
 }
 
 // script JIT system
@@ -1938,29 +2158,27 @@ void SimulationWrapper::clear_all_constraints()
 void SimulationWrapper::set_parameter(const std::string &name, float value)
 {
     ensure_initialized();
-
     if (name == "gravity" || name == "g")
-        Objects::SetSystemParameters(value, 0.1f, 1.0f);
+        m_gravity = value;
     else if (name == "damping" || name == "b")
-        Objects::SetSystemParameters(9.81f, value, 1.0f);
+        m_damping = value;
     else if (name == "stiffness" || name == "k")
-        Objects::SetSystemParameters(9.81f, 0.1f, value);
+        m_stiffness = value;
     else
         throw std::runtime_error("Unknown parameter: " + name);
+    Objects::SetSystemParameters(m_gravity, m_damping, m_stiffness);
 }
 
 // Get current value of a global physics parameter
 float SimulationWrapper::get_parameter(const std::string &name) const
 {
     ensure_initialized();
-
     if (name == "gravity" || name == "g")
-        return 9.81f;
+        return m_gravity;
     if (name == "damping" || name == "b")
-        return 0.1f;
+        return m_damping;
     if (name == "stiffness" || name == "k")
-        return 1.0f;
-
+        return m_stiffness;
     throw std::runtime_error("Unknown parameter: " + name);
 }
 
@@ -1980,12 +2198,10 @@ void SimulationWrapper::save_to_file(
     if (m_window)
         glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
-    // Open file for writing
     FILE *file = fopen(filename.c_str(), "w");
     if (!file)
         throw std::runtime_error("Failed to open file: " + filename);
 
-    // Write header information
     fprintf(file, "# Simulation State File\n");
     fprintf(file, "# Created with ProjStellar\n");
     if (!title.empty())
@@ -1994,20 +2210,18 @@ void SimulationWrapper::save_to_file(
         fprintf(file, "# Author: %s\n", author.c_str());
     if (!description.empty())
         fprintf(file, "# Description: %s\n", description.c_str());
-    fprintf(file, "# Version: 1.0\n\n");
+    fprintf(file, "# Version: 2.1\n\n");
 
-    // Save system parameters
     fprintf(file, "[SYSTEM_PARAMETERS]\n");
     fprintf(file, "gravity = %.6f\n", get_parameter("gravity"));
     fprintf(file, "damping = %.6f\n", get_parameter("damping"));
     fprintf(file, "stiffness = %.6f\n\n", get_parameter("stiffness"));
 
-    // Save camera state
     fprintf(file, "[CAMERA]\n");
-    fprintf(file, "position = %.6f %.6f\n", g_camera.position.x, g_camera.position.y);
+    fprintf(file, "position = %.6f %.6f\n",
+            g_camera.position.x, g_camera.position.y);
     fprintf(file, "zoom = %.6f\n\n", g_camera.zoom);
 
-    // Save objects
     fprintf(file, "[OBJECTS]\n");
     int numObjects = object_count();
     fprintf(file, "count = %d\n\n", numObjects);
@@ -2023,33 +2237,59 @@ void SimulationWrapper::save_to_file(
         throw std::runtime_error("Failed to fetch object data: " + std::string(e.what()));
     }
 
-    // Write each object's state
     for (int i = 0; i < numObjects && i < static_cast<int>(objects.size()); ++i)
     {
         const Object &p = objects[i];
+        CollisionProperties props = Objects::GetCollisionProperties(i);
 
         fprintf(file, "OBJECT %d\n", i);
-        fprintf(file, "position = %.6f %.6f\n", p.position.x, p.position.y);
-        fprintf(file, "velocity = %.6f %.6f\n", p.velocity.x, p.velocity.y);
+
+        fprintf(file, "position3 = %.6f %.6f %.6f\n",
+                p.position.x, p.position.y, p.position.z);
+        fprintf(file, "velocity3 = %.6f %.6f %.6f\n",
+                p.velocity.x, p.velocity.y, p.velocity.z);
+        fprintf(file, "orientation = %.6f %.6f %.6f %.6f\n",
+                p.orientation.x, p.orientation.y,
+                p.orientation.z, p.orientation.w);
+        fprintf(file, "spin = %.6f %.6f %.6f\n",
+                p.spin.x, p.spin.y, p.spin.z);
+        fprintf(file, "visual_data = %.6f %.6f %.6f %.6f\n",
+                p.visualData.x, p.visualData.y,
+                p.visualData.z, p.visualData.w);
+
         fprintf(file, "mass = %.6f\n", p.mass);
         fprintf(file, "charge = %.6f\n", p.charge);
         fprintf(file, "skin_type = %d\n", p.visualSkinType);
-        fprintf(file, "color = %.6f %.6f %.6f %.6f\n", p.color.r, p.color.g, p.color.b, p.color.a);
-        fprintf(file, "rotation = %.6f\n", p.visualData.z);
-        fprintf(file, "angular_velocity = %.6f\n", p.visualData.w);
+        fprintf(file, "color = %.6f %.6f %.6f %.6f\n",
+                p.color.r, p.color.g, p.color.b, p.color.a);
+        fprintf(file, "mesh_id = %d\n", p.meshID);
 
-        // Save shape-specific properties
+        fprintf(file, "collision_shape = %d\n", props.shapeType);
+        fprintf(file, "collision_enabled = %d\n", props.enabled);
+        fprintf(file, "restitution = %.6f\n", props.restitution);
+        fprintf(file, "friction = %.6f\n", props.friction);
+
+        fprintf(file, "position = %.6f %.6f\n",
+                p.position.x, p.position.y);
+        fprintf(file, "velocity = %.6f %.6f\n",
+                p.velocity.x, p.velocity.y);
+        fprintf(file, "rotation = %.6f\n",
+                2.0f * std::atan2(p.orientation.z, p.orientation.w));
+        fprintf(file, "angular_velocity = %.6f\n", p.spin.z);
+
         if (p.visualSkinType == 0)
+        {
             fprintf(file, "radius = %.6f\n", p.visualData.x);
+        }
         else if (p.visualSkinType == 1)
         {
-            fprintf(file, "width = %.6f\n", p.visualData.x);
+            fprintf(file, "width  = %.6f\n", p.visualData.x);
             fprintf(file, "height = %.6f\n", p.visualData.y);
         }
         else if (p.visualSkinType == 2)
         {
             fprintf(file, "radius = %.6f\n", p.visualData.x);
-            fprintf(file, "sides = %d\n", static_cast<int>(p.visualData.y));
+            fprintf(file, "sides  = %d\n", static_cast<int>(p.visualData.y));
         }
 
         fprintf(file, "\n");
@@ -2067,217 +2307,374 @@ void SimulationWrapper::load_from_file(const std::string &filename)
     if (!file)
         throw std::runtime_error("Failed to open file: " + filename);
 
-    // Clear existing simulation
-    reset();
     clear_all_constraints();
     while (object_count() > 0)
         remove_object(0);
+    m_currentBuffer = 0;
 
     std::string line;
     std::string current_section;
+
     int current_object_id = -1;
-    Object current_object;
-    PySkinType current_skin = PySkinType::PY_SKIN_CIRCLE;
+    Object current_object{};
+    int current_collision_shape = static_cast<int>(PyCollisionShape::NONE);
+    int current_collision_enabled = 1;
+    float current_restitution = 0.7f;
+    float current_friction = 0.3f;
+
+    bool has_position3 = false;
+    bool has_velocity3 = false;
+    bool has_orientation = false;
+    bool has_spin = false;
+    bool has_visual_data = false;
+    bool has_mesh_id = false;
+    bool has_collision_shape = false;
+
+    float legacy_rotation = 0.0f;
+    float legacy_angular_velocity = 0.0f;
+    float legacy_radius = 0.0f;
+    float legacy_width = 0.0f;
+    float legacy_height = 0.0f;
+    int legacy_sides = 0;
+    int legacy_skin = 0;
+
+    auto reset_accumulator = [&]()
+    {
+        current_object = Object{};
+        current_object.position = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        current_object.velocity = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        current_object.orientation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        current_object.spin = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        current_object.visualData = glm::vec4(0.0f);
+        current_object.color = glm::vec4(1.0f);
+        current_object.mass = 1.0f;
+        current_object.meshID = -1;
+        current_object.collisionShapeType = static_cast<int>(PyCollisionShape::NONE);
+        current_object.scriptID = -1;
+        current_object.equationID = 0;
+
+        has_position3 = has_velocity3 = has_orientation = false;
+        has_spin = has_visual_data = has_mesh_id = has_collision_shape = false;
+
+        legacy_rotation = legacy_angular_velocity = 0.0f;
+        legacy_radius = legacy_width = legacy_height = 0.0f;
+        legacy_sides = legacy_skin = 0;
+
+        current_collision_shape = static_cast<int>(PyCollisionShape::NONE);
+        current_collision_enabled = 1;
+        current_restitution = 0.7f;
+        current_friction = 0.3f;
+    };
+
+    auto emit_object = [&]()
+    {
+        if (current_object_id < 0)
+            return;
+
+        if (!has_orientation)
+        {
+            float h = legacy_rotation * 0.5f;
+            current_object.orientation = glm::vec4(0.0f, 0.0f, std::sin(h), std::cos(h));
+        }
+        else
+        {
+            float len = glm::length(current_object.orientation);
+            current_object.orientation = (len < 1e-6f)
+                                             ? glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)
+                                             : current_object.orientation / len;
+        }
+
+        if (!has_spin)
+            current_object.spin = glm::vec4(0.0f, 0.0f, legacy_angular_velocity, 0.0f);
+
+        if (!has_visual_data)
+        {
+            if (legacy_skin == 0)
+                current_object.visualData = glm::vec4(legacy_radius, 0.0f, 0.0f, 0.0f);
+            else if (legacy_skin == 1)
+                current_object.visualData = glm::vec4(legacy_width, legacy_height, 0.0f, 0.0f);
+            else if (legacy_skin == 2)
+                current_object.visualData = glm::vec4(legacy_radius,
+                                                      static_cast<float>(legacy_sides),
+                                                      0.0f, 0.0f);
+        }
+
+        if (!has_collision_shape)
+        {
+            if (legacy_skin == 0)
+                current_collision_shape = static_cast<int>(PyCollisionShape::CIRCLE);
+            else if (legacy_skin == 1)
+                current_collision_shape = static_cast<int>(PyCollisionShape::AABB);
+            else if (legacy_skin == 2)
+                current_collision_shape = static_cast<int>(PyCollisionShape::POLYGON);
+        }
+
+        current_object.visualSkinType = legacy_skin;
+        current_object.collisionShapeType = current_collision_shape;
+
+        if (!has_mesh_id)
+            current_object.meshID = -1;
+
+        if (current_object.meshID >= 0 && Meshes::Get(current_object.meshID) == nullptr)
+        {
+            int fallback = -1;
+            if (current_object.visualSkinType == 0)
+                fallback = Meshes::RegisterCircle(current_object.visualData.x, 32);
+            else if (current_object.visualSkinType == 1)
+                fallback = Meshes::RegisterSquare(current_object.visualData.x,
+                                                  current_object.visualData.y);
+            else if (current_object.visualSkinType == 2)
+                fallback = Meshes::RegisterPolygon(current_object.visualData.x,
+                                                   static_cast<int>(current_object.visualData.y));
+            current_object.meshID = fallback;
+        }
+
+        memset(current_object._pad, 0, sizeof(current_object._pad));
+
+        int prev_count = Objects::GetNumObjects();
+        Objects::AddObject(current_object.meshID);
+        if (Objects::GetNumObjects() == prev_count)
+        {
+            std::cerr << "[load_from_file] object limit reached; dropping slot "
+                      << current_object_id << std::endl;
+            return;
+        }
+
+        int slot = Objects::GetNumObjects() - 1;
+        Objects::UpdateObjectCPU(slot, current_object);
+
+        set_collision_shape(slot, static_cast<PyCollisionShape>(current_collision_shape));
+        set_collision_enabled(slot, current_collision_enabled != 0);
+        set_collision_properties(slot, current_restitution, current_friction);
+    };
 
     try
     {
         while (getline(file, line))
         {
-            if (line.empty() || (line.size() > 0 && line[0] == '#'))
+            if (line.empty() || line[0] == '#')
                 continue;
 
-            // Parse section headers
-            if (line.size() > 0 && line[0] == '[' && line[line.size() - 1] == ']')
+            if (line.front() == '[' && line.back() == ']')
             {
                 current_section = line.substr(1, line.size() - 2);
                 continue;
             }
 
-            // Parse system parameters
             if (current_section == "SYSTEM_PARAMETERS")
             {
-                size_t eq_pos = line.find('=');
-                if (eq_pos != std::string::npos)
+                size_t eq = line.find('=');
+                if (eq == std::string::npos)
+                    continue;
+                std::string k = line.substr(0, eq);
+                std::string v = line.substr(eq + 1);
+                k.erase(0, k.find_first_not_of(" \t"));
+                k.erase(k.find_last_not_of(" \t") + 1);
+                v.erase(0, v.find_first_not_of(" \t"));
+                v.erase(v.find_last_not_of(" \t") + 1);
+                try
                 {
-                    std::string key = line.substr(0, eq_pos);
-                    std::string value = line.substr(eq_pos + 1);
+                    if (k == "gravity" || k == "g" ||
+                        k == "damping" || k == "b" ||
+                        k == "stiffness" || k == "k")
+                        set_parameter(k, std::stof(v));
+                }
+                catch (const std::exception &)
+                {
+                    std::cerr << "[load_from_file] bad system parameter: "
+                              << line << std::endl;
+                }
+                continue;
+            }
 
-                    key.erase(0, key.find_first_not_of(" \t"));
-                    key.erase(key.find_last_not_of(" \t") + 1);
-                    value.erase(0, value.find_first_not_of(" \t"));
-                    value.erase(value.find_last_not_of(" \t") + 1);
+            if (current_section == "CAMERA")
+            {
+                size_t eq = line.find('=');
+                if (eq == std::string::npos)
+                    continue;
+                std::string k = line.substr(0, eq);
+                std::string v = line.substr(eq + 1);
+                k.erase(0, k.find_first_not_of(" \t"));
+                k.erase(k.find_last_not_of(" \t") + 1);
+                v.erase(0, v.find_first_not_of(" \t"));
+                v.erase(v.find_last_not_of(" \t") + 1);
+                if (k == "position")
+                {
+                    std::istringstream iss(v);
+                    float px, py;
+                    if (iss >> px >> py)
+                        g_camera.position = {px, py};
+                }
+                else if (k == "zoom")
+                {
+                    g_camera.zoom = std::stof(v);
+                }
+                continue;
+            }
 
-                    if (key == "gravity")
-                        set_parameter("gravity", std::stof(value));
-                    else if (key == "damping")
-                        set_parameter("damping", std::stof(value));
-                    else if (key == "stiffness")
-                        set_parameter("stiffness", std::stof(value));
+            if (current_section != "OBJECTS")
+                continue;
+
+            if (line.find("OBJECT") == 0)
+            {
+                emit_object();
+
+                size_t sp = line.find(' ');
+                current_object_id = (sp != std::string::npos)
+                                        ? std::stoi(line.substr(sp + 1))
+                                        : 0;
+                reset_accumulator();
+                continue;
+            }
+
+            if (current_object_id < 0)
+                continue;
+
+            size_t eq = line.find('=');
+            if (eq == std::string::npos)
+                continue;
+
+            std::string k = line.substr(0, eq);
+            std::string v = line.substr(eq + 1);
+            k.erase(0, k.find_first_not_of(" \t"));
+            k.erase(k.find_last_not_of(" \t") + 1);
+            v.erase(0, v.find_first_not_of(" \t"));
+            v.erase(v.find_last_not_of(" \t") + 1);
+
+            if (k == "position3")
+            {
+                std::istringstream iss(v);
+                float px, py, pz;
+                if (iss >> px >> py >> pz)
+                    current_object.position = glm::vec4(px, py, pz, 0.0f);
+                has_position3 = true;
+            }
+            else if (k == "velocity3")
+            {
+                std::istringstream iss(v);
+                float vx, vy, vz;
+                if (iss >> vx >> vy >> vz)
+                    current_object.velocity = glm::vec4(vx, vy, vz, 0.0f);
+                has_velocity3 = true;
+            }
+            else if (k == "orientation")
+            {
+                std::istringstream iss(v);
+                float qx, qy, qz, qw;
+                if (iss >> qx >> qy >> qz >> qw)
+                    current_object.orientation = glm::vec4(qx, qy, qz, qw);
+                has_orientation = true;
+            }
+            else if (k == "spin")
+            {
+                std::istringstream iss(v);
+                float sx, sy, sz;
+                if (iss >> sx >> sy >> sz)
+                    current_object.spin = glm::vec4(sx, sy, sz, 0.0f);
+                has_spin = true;
+            }
+            else if (k == "visual_data")
+            {
+                std::istringstream iss(v);
+                float vx, vy, vz, vw;
+                if (iss >> vx >> vy >> vz >> vw)
+                    current_object.visualData = glm::vec4(vx, vy, vz, vw);
+                has_visual_data = true;
+            }
+            else if (k == "position")
+            {
+                std::istringstream iss(v);
+                float px, py;
+                if (iss >> px >> py)
+                {
+                    current_object.position.x = px;
+                    current_object.position.y = py;
                 }
             }
-            // Parse camera state
-            else if (current_section == "CAMERA")
+            else if (k == "velocity")
             {
-                size_t eq_pos = line.find('=');
-                if (eq_pos != std::string::npos)
+                std::istringstream iss(v);
+                float vx, vy;
+                if (iss >> vx >> vy)
                 {
-                    std::string key = line.substr(0, eq_pos);
-                    std::string value = line.substr(eq_pos + 1);
-
-                    key.erase(0, key.find_first_not_of(" \t"));
-                    key.erase(key.find_last_not_of(" \t") + 1);
-                    value.erase(0, value.find_first_not_of(" \t"));
-                    value.erase(value.find_last_not_of(" \t") + 1);
-
-                    if (key == "position")
-                    {
-                        size_t space_pos = value.find(' ');
-                        if (space_pos != std::string::npos)
-                        {
-                            g_camera.position.x = std::stof(value.substr(0, space_pos));
-                            g_camera.position.y = std::stof(value.substr(space_pos + 1));
-                        }
-                    }
-                    else if (key == "zoom")
-                        g_camera.zoom = std::stof(value);
+                    current_object.velocity.x = vx;
+                    current_object.velocity.y = vy;
                 }
             }
-            // Parse object data
-            else if (current_section == "OBJECTS")
+            else if (k == "mass")
             {
-                if (line.find("OBJECT") == 0)
-                {
-                    // Create previous object before starting new one
-                    if (current_object_id >= 0)
-                    {
-                        int pid = add_object_raw(
-                            current_object.position.x, current_object.position.y,
-                            current_object.velocity.x, current_object.velocity.y,
-                            current_object.mass, current_object.charge,
-                            current_object.visualData.z, current_object.visualData.w,
-                            current_skin,
-                            (current_skin == PySkinType::PY_SKIN_CIRCLE || current_skin == PySkinType::PY_SKIN_POLYGON) ? current_object.visualData.x : 0.0f,
-                            (current_skin == PySkinType::PY_SKIN_RECTANGLE) ? current_object.visualData.x : current_object.visualData.x,
-                            (current_skin == PySkinType::PY_SKIN_RECTANGLE) ? current_object.visualData.y : current_object.visualData.x,
-                            current_object.color.r, current_object.color.g,
-                            current_object.color.b, current_object.color.a,
-                            (current_skin == PySkinType::PY_SKIN_POLYGON) ? static_cast<int>(current_object.visualData.y) : 0);
-
-                        if (pid != current_object_id)
-                            std::cerr << "Object ID mismatch during load" << std::endl;
-                    }
-
-                    // Start new object
-                    size_t space_pos = line.find(' ');
-                    if (space_pos != std::string::npos)
-                    {
-                        current_object_id = std::stoi(line.substr(space_pos + 1));
-                        current_object = Object();
-                        current_skin = PySkinType::PY_SKIN_CIRCLE;
-                    }
-                }
-                else if (current_object_id >= 0)
-                {
-                    // Parse object properties
-                    size_t eq_pos = line.find('=');
-                    if (eq_pos != std::string::npos)
-                    {
-                        std::string key = line.substr(0, eq_pos);
-                        std::string value = line.substr(eq_pos + 1);
-
-                        key.erase(0, key.find_first_not_of(" \t"));
-                        key.erase(key.find_last_not_of(" \t") + 1);
-                        value.erase(0, value.find_first_not_of(" \t"));
-                        value.erase(value.find_last_not_of(" \t") + 1);
-
-                        if (key == "position")
-                        {
-                            size_t space_pos = value.find(' ');
-                            if (space_pos != std::string::npos)
-                            {
-                                current_object.position.x = std::stof(value.substr(0, space_pos));
-                                current_object.position.y = std::stof(value.substr(space_pos + 1));
-                            }
-                        }
-                        else if (key == "velocity")
-                        {
-                            size_t space_pos = value.find(' ');
-                            if (space_pos != std::string::npos)
-                            {
-                                current_object.velocity.x = std::stof(value.substr(0, space_pos));
-                                current_object.velocity.y = std::stof(value.substr(space_pos + 1));
-                            }
-                        }
-                        else if (key == "mass")
-                            current_object.mass = std::stof(value);
-                        else if (key == "charge")
-                            current_object.charge = std::stof(value);
-                        else if (key == "skin_type")
-                        {
-                            int skin_type = std::stoi(value);
-                            current_object.visualSkinType = skin_type;
-                            if (skin_type == 0)
-                                current_skin = PySkinType::PY_SKIN_CIRCLE;
-                            else if (skin_type == 1)
-                                current_skin = PySkinType::PY_SKIN_RECTANGLE;
-                            else if (skin_type == 2)
-                                current_skin = PySkinType::PY_SKIN_POLYGON;
-                        }
-                        else if (key == "color")
-                        {
-                            size_t pos1 = value.find(' ');
-                            size_t pos2 = value.find(' ', pos1 + 1);
-                            size_t pos3 = value.find(' ', pos2 + 1);
-                            if (pos1 != std::string::npos && pos2 != std::string::npos && pos3 != std::string::npos)
-                            {
-                                current_object.color.r = std::stof(value.substr(0, pos1));
-                                current_object.color.g = std::stof(value.substr(pos1 + 1, pos2 - pos1 - 1));
-                                current_object.color.b = std::stof(value.substr(pos2 + 1, pos3 - pos2 - 1));
-                                current_object.color.a = std::stof(value.substr(pos3 + 1));
-                            }
-                        }
-                        else if (key == "rotation")
-                            current_object.visualData.z = std::stof(value);
-                        else if (key == "angular_velocity")
-                            current_object.visualData.w = std::stof(value);
-                        else if (key == "radius")
-                            current_object.visualData.x = std::stof(value);
-                        else if (key == "width")
-                            current_object.visualData.x = std::stof(value);
-                        else if (key == "height")
-                            current_object.visualData.y = std::stof(value);
-                        else if (key == "sides")
-                            current_object.visualData.y = std::stof(value);
-                    }
-                }
+                current_object.mass = std::stof(v);
+            }
+            else if (k == "charge")
+            {
+                current_object.charge = std::stof(v);
+            }
+            else if (k == "skin_type")
+            {
+                legacy_skin = std::stoi(v);
+            }
+            else if (k == "color")
+            {
+                std::istringstream iss(v);
+                float cr, cg, cb, ca;
+                if (iss >> cr >> cg >> cb >> ca)
+                    current_object.color = glm::vec4(cr, cg, cb, ca);
+            }
+            else if (k == "mesh_id")
+            {
+                current_object.meshID = std::stoi(v);
+                has_mesh_id = true;
+            }
+            else if (k == "collision_shape")
+            {
+                current_collision_shape = std::stoi(v);
+                has_collision_shape = true;
+            }
+            else if (k == "collision_enabled")
+            {
+                current_collision_enabled = std::stoi(v);
+            }
+            else if (k == "restitution")
+            {
+                current_restitution = std::stof(v);
+            }
+            else if (k == "friction")
+            {
+                current_friction = std::stof(v);
+            }
+            else if (k == "rotation")
+            {
+                legacy_rotation = std::stof(v);
+            }
+            else if (k == "angular_velocity")
+            {
+                legacy_angular_velocity = std::stof(v);
+            }
+            else if (k == "radius")
+            {
+                legacy_radius = std::stof(v);
+            }
+            else if (k == "width")
+            {
+                legacy_width = std::stof(v);
+            }
+            else if (k == "height")
+            {
+                legacy_height = std::stof(v);
+            }
+            else if (k == "sides")
+            {
+                legacy_sides = std::stoi(v);
             }
         }
 
-        // Create final object
-        if (current_object_id >= 0)
-        {
-            int pid = add_object_raw(
-                current_object.position.x, current_object.position.y,
-                current_object.velocity.x, current_object.velocity.y,
-                current_object.mass, current_object.charge,
-                current_object.visualData.z, current_object.visualData.w,
-                current_skin,
-                (current_skin == PySkinType::PY_SKIN_CIRCLE || current_skin == PySkinType::PY_SKIN_POLYGON) ? current_object.visualData.x : 0.0f,
-                (current_skin == PySkinType::PY_SKIN_RECTANGLE) ? current_object.visualData.x : current_object.visualData.x,
-                (current_skin == PySkinType::PY_SKIN_RECTANGLE) ? current_object.visualData.y : current_object.visualData.x,
-                current_object.color.r, current_object.color.g,
-                current_object.color.b, current_object.color.a,
-                (current_skin == PySkinType::PY_SKIN_POLYGON) ? static_cast<int>(current_object.visualData.y) : 0);
-        }
+        emit_object();
     }
     catch (const std::exception &e)
     {
         throw std::runtime_error("Error parsing simulation file: " + std::string(e.what()));
     }
-
-    file.close();
 }
-
 // ============================================================================
 // SIMULATION CONTROL FUNCTIONS
 // ============================================================================
@@ -2299,6 +2696,7 @@ void SimulationWrapper::reset()
 {
     ensure_initialized();
     Objects::ResetToInitialConditions();
+    g_camera3d.Reset();
     m_currentBuffer = 0;
 }
 
@@ -2318,13 +2716,7 @@ void SimulationWrapper::run_batch(
         const auto &config = configs[i];
 
         // Reset simulation
-        reset();
-        clear_all_constraints();
-
-        // Remove any existing objects
-        while (object_count() > 0)
-            remove_object(0);
-
+        clear_all();
         // Create objects from configuration
         for (const auto &pconfig : config.objects)
         {
@@ -2467,7 +2859,8 @@ std::string SimulationWrapper::get_shader_load_status() const
 // ============================================================================
 
 // Generate a new handle for a freshly created object
-ObjectHandle SimulationWrapper::make_handle(int slot) {
+ObjectHandle SimulationWrapper::make_handle(int slot)
+{
     ObjectHandle h;
     h.slot = slot;
     h.generation = g_objectGenerations[slot];
@@ -2475,23 +2868,30 @@ ObjectHandle SimulationWrapper::make_handle(int slot) {
 }
 
 // Check if a handle is still valid
-bool SimulationWrapper::is_handle_valid(const ObjectHandle& handle) const {
-    if (handle.slot < 0 || handle.slot >= Objects::MAX_OBJECTS) return false;
-    if (!g_objectSlotsUsed[handle.slot]) return false;
+bool SimulationWrapper::is_handle_valid(const ObjectHandle &handle) const
+{
+    if (handle.slot < 0 || handle.slot >= Objects::MAX_OBJECTS)
+        return false;
+    if (!g_objectSlotsUsed[handle.slot])
+        return false;
     return g_objectGenerations[handle.slot] == handle.generation;
 }
 
 // Get the raw slot index from a handle (throws if invalid)
-int SimulationWrapper::get_slot_index(const ObjectHandle& handle) const {
-    if (!is_handle_valid(handle)) {
+int SimulationWrapper::get_slot_index(const ObjectHandle &handle) const
+{
+    if (!is_handle_valid(handle))
+    {
         throw std::runtime_error("ObjectHandle is invalid - object was removed or slot was reused");
     }
     return handle.slot;
 }
 
 // Get handle for a raw index (returns invalid handle if slot empty)
-ObjectHandle SimulationWrapper::get_handle(int raw_index) const {
-    if (raw_index < 0 || raw_index >= Objects::GetNumObjects()) {
+ObjectHandle SimulationWrapper::get_handle(int raw_index) const
+{
+    if (raw_index < 0 || raw_index >= Objects::GetNumObjects())
+    {
         ObjectHandle invalid;
         invalid.slot = -1;
         invalid.generation = -1;
@@ -2507,7 +2907,7 @@ ObjectHandle SimulationWrapper::get_handle(int raw_index) const {
 // COLLISION CALLBACK
 // ============================================================================
 
-void SimulationWrapper::set_collision_callback(std::function<void(const CollisionEvent&)> callback)
+void SimulationWrapper::set_collision_callback(std::function<void(const CollisionEvent &)> callback)
 {
     g_collisionCallback = callback;
 }
@@ -2542,7 +2942,8 @@ void SimulationWrapper::clear_agents()
 {
     ensure_initialized();
     auto ids = scriptManager.getAgentIDs();
-    for (int id : ids) {
+    for (int id : ids)
+    {
         scriptManager.unregisterScript(id);
     }
 }
@@ -2556,19 +2957,20 @@ std::pair<float, float> SimulationWrapper::screen_to_world(float screen_x, float
     ensure_initialized();
     int w = g_width;
     int h = g_height;
-    
-    if (w == 0 || h == 0) return {0.0f, 0.0f};
-    
+
+    if (w == 0 || h == 0)
+        return {0.0f, 0.0f};
+
     float ndcX = (screen_x / w) * 2.0f - 1.0f;
     float ndcY = 1.0f - (screen_y / h) * 2.0f;
-    
+
     float aspect = (float)w / (float)h;
     float halfWidth = g_camera.zoom * aspect;
     float halfHeight = g_camera.zoom;
-    
+
     float worldX = g_camera.position.x + ndcX * halfWidth;
     float worldY = g_camera.position.y + ndcY * halfHeight;
-    
+
     return {worldX, worldY};
 }
 
@@ -2577,19 +2979,20 @@ std::pair<float, float> SimulationWrapper::world_to_screen(float world_x, float 
     ensure_initialized();
     int w = g_width;
     int h = g_height;
-    
-    if (w == 0 || h == 0) return {0.0f, 0.0f};
-    
+
+    if (w == 0 || h == 0)
+        return {0.0f, 0.0f};
+
     float aspect = (float)w / (float)h;
     float halfWidth = g_camera.zoom * aspect;
     float halfHeight = g_camera.zoom;
-    
+
     float ndcX = (world_x - g_camera.position.x) / halfWidth;
     float ndcY = (world_y - g_camera.position.y) / halfHeight;
-    
+
     float screenX = (ndcX + 1.0f) * 0.5f * w;
     float screenY = (1.0f - ndcY) * 0.5f * h;
-    
+
     return {screenX, screenY};
 }
 
@@ -2600,36 +3003,39 @@ std::pair<float, float> SimulationWrapper::world_to_screen(float world_x, float 
 void SimulationWrapper::fit_camera_to_objects(float padding)
 {
     ensure_initialized();
-    
+
     int count = object_count();
-    if (count == 0) return;
-    
+    if (count == 0)
+        return;
+
     // Get all object positions
     std::vector<ObjectState> states = get_all_objects();
-    
+
     float minX = states[0].x, maxX = states[0].x;
     float minY = states[0].y, maxY = states[0].y;
-    
-    for (const auto& s : states) {
+
+    for (const auto &s : states)
+    {
         minX = std::min(minX, s.x);
         maxX = std::max(maxX, s.x);
         minY = std::min(minY, s.y);
         maxY = std::max(maxY, s.y);
     }
-    
+
     float centerX = (minX + maxX) * 0.5f;
     float centerY = (minY + maxY) * 0.5f;
     float rangeX = (maxX - minX) * (1.0f + padding);
     float rangeY = (maxY - minY) * (1.0f + padding);
-    
+
     // Set camera position
     g_camera.position.x = centerX;
     g_camera.position.y = centerY;
-    
+
     // Set zoom to fit both axes
     int w = g_width;
     int h = g_height;
-    if (w > 0 && h > 0) {
+    if (w > 0 && h > 0)
+    {
         float aspect = (float)w / (float)h;
         float zoomX = rangeX * 0.5f;
         float zoomY = rangeY * 0.5f;
@@ -2640,14 +3046,15 @@ void SimulationWrapper::fit_camera_to_objects(float padding)
 void SimulationWrapper::follow_object(int index, float smoothing)
 {
     ensure_initialized();
-    
-    if (index < 0 || index >= object_count()) return;
-    
+
+    if (index < 0 || index >= object_count())
+        return;
+
     ObjectState state = get_object(index);
-    
+
     float dx = state.x - g_camera.position.x;
     float dy = state.y - g_camera.position.y;
-    
+
     g_camera.position.x += dx * (1.0f - smoothing);
     g_camera.position.y += dy * (1.0f - smoothing);
 }
@@ -2685,6 +3092,7 @@ void SimulationWrapper::cleanup()
 
     // Clean up object system
     Objects::Cleanup();
+    Meshes::Cleanup();
 
     // Destroy window and terminate GLFW
     if (m_window)
@@ -2694,5 +3102,6 @@ void SimulationWrapper::cleanup()
     }
 
     glfwTerminate();
+    g_activeSimCount.fetch_sub(1);
     m_initialized = false;
 }

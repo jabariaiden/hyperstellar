@@ -441,6 +441,30 @@ home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.s
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.s
 
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.o
+
+# target to build an object file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o
+
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.i: home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.i
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.i
+
+# target to preprocess a source file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.i
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.i
+
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.s: home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.s
+
+# target to generate assembly for a file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s
+
 home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.o
 
@@ -657,6 +681,9 @@ help:
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.s"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.o"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.i"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.s"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.s"

@@ -166,7 +166,6 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /usr/lib/gcc/x86_64-redhat-linux/16/include/stdint.h \
  /usr/include/stdint.h /usr/include/bits/stdint-uintn.h \
  /usr/include/bits/stdint-least.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/objects.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/glm.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/_fixes.hpp \
  /usr/include/c++/16/cmath /usr/include/math.h \
@@ -337,6 +336,7 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/type_half.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/integer.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/func_integer.inl \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/objects.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/parser.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
@@ -395,6 +395,7 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /usr/include/c++/16/pstl/execution_defs.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/quaternion.hpp \

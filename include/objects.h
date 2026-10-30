@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include "common_definitions.h"
 #include "parser.h"
 #include "constraints.h"
@@ -12,26 +13,25 @@
 // Forward declaration for JIT script manager
 class ScriptManager;
 
-// Object structure – matches GLSL layout exactly (96 bytes)
 struct Object
 {
-    glm::vec2 position; // offset 0
-    glm::vec2 velocity; // offset 8
-    float mass;         // offset 16
-    float charge;       // offset 20
-
-    int visualSkinType;     // offset 24
-    int collisionShapeType; // offset 28
-
-    glm::vec4 visualData;    // offset 32  (x=radius/width, y=height/sides, z=rotation, w=omega)
-    glm::vec4 collisionData; // offset 48
-    glm::vec4 color;         // offset 64
-
-    int equationID; // offset 80 (DSL equation ID)
-    int scriptID;   // offset 84 –1 = DSL, >=0 = JIT script
-    int _padEnd[2]; // offset 88, pad to 96 bytes
+    glm::vec4 position;    // xyz world, w unused
+    glm::vec4 velocity;    // xyz, w unused
+    glm::vec4 orientation; // quat; identity = (0,0,0,1)
+    glm::vec4 spin;        // angular velocity (wx, wy, wz, 0)
+    glm::vec4 visualData;  // retained for JIT compat; renderer ignores
+    glm::vec4 collisionData;
+    glm::vec4 color; // rgba
+    float mass;
+    float charge;
+    int visualSkinType; // 0=CIRCLE 1=RECT 2=POLY 3=SPHERE 4=CUBE — renderer ignores
+    int collisionShapeType;
+    int equationID;
+    int scriptID;
+    int meshID;  // -1 = no shape
+    int _pad[5]; // 5 × 4 = 20 bytes → struct exactly 160 (std430 alignment)
 };
-static_assert(sizeof(Object) == 96, "Object size must be 96 bytes for GLSL");
+static_assert(sizeof(Object) == 160, "Object layout must match GLSL");
 
 extern float g_simulationTime;
 extern int g_paintWidth;
@@ -79,7 +79,9 @@ enum CollisionShape
     COLLISION_NONE = 0,
     COLLISION_CIRCLE = 1,
     COLLISION_AABB = 2,
-    COLLISION_POLYGON = 3
+    COLLISION_POLYGON = 3,
+    COLLISION_SPHERE = 4,
+    COLLISION_BOX = 5
 };
 const int MAX_CONTACTS_PER_OBJECT = 4;
 
@@ -103,8 +105,17 @@ namespace Objects
     GLuint GetPrevPaintTexture();
 
     std::vector<int> GetScratchpadIDs();
-    
-    
+
+    // renderer access
+    GLuint GetObjectSSBO(int bufferIndex);
+   const std::unordered_map<int, std::vector<int>>& GetMeshGroups(int sourceIndex);
+    void MarkMeshGroupsDirty();
+    void AddObject(int meshID = -1);
+    void Draw(int sourceIndex,
+              const glm::mat4 &projection,
+              const glm::mat4 &view,
+              const glm::vec3 &cameraPos,
+              const glm::vec3 &lightDir);
 
     // In the Objects class:
     GLuint GetPaintTexture(int &width, int &height);
@@ -119,7 +130,6 @@ namespace Objects
 
     // Signal queue
     void SetSignalQueueCapacity(size_t capacity);
-    void SetSignalQueueOverflowPolicy(int policy); // 0=drop, 1=block
     void ClearSignalQueue();
     size_t GetSignalQueueCount();
 
@@ -143,13 +153,12 @@ namespace Objects
     void ResizePaintTexture(int width, int height);
     void CleanupPaint();
     void SetPaintScript(int scriptID);
-    void GetFullFrameImage(std::vector<unsigned char> &jpeg_data, int quality, 
-                              int objectBufferIndex, const glm::mat4 &projView);
+    void GetFullFrameImage(std::vector<unsigned char> &jpeg_data, int quality,
+                           int objectBufferIndex, const glm::mat4 &projView);
 
     // ---- Core simulation ----
     bool Init(void *glfwWindow = nullptr);
     void Update(int inputIndex, int outputIndex, float dt);
-    void Draw(int sourceIndex);
     void Cleanup();
 
     // ---- Equation (DSL) management ----
@@ -179,17 +188,15 @@ namespace Objects
     void SetCollisionShape(int objectIndex, CollisionShape shape);
     void SetCollisionProperties(int objectIndex, float restitution, float friction);
     CollisionProperties GetCollisionProperties(int objectIndex);
-    void EnableCollisionBetween(int obj1, int obj2, bool enable);
     bool IsCollisionEnabled(int objectIndex);
     void SetCollisionParameters(bool enableWarmStart, int maxContactIterations);
     void GetCollisionParameters(bool &enableWarmStart, int &maxContactIterations);
 
     // In namespace Objects
-    GLuint GetContactBuffer();   // returns g_contactBufferSSBO
-    int GetNumObjects();        // already exists
+    GLuint GetContactBuffer(); // returns g_contactBufferSSBO
+    int GetNumObjects();       // already exists
 
     // ---- Object lifecycle ----
-    void AddObject();
     void RemoveObject(int index = -1);
     void ResetToInitialConditions();
 

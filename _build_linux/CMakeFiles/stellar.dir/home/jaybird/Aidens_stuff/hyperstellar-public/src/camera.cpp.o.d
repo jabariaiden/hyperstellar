@@ -285,11 +285,4 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.
  /usr/include/c++/16/pstl/execution_defs.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
- /usr/include/GL/gl.h /usr/include/GL/glext.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/KHR/khrplatform.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/imgui.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/imconfig.h \
- /usr/lib/gcc/x86_64-redhat-linux/16/include/stdarg.h \
- /usr/include/string.h /usr/include/strings.h
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h

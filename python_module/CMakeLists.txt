@@ -101,6 +101,7 @@ set(CORE_SOURCES
     ../src/utils.cpp
     ../src/vectorfield.cpp
     ../src/script_manager.cpp
+    ../src/mesh.cpp
 )
 
 set(PYTHON_SOURCES

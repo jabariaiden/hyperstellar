@@ -26,6 +26,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o.d"
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o"
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o.d"
+  "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o"
+  "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o.d"
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o"
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o.d"
   "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o"

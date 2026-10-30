@@ -1,39 +1,54 @@
 #version 430 core
 
-// These should match  VAO setup from objects.cpp
-layout(location = 0) in vec2 aPosition;
-layout(location = 1) in vec2 aVelocity;
-layout(location = 2) in float aMass;
-layout(location = 3) in float aCharge;
-layout(location = 4) in int aVisualSkinType;    
-layout(location = 5) in vec4 aVisualData;       
-layout(location = 6) in vec4 aColor;            
-layout(location = 7) in int aEquationID;
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNormal;
+layout(location=2) in vec2 aUV;
 
-out vec2 vPosition;
-out vec2 vVelocity;
-out float vMass;
-out float vCharge;
-out int vVisualSkinType;    
-out vec4 vVisualData;       
-out vec4 vColor;            
-//Add rotation and angular velocity as separate outputs if needed
-out float vRotation;
-out float vAngularVelocity;
+struct Object {
+    vec4 position;
+    vec4 velocity;
+    vec4 orientation;
+    vec4 spin;
+    vec4 visualData;
+    vec4 collisionData;
+    vec4 color;
+    float mass;
+    float charge;
+    int visualSkinType;
+    int collisionShapeType;
+    int equationID;
+    int scriptID;
+    int meshID;
+    int _pad[5];
+};
+layout(std430, binding=0) readonly buffer Objects { Object objects[]; };
+// Indirection buffer: instanced draws look up scattered object slots by index
+layout(std430, binding=12) readonly buffer DrawIndex { int drawIndex[]; };
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+
+out vec3 vWorldPos;
+out vec3 vNormal;
+out vec4 vColor;
+out vec2 vUV;
+
+vec3 quat_rotate(vec4 q, vec3 v) {
+    vec3 u = q.xyz; float s = q.w;
+    return 2.0 * dot(u, v) * u + (s*s - dot(u,u)) * v + 2.0 * s * cross(u, v);
+}
 
 void main() {
-    vPosition = aPosition;
-    vVelocity = aVelocity;
-    vMass = aMass;
-    vCharge = aCharge;
-    vVisualSkinType = aVisualSkinType;
-    vVisualData = aVisualData;
-    vColor = aColor;
-    
-    // Extract rotation and angular velocity from visualData
-    vRotation = aVisualData.x;
-    vAngularVelocity = aVisualData.y;
-    
-    gl_Position = vec4(aPosition, 0.0, 1.0);
-    gl_PointSize = 10.0; // For point rendering fallback
+    int slot = drawIndex[gl_InstanceID];
+    Object inst = objects[slot];
+
+    vec3 worldPos = inst.position.xyz + quat_rotate(inst.orientation, aPos);
+    vec3 worldNrm = quat_rotate(inst.orientation, aNormal);
+
+    vWorldPos = worldPos;
+    vNormal   = worldNrm;
+    vColor    = inst.color;
+    vUV       = aUV;
+
+    gl_Position = uProjection * uView * vec4(worldPos, 1.0);
 }

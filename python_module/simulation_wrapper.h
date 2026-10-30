@@ -7,11 +7,14 @@
 #include <fstream>
 #include <vector>
 #include <array>
-#include <utility>   // for std::pair
+#include <utility> // for std::pair
 #include "script_manager.h"
+#include <glm/glm.hpp>
 
 // Forward declarations
 class SimulationWrapper;
+
+struct Object;
 
 // Python-friendly enums
 enum class PySkinType
@@ -40,6 +43,12 @@ struct ObjectState
     int polygon_sides;      // for polygons
     int skin_type;          // so users know what shape it is
     float r, g, b, a;
+
+    // 3D fields
+    float z = 0.0f, vz = 0.0f;
+    float qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f;
+    float spin_x = 0.0f, spin_y = 0.0f, spin_z = 0.0f;
+    int mesh_id = -1;
 };
 
 // Batch update data structure
@@ -56,23 +65,16 @@ struct BatchUpdateData
 // Batch get data structure
 struct BatchGetData
 {
-    float x;
-    float y;
-    float vx;
-    float vy;
-    float mass;
-    float charge;
-    float rotation;
-    float angular_velocity;
-    float width;
-    float height;
-    float radius;
-    int polygon_sides;
-    int skin_type;
-    float r;
-    float g;
-    float b;
-    float a;
+    float x, y, vx, vy, mass, charge, rotation, angular_velocity;
+    float width, height, radius;
+    int polygon_sides, skin_type;
+    float r, g, b, a;
+
+    // 3D fields (mirror ObjectState)
+    float z = 0.0f, vz = 0.0f;
+    float qx = 0.0f, qy = 0.0f, qz = 0.0f, qw = 1.0f;
+    float spin_x = 0.0f, spin_y = 0.0f, spin_z = 0.0f;
+    int mesh_id = -1;
 };
 
 // Constraint types for Python
@@ -110,9 +112,10 @@ enum class PyCollisionShape
     NONE = 0,
     CIRCLE = 1,
     AABB = 2,
-    POLYGON = 3
+    POLYGON = 3,
+    SPHERE = 4,
+    BOX = 5
 };
-
 // Collision property struct
 struct CollisionConfig
 {
@@ -174,6 +177,10 @@ struct CollisionEvent
                        contact_x(0), contact_y(0), impulse(0) {}
 };
 
+// Returns true once at least one Simulation has been successfully initialized.
+// Used by MeshPresets to guard mesh creation (which needs a GL context).
+bool AnySimulationInitialized();
+
 // ----------------------------------------------------------------------------
 // Helper classes for keyboard
 // ----------------------------------------------------------------------------
@@ -215,6 +222,10 @@ private:
     float m_simulationTime = 0.0f;
     bool m_enable_grid;
     float m_speed = 1.0f;
+    ObjectState object_to_state(const Object &p) const;
+    float m_gravity = 9.81f;
+    float m_damping = 0.1f;
+    float m_stiffness = 1.0f;
 
     ScriptManager scriptManager;
 
@@ -289,12 +300,36 @@ public:
         float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
         int polygon_sides = 6);
 
+    // ---- 3D-native object creation ----
+    ObjectHandle add_object_3d(
+        float x, float y, float z,
+        float vx, float vy, float vz,
+        float mass, float charge,
+        int meshID,
+        glm::vec4 orientation,
+        glm::vec3 spin,
+        float r, float g, float b, float a,
+        PyCollisionShape shape = PyCollisionShape::SPHERE);
+
+    // ---- 3D helpers (each operates on a raw slot index) ----
+    void set_mesh_3d(int index, int meshID);
+    int get_mesh_3d(int index) const;
+
+    void set_position_3d(int index, float x, float y, float z);
+    glm::vec3 get_position_3d(int index) const;
+    void set_velocity_3d(int index, float vx, float vy, float vz);
+    glm::vec3 get_velocity_3d(int index) const;
+    void set_orientation_3d(int index, float qx, float qy, float qz, float qw);
+    glm::vec4 get_orientation_3d(int index) const;
+    void set_spin_3d(int index, float sx, float sy, float sz);
+    glm::vec3 get_spin_3d(int index) const;
+
     // Remove by handle (preferred)
-    void remove_object_handle(const ObjectHandle& handle);
+    void remove_object_handle(const ObjectHandle &handle);
     // Remove by raw index (deprecated)
     void remove_object(int index);
     // Batch remove
-    void remove_objects(const std::vector<ObjectHandle>& handles);
+    void remove_objects(const std::vector<ObjectHandle> &handles);
 
     // Clear all objects, constraints, and reset simulation state
     void clear_all();
@@ -303,18 +338,18 @@ public:
 
     // Get object state by raw index or handle
     ObjectState get_object(int index) const;
-    ObjectState get_object(const ObjectHandle& handle) const;  //handle overload
+    ObjectState get_object(const ObjectHandle &handle) const; // handle overload
 
-    //IDK
-    void follow_object(const ObjectHandle& handle, float smoothing = 0.05f);
+    // IDK
+    void follow_object(const ObjectHandle &handle, float smoothing = 0.05f);
 
     // Get all objects
     std::vector<ObjectState> get_all_objects() const;
 
     // Handle utilities
     ObjectHandle make_handle(int slot);
-    bool is_handle_valid(const ObjectHandle& handle) const;
-    int get_slot_index(const ObjectHandle& handle) const;
+    bool is_handle_valid(const ObjectHandle &handle) const;
+    int get_slot_index(const ObjectHandle &handle) const;
     ObjectHandle get_handle(int raw_index) const;
 
     void update_object(
@@ -362,14 +397,12 @@ public:
     void set_collision_shape(int index, PyCollisionShape shape);
     void set_collision_properties(int index, float restitution, float friction);
     CollisionConfig get_collision_config(int index);
-    void enable_collision_between(int obj1, int obj2, bool enable);
     bool is_collision_enabled(int index);
     void set_collision_parameters(bool enable_warm_start, int max_contact_iterations);
     std::pair<bool, int> get_collision_parameters() const;
-    
 
     // ---- Collision callback ----
-    void set_collision_callback(std::function<void(const CollisionEvent&)> callback);
+    void set_collision_callback(std::function<void(const CollisionEvent &)> callback);
     void clear_collision_callback();
 
     // System parameters
@@ -424,7 +457,6 @@ public:
     bool is_valid_scratchpad(int id);
 
     void set_signal_queue_capacity(size_t capacity);
-    void set_signal_queue_overflow_policy(int policy);
     void clear_signal_queue();
     size_t get_signal_queue_count();
 

@@ -295,8 +295,8 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/parser.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/shader_utils.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/src/../include/globals.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/src/../include/camera.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/camera.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_projection.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/../gtc/constants.hpp \
@@ -317,8 +317,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /usr/include/c++/16/bits/stl_tempbuf.h \
  /usr/include/c++/16/pstl/glue_algorithm_defs.h \
  /usr/include/c++/16/pstl/execution_defs.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/src/../include/physics_system.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/src/../include/common_definitions.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/utils.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/debug_helpers.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/gpu_serializer.h \
@@ -397,6 +396,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/script_manager.h \
  /usr/include/c++/16/unordered_set \
  /usr/include/c++/16/bits/unordered_set.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/quaternion.hpp \

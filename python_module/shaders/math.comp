@@ -30,18 +30,21 @@ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 // DATA STRUCTURES (should be same as CPU side)
 // ----------------------------------------------------------------------------
 struct Object {
-    vec2 position;
-    vec2 velocity;
+    vec4 position;
+    vec4 velocity;
+    vec4 orientation;
+    vec4 spin;
+    vec4 visualData;
+    vec4 collisionData;
+    vec4 color;
     float mass;
     float charge;
     int visualSkinType;
     int collisionShapeType;
-    vec4 visualData;          // x = radius/width, y = height, z = theta, w = omega
-    vec4 collisionData;       // x = previous ax, y = previous ay
-    vec4 color;
     int equationID;
-    int _pad1;
-    int _padEnd[2];
+    int scriptID;
+    int meshID;
+    int _pad[5];
 };
 
 struct EquationMapping {

@@ -6,8 +6,51 @@
 #include <vector>
 #include <unordered_map>
 #include "simulation_wrapper.h"
+#include "../include/mesh.h"
+#include <array>
+
+// -------------------------------------------------------------------------
+// PRE-STEP includes required by the 3D bindings
+// -------------------------------------------------------------------------
+#include <glm/glm.hpp>
+#include <sstream>
 
 namespace py = pybind11;
+
+// =========================================================================
+// PRE-STEP: glm type casters
+// Required for add_object_3d / get_*_3d / set_*_3d bindings below.
+// =========================================================================
+namespace pybind11 { namespace detail {
+template <> struct type_caster<glm::vec3> {
+    PYBIND11_TYPE_CASTER(glm::vec3, _("glm::vec3"));
+    bool load(handle src, bool) {
+        if (!py::isinstance<py::tuple>(src) && !py::isinstance<py::list>(src)) return false;
+        auto seq = py::reinterpret_borrow<py::sequence>(src);
+        if (seq.size() != 3) return false;
+        value = glm::vec3(seq[0].cast<float>(), seq[1].cast<float>(), seq[2].cast<float>());
+        return true;
+    }
+    static handle cast(const glm::vec3 &v, return_value_policy, handle) {
+        return py::make_tuple(v.x, v.y, v.z).release();
+    }
+};
+
+template <> struct type_caster<glm::vec4> {
+    PYBIND11_TYPE_CASTER(glm::vec4, _("glm::vec4"));
+    bool load(handle src, bool) {
+        if (!py::isinstance<py::tuple>(src) && !py::isinstance<py::list>(src)) return false;
+        auto seq = py::reinterpret_borrow<py::sequence>(src);
+        if (seq.size() != 4) return false;
+        value = glm::vec4(seq[0].cast<float>(), seq[1].cast<float>(),
+                          seq[2].cast<float>(), seq[3].cast<float>());
+        return true;
+    }
+    static handle cast(const glm::vec4 &v, return_value_policy, handle) {
+        return py::make_tuple(v.x, v.y, v.z, v.w).release();
+    }
+};
+}}
 
 PYBIND11_MODULE(stellar, m)
 {
@@ -21,7 +64,7 @@ PYBIND11_MODULE(stellar, m)
         - Batch processing for headless simulations
         - Multiple constraint types
         - Object rotation and angular dynamics
-        - Complete collision system (Circle, AABB, SAT)
+        - Complete collision system (Circle, AABB, SAT, Sphere, Box)
         - Stable object handles with generation counting
         - Collision callbacks
         - Object tagging and groups
@@ -63,20 +106,65 @@ PYBIND11_MODULE(stellar, m)
         .value("BOUNDARY", PyConstraintType::PY_CONSTRAINT_BOUNDARY, "Boundary constraint")
         .export_values();
 
+    // -------------------------------------------------------------------------
+    // ITEM 1: CollisionShape enum now includes SPHERE and BOX
+    // -------------------------------------------------------------------------
     py::enum_<PyCollisionShape>(m, "CollisionShape", R"pbdoc(
         Collision shape type for physics interactions.
         
         Attributes:
-            NONE: No collision detection
-            CIRCLE: Circular collision boundary
-            AABB: Axis-aligned bounding box (rectangle)
-            POLYGON: Convex polygon collision (uses SAT)
+            NONE:    No collision detection
+            CIRCLE:  Circular collision boundary (2D)
+            AABB:    Axis-aligned bounding box (2D rectangle)
+            POLYGON: Convex polygon (2D, SAT)
+            SPHERE:  3D sphere
+            BOX:     3D oriented box
         )pbdoc")
         .value("NONE", PyCollisionShape::NONE, "No collision")
         .value("CIRCLE", PyCollisionShape::CIRCLE, "Circle collision")
         .value("AABB", PyCollisionShape::AABB, "Rectangle AABB collision")
         .value("POLYGON", PyCollisionShape::POLYGON, "Polygon SAT collision")
+        .value("SPHERE", PyCollisionShape::SPHERE, "3D sphere collision")   // new
+        .value("BOX", PyCollisionShape::BOX, "3D oriented box collision")   // new
         .export_values();
+
+    // =========================================================================
+    // ITEM 2: Meshes namespace bindings
+    // Handles are plain ints; nothing about Mesh lifetime is exposed to Python.
+    // =========================================================================
+    m.def("register_circle", [](float r, int s) {
+        return Meshes::RegisterCircle(r, s); },
+        py::arg("radius"), py::arg("segs") = 32);
+
+    m.def("register_square", [](float w, float h) {
+        return Meshes::RegisterSquare(w, h); },
+        py::arg("width"), py::arg("height"));
+
+    m.def("register_polygon", [](float r, int sides) {
+        return Meshes::RegisterPolygon(r, sides); },
+        py::arg("radius"), py::arg("sides") = 6);
+
+    m.def("register_sphere", [](float r, int segs, int rings) {
+        return Meshes::RegisterSphere(r, segs, rings); },
+        py::arg("radius"), py::arg("segs") = 32, py::arg("rings") = 16);
+
+    m.def("register_cube", [](float sx, float sy, float sz) {
+        return Meshes::RegisterCube(sx, sy, sz); },
+        py::arg("size_x"), py::arg("size_y"), py::arg("size_z"));
+
+    m.def("register_cylinder", [](float r, float h, int segs) {
+        return Meshes::RegisterCylinder(r, h, segs); },
+        py::arg("radius"), py::arg("height"), py::arg("segs") = 32);
+
+    m.def("register_capsule", [](float r, float h, int segs, int cap_rings) {
+        return Meshes::RegisterCapsule(r, h, segs, cap_rings); },
+        py::arg("radius"), py::arg("height"),
+        py::arg("segs") = 32, py::arg("cap_rings") = 8);
+
+    m.def("destroy_mesh", &Meshes::Destroy, py::arg("mesh_id"));
+    m.def("mesh_count",   &Meshes::Count);
+    m.def("mesh_ids", &Meshes::GetLiveIds,
+      "Return a list of all currently-live mesh IDs.");
 
     // =========================================================================
     // OBJECT STATE
@@ -99,6 +187,11 @@ PYBIND11_MODULE(stellar, m)
             polygon_sides (int): Number of sides for polygons
             skin_type (SkinType): Visual type
             r,g,b,a (float): Color components (0.0-1.0)
+            z (float): Z position (3D)
+            vz (float): Z velocity (3D)
+            qx,qy,qz,qw (float): Orientation quaternion (3D)
+            spin_x,spin_y,spin_z (float): Angular velocity vector (3D)
+            mesh_id (int): Mesh handle (-1 = none)
         )pbdoc")
         .def(py::init<>(), "Create default object state")
         .def_readwrite("x", &ObjectState::x, "X position")
@@ -118,10 +211,41 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("g", &ObjectState::g, "Green color component (0.0-1.0)")
         .def_readwrite("b", &ObjectState::b, "Blue color component (0.0-1.0)")
         .def_readwrite("a", &ObjectState::a, "Alpha/opacity (0.0-1.0)")
-        .def("__repr__", [](const ObjectState &p)
-             { return "<ObjectState pos=(" + std::to_string(p.x) + ", " +
-                      std::to_string(p.y) + ") vel=(" + std::to_string(p.vx) +
-                      ", " + std::to_string(p.vy) + ") mass=" + std::to_string(p.mass) + ">"; });
+
+        // ---------------------------------------------------------------------
+        // ITEM 4: 3D state fields
+        // ---------------------------------------------------------------------
+        .def_readwrite("z",       &ObjectState::z,       "Z position (0 for 2D objects)")
+        .def_readwrite("vz",      &ObjectState::vz,      "Z velocity (0 for 2D objects)")
+        .def_readwrite("qx",      &ObjectState::qx,      "Orientation quaternion x")
+        .def_readwrite("qy",      &ObjectState::qy,      "Orientation quaternion y")
+        .def_readwrite("qz",      &ObjectState::qz,      "Orientation quaternion z")
+        .def_readwrite("qw",      &ObjectState::qw,      "Orientation quaternion w (scalar)")
+        .def_readwrite("spin_x",  &ObjectState::spin_x,  "Angular velocity x (rad/s)")
+        .def_readwrite("spin_y",  &ObjectState::spin_y,  "Angular velocity y (rad/s)")
+        .def_readwrite("spin_z",  &ObjectState::spin_z,  "Angular velocity z (rad/s) [= angular_velocity for 2D]")
+        .def_readwrite("mesh_id", &ObjectState::mesh_id, "Mesh handle (-1 = no mesh)")
+
+        // ---------------------------------------------------------------------
+        // ITEM 7: extended __repr__ that shows 3D fields
+        // ---------------------------------------------------------------------
+        .def("__repr__", [](const ObjectState &p) {
+            std::ostringstream s;
+            if (p.skin_type == -1) {
+                s << "<ObjectState 3D pos=(" << p.x << ", " << p.y << ", " << p.z
+                  << ") vel=(" << p.vx << ", " << p.vy << ", " << p.vz
+                  << ") q=(" << p.qx << ", " << p.qy << ", " << p.qz << ", " << p.qw
+                  << ") spin=(" << p.spin_x << ", " << p.spin_y << ", " << p.spin_z
+                  << ") mesh=" << p.mesh_id
+                  << " mass=" << p.mass << ">";
+            } else {
+                s << "<ObjectState 2D pos=(" << p.x << ", " << p.y
+                  << ") vel=(" << p.vx << ", " << p.vy
+                  << ") rot=" << p.rotation
+                  << " mass=" << p.mass << ">";
+            }
+            return s.str();
+        });
 
     // =========================================================================
     // OBJECT CONFIG (for batch mode)
@@ -216,7 +340,23 @@ PYBIND11_MODULE(stellar, m)
         .def_readwrite("r", &BatchGetData::r)
         .def_readwrite("g", &BatchGetData::g)
         .def_readwrite("b", &BatchGetData::b)
-        .def_readwrite("a", &BatchGetData::a);
+        .def_readwrite("a", &BatchGetData::a)
+
+        // ---------------------------------------------------------------------
+        // ITEM 5: BatchGetData 3D fields
+        // NOTE: these are only useful once simulation_wrapper.cpp::batch_get
+        // populates them. Binding without populating yields zeros.
+        // ---------------------------------------------------------------------
+        .def_readwrite("z",       &BatchGetData::z)
+        .def_readwrite("vz",      &BatchGetData::vz)
+        .def_readwrite("qx",      &BatchGetData::qx)
+        .def_readwrite("qy",      &BatchGetData::qy)
+        .def_readwrite("qz",      &BatchGetData::qz)
+        .def_readwrite("qw",      &BatchGetData::qw)
+        .def_readwrite("spin_x",  &BatchGetData::spin_x)
+        .def_readwrite("spin_y",  &BatchGetData::spin_y)
+        .def_readwrite("spin_z",  &BatchGetData::spin_z)
+        .def_readwrite("mesh_id", &BatchGetData::mesh_id);
 
     py::class_<BatchUpdateData>(m, "BatchUpdateData", "Batch update data structure")
         .def(py::init<>())
@@ -335,11 +475,15 @@ PYBIND11_MODULE(stellar, m)
         .def("__repr__", [](const CollisionConfig &c)
              {
         std::string shapeStr;
+        // ITEM 1: new SPHERE/BOX cases plus defensive default
         switch (c.shape) {
-        case PyCollisionShape::NONE: shapeStr = "NONE"; break;
-        case PyCollisionShape::CIRCLE: shapeStr = "CIRCLE"; break;
-        case PyCollisionShape::AABB: shapeStr = "AABB"; break;
+        case PyCollisionShape::NONE:    shapeStr = "NONE";    break;
+        case PyCollisionShape::CIRCLE:  shapeStr = "CIRCLE";  break;
+        case PyCollisionShape::AABB:    shapeStr = "AABB";    break;
         case PyCollisionShape::POLYGON: shapeStr = "POLYGON"; break;
+        case PyCollisionShape::SPHERE:  shapeStr = "SPHERE";  break;   // new
+        case PyCollisionShape::BOX:     shapeStr = "BOX";     break;   // new
+        default:                        shapeStr = "UNKNOWN"; break;   // new (defensive)
         }
         return "<CollisionConfig shape=" + shapeStr +
             " restitution=" + std::to_string(c.restitution) +
@@ -526,6 +670,64 @@ PYBIND11_MODULE(stellar, m)
                  >>> handle = sim.add_object(x=10, y=5, mass=50, skin=SkinType.CIRCLE)
              )pbdoc")
 
+        // =====================================================================
+        // ITEM 3: 3D object methods
+        // =====================================================================
+        .def("add_object_3d", &SimulationWrapper::add_object_3d,
+             py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
+             py::arg("vx") = 0.0f, py::arg("vy") = 0.0f, py::arg("vz") = 0.0f,
+             py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
+             py::arg("mesh_id"),
+             py::arg("orientation") = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+             py::arg("spin")        = glm::vec3(0.0f, 0.0f, 0.0f),
+             py::arg("r") = 1.0f, py::arg("g") = 1.0f,
+             py::arg("b") = 1.0f, py::arg("a") = 1.0f,
+             py::arg("shape") = PyCollisionShape::SPHERE,
+             R"pbdoc(
+             Add a 3D object driven by an instanced mesh.
+
+             Args:
+                 x, y, z (float): Initial position
+                 vx, vy, vz (float): Initial velocity
+                 mass (float): Mass
+                 charge (float): Electric charge
+                 mesh_id (int): Handle returned by register_sphere / register_cube / ...
+                 orientation (tuple[float,float,float,float]): Unit quaternion (x, y, z, w).
+                     Defaults to identity.
+                 spin (tuple[float,float,float]): Angular velocity vector (rad/s).
+                 r, g, b, a (float): Color (0-1)
+                 shape (CollisionShape): SPHERE (default), BOX, or NONE.
+
+             Returns:
+                 ObjectHandle: Stable handle to the new object
+
+             Example:
+                 >>> mesh = register_sphere(radius=1.0)
+                 >>> h = sim.add_object_3d(0, 0, 5, mesh_id=mesh, mass=2.0,
+                 ...                       shape=CollisionShape.SPHERE)
+             )pbdoc")
+
+        .def("set_mesh_3d",       &SimulationWrapper::set_mesh_3d,
+             py::arg("index"), py::arg("mesh_id"),
+             "Swap the mesh of an existing 3D object. Pass -1 to hide.")
+        .def("get_mesh_3d",       &SimulationWrapper::get_mesh_3d,  py::arg("index"))
+
+        .def("set_position_3d",   &SimulationWrapper::set_position_3d,
+             py::arg("index"), py::arg("x"), py::arg("y"), py::arg("z"))
+        .def("get_position_3d",   &SimulationWrapper::get_position_3d, py::arg("index"))
+
+        .def("set_velocity_3d",   &SimulationWrapper::set_velocity_3d,
+             py::arg("index"), py::arg("vx"), py::arg("vy"), py::arg("vz"))
+        .def("get_velocity_3d",   &SimulationWrapper::get_velocity_3d, py::arg("index"))
+
+        .def("set_orientation_3d", &SimulationWrapper::set_orientation_3d,
+             py::arg("index"), py::arg("qx"), py::arg("qy"), py::arg("qz"), py::arg("qw"))
+        .def("get_orientation_3d", &SimulationWrapper::get_orientation_3d, py::arg("index"))
+
+        .def("set_spin_3d",       &SimulationWrapper::set_spin_3d,
+             py::arg("index"), py::arg("sx"), py::arg("sy"), py::arg("sz"))
+        .def("get_spin_3d",       &SimulationWrapper::get_spin_3d, py::arg("index"))
+
         // Raw index add (kept for backward compatibility)
         .def("add_object_raw", &SimulationWrapper::add_object_raw,
              py::arg("x") = 0.0f, py::arg("y") = 0.0f,
@@ -567,57 +769,67 @@ PYBIND11_MODULE(stellar, m)
                     polygon_sides (int): Number of sides for polygons (0 = keep existing)
                 )pbdoc")
 
-        // Partial update with kwargs (only specified properties change)
+        // ---------------------------------------------------------------------
+        // ITEM 6: kwargs update_object (int-index) — 3D-safe
+        // ---------------------------------------------------------------------
         .def("update_object", [](SimulationWrapper &self, int index, const py::kwargs &kwargs)
              {
             // Fetch current state
             ObjectState state = self.get_object(index);
 
-            // Convert kwargs to dict for easier access
-            py::dict kwargs_dict = kwargs;
+            py::dict kw = kwargs;
 
-            // Helper to get float with default
-            auto get_float = [&](const char* key, float default_val) -> float {
-                if (kwargs_dict.contains(key)) {
-                    return py::cast<float>(kwargs_dict[key]);
+            auto get_f = [&](const char *k, float d) {
+                return kw.contains(k) ? py::cast<float>(kw[k]) : d; };
+            auto get_i = [&](const char *k, int d) {
+                return kw.contains(k) ? py::cast<int>(kw[k]) : d; };
+
+            // --- 2D field update (existing) ---
+            float x    = get_f("x",    state.x);
+            float y    = get_f("y",    state.y);
+            float vx   = get_f("vx",   state.vx);
+            float vy   = get_f("vy",   state.vy);
+            float mass = get_f("mass", state.mass);
+            float charge = get_f("charge", state.charge);
+            float size   = get_f("size",   state.radius);
+            float width  = get_f("width",  state.width);
+            float height = get_f("height", state.height);
+            float r = get_f("r", state.r), g = get_f("g", state.g);
+            float b = get_f("b", state.b), a = get_f("a", state.a);
+            int   sides = get_i("polygon_sides", state.polygon_sides);
+
+            // --- rotation/angular velocity: only override if user asked ---
+            bool touched_rot = kw.contains("rotation");
+            bool touched_ang = kw.contains("angular_velocity");
+            float rotation = touched_rot ? py::cast<float>(kw["rotation"]) : state.rotation;
+            float ang_vel  = touched_ang ? py::cast<float>(kw["angular_velocity"]) : state.angular_velocity;
+
+            bool is_3d = (state.skin_type == -1);
+
+            if (is_3d) {
+                // For 3D objects, do NOT call the positional update_object —
+                // it would flatten the quaternion. Update only what the user
+                // explicitly asked for.
+                if (kw.contains("x") || kw.contains("y") ||
+                    kw.contains("vx") || kw.contains("vy") ||
+                    kw.contains("mass") || kw.contains("charge")) {
+                    self.set_position_3d(index, x, y, state.z);
+                    self.set_velocity_3d(index, vx, vy, state.vz);
+                    // mass/charge: no 3D setter exists yet
                 }
-                return default_val;
-            };
-
-            auto get_int = [&](const char* key, int default_val) -> int {
-                if (kwargs_dict.contains(key)) {
-                    return py::cast<int>(kwargs_dict[key]);
+                if (touched_rot || touched_ang) {
+                    throw py::type_error(
+                        "update_object(rotation=..., angular_velocity=...) is 2D-only; "
+                        "use set_orientation_3d() / set_spin_3d() for 3D objects");
                 }
-                return default_val;
-            };
+                return;
+            }
 
-            float x = get_float("x", state.x);
-            float y = get_float("y", state.y);
-            float vx = get_float("vx", state.vx);
-            float vy = get_float("vy", state.vy);
-            float mass = get_float("mass", state.mass);
-            float charge = get_float("charge", state.charge);
-            float rotation = get_float("rotation", state.rotation);
-            float angular_velocity = get_float("angular_velocity", state.angular_velocity);
-            float size = get_float("size", state.radius);
-            float width = get_float("width", state.width);
-            float height = get_float("height", state.height);
-            float r = get_float("r", state.r);
-            float g = get_float("g", state.g);
-            float b = get_float("b", state.b);
-            float a = get_float("a", state.a);
-            int polygon_sides = get_int("polygon_sides", state.polygon_sides);
-
-            // Call the full update
-            self.update_object(index,
-                               x, y,
-                               vx, vy,
-                               mass, charge,
-                               rotation, angular_velocity,
-                               size,
-                               width, height,
-                               r, g, b, a,
-                               polygon_sides); }, py::arg("index"), R"pbdoc(
+            // --- existing 2D path ---
+            self.update_object(index, x, y, vx, vy, mass, charge,
+                               rotation, ang_vel, size, width, height,
+                               r, g, b, a, sides);
+        }, py::arg("index"), R"pbdoc(
             Update only specified properties. Properties not provided keep their current values.
 
             Example:
@@ -625,58 +837,63 @@ PYBIND11_MODULE(stellar, m)
                 >>> sim.update_object(handle, size=0.8)      # change radius of a circle
             )pbdoc")
 
-        // Update by handle
+        // ---------------------------------------------------------------------
+        // ITEM 6: kwargs update_object (ObjectHandle) — 3D-safe
+        // ---------------------------------------------------------------------
         .def("update_object", [](SimulationWrapper &self, const ObjectHandle &handle, const py::kwargs &kwargs)
              {
             if (!self.is_handle_valid(handle)) {
                 throw std::runtime_error("ObjectHandle is invalid (object was removed)");
             }
             int index = self.get_slot_index(handle);
-            // Fetch current state
+
             ObjectState state = self.get_object(index);
+            py::dict kw = kwargs;
 
-            py::dict kwargs_dict = kwargs;
+            auto get_f = [&](const char *k, float d) {
+                return kw.contains(k) ? py::cast<float>(kw[k]) : d; };
+            auto get_i = [&](const char *k, int d) {
+                return kw.contains(k) ? py::cast<int>(kw[k]) : d; };
 
-            auto get_float = [&](const char* key, float default_val) -> float {
-                if (kwargs_dict.contains(key)) {
-                    return py::cast<float>(kwargs_dict[key]);
+            float x    = get_f("x",    state.x);
+            float y    = get_f("y",    state.y);
+            float vx   = get_f("vx",   state.vx);
+            float vy   = get_f("vy",   state.vy);
+            float mass = get_f("mass", state.mass);
+            float charge = get_f("charge", state.charge);
+            float size   = get_f("size",   state.radius);
+            float width  = get_f("width",  state.width);
+            float height = get_f("height", state.height);
+            float r = get_f("r", state.r), g = get_f("g", state.g);
+            float b = get_f("b", state.b), a = get_f("a", state.a);
+            int   sides = get_i("polygon_sides", state.polygon_sides);
+
+            bool touched_rot = kw.contains("rotation");
+            bool touched_ang = kw.contains("angular_velocity");
+            float rotation = touched_rot ? py::cast<float>(kw["rotation"]) : state.rotation;
+            float ang_vel  = touched_ang ? py::cast<float>(kw["angular_velocity"]) : state.angular_velocity;
+
+            bool is_3d = (state.skin_type == -1);
+
+            if (is_3d) {
+                if (kw.contains("x") || kw.contains("y") ||
+                    kw.contains("vx") || kw.contains("vy") ||
+                    kw.contains("mass") || kw.contains("charge")) {
+                    self.set_position_3d(index, x, y, state.z);
+                    self.set_velocity_3d(index, vx, vy, state.vz);
                 }
-                return default_val;
-            };
-
-            auto get_int = [&](const char* key, int default_val) -> int {
-                if (kwargs_dict.contains(key)) {
-                    return py::cast<int>(kwargs_dict[key]);
+                if (touched_rot || touched_ang) {
+                    throw py::type_error(
+                        "update_object(rotation=..., angular_velocity=...) is 2D-only; "
+                        "use set_orientation_3d() / set_spin_3d() for 3D objects");
                 }
-                return default_val;
-            };
+                return;
+            }
 
-            float x = get_float("x", state.x);
-            float y = get_float("y", state.y);
-            float vx = get_float("vx", state.vx);
-            float vy = get_float("vy", state.vy);
-            float mass = get_float("mass", state.mass);
-            float charge = get_float("charge", state.charge);
-            float rotation = get_float("rotation", state.rotation);
-            float angular_velocity = get_float("angular_velocity", state.angular_velocity);
-            float size = get_float("size", state.radius);
-            float width = get_float("width", state.width);
-            float height = get_float("height", state.height);
-            float r = get_float("r", state.r);
-            float g = get_float("g", state.g);
-            float b = get_float("b", state.b);
-            float a = get_float("a", state.a);
-            int polygon_sides = get_int("polygon_sides", state.polygon_sides);
-
-            self.update_object(index,
-                               x, y,
-                               vx, vy,
-                               mass, charge,
-                               rotation, angular_velocity,
-                               size,
-                               width, height,
-                               r, g, b, a,
-                               polygon_sides); }, py::arg("handle"), R"pbdoc(
+            self.update_object(index, x, y, vx, vy, mass, charge,
+                               rotation, ang_vel, size, width, height,
+                               r, g, b, a, sides);
+        }, py::arg("handle"), R"pbdoc(
             Update an object by stable handle.
 
             Example:
@@ -1159,33 +1376,6 @@ PYBIND11_MODULE(stellar, m)
             return self.get_collision_config(self.get_slot_index(handle)); }, py::arg("handle"),
              "Get collision configuration for an object by stable handle.")
 
-        .def("enable_collision_between", &SimulationWrapper::enable_collision_between, py::arg("obj1"), py::arg("obj2"), py::arg("enable"),
-             R"pbdoc(
-             Enable or disable collision detection between two specific objects.
-             
-             Args:
-                 obj1 (int): First object ID (raw index, or ObjectHandle.slot)
-                 obj2 (int): Second object ID (raw index, or ObjectHandle.slot)
-                 enable (bool): True to enable, False to disable
-                 
-             Useful for creating collision layers or groups.
-             
-             Example:
-                 >>> sim.enable_collision_between(0, 1, False)
-                 >>> # Objects 0 and 1 will pass through each other
-             )pbdoc")
-
-        .def("enable_collision_between", [](SimulationWrapper &self, const ObjectHandle &handle1, const ObjectHandle &handle2, bool enable)
-             {
-            if (!self.is_handle_valid(handle1)) {
-                throw std::runtime_error("ObjectHandle 1 is invalid (object was removed)");
-            }
-            if (!self.is_handle_valid(handle2)) {
-                throw std::runtime_error("ObjectHandle 2 is invalid (object was removed)");
-            }
-            self.enable_collision_between(self.get_slot_index(handle1), self.get_slot_index(handle2), enable); }, py::arg("handle1"), py::arg("handle2"), py::arg("enable"),
-             "Enable or disable collision detection between two objects by stable handles.")
-
         .def("is_collision_enabled", &SimulationWrapper::is_collision_enabled, py::arg("index"),
              R"pbdoc(
              Check if collision detection is enabled for an object.
@@ -1429,7 +1619,6 @@ PYBIND11_MODULE(stellar, m)
 
         // Signal queue
         .def("set_signal_queue_capacity", &SimulationWrapper::set_signal_queue_capacity, py::arg("capacity"), "Set the maximum number of pending signals.")
-        .def("set_signal_queue_overflow_policy", &SimulationWrapper::set_signal_queue_overflow_policy, py::arg("policy"), "Set overflow policy: 0=drop, 1=block.")
         .def("clear_signal_queue", &SimulationWrapper::clear_signal_queue, "Clear all pending signals.")
         .def("get_signal_queue_count", &SimulationWrapper::get_signal_queue_count, "Get the number of pending signals.")
 

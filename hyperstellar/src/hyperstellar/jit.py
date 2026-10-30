@@ -86,8 +86,16 @@ class NameChecker(ast.NodeVisitor):
         """Return the set of built-in variable names for the current mode."""
         common = {'num_objects', 'dt', 'time', 'idx', 'group_count', 'i', 'p'}
         if self.mode == 'object':
-            return common | {'x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
-                             'ax', 'ay', 'angular', 'color', 'pos', 'vel'}
+            return common | {
+                # 2D user-facing aliases.
+                'x', 'y', 'vx', 'vy',
+                'mass', 'charge', 'theta', 'omega',
+                'ax', 'ay', 'angular', 'color', 'pos', 'vel',
+                # 3D state variables declared by the object shader.
+                'z', 'vz', 'az',
+                'wx', 'wy', 'wz',
+                'angular_x', 'angular_y', 'angular_z',
+            }
         elif self.mode == 'paint':
             return common | {'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
                              'color', 't'}
@@ -111,6 +119,10 @@ class NameChecker(ast.NodeVisitor):
             # JIT-specific
             'signal', 'scratchpad_read', 'scratchpad_write',
             'apply_constraints', 'detect_collision', 'resolve_collision',
+            # Constraint DSL and query helpers.
+            'spring', 'distance', 'boundary', 'angle',
+            'get_constraint_count', 'get_constraint_type',
+            'get_constraint_target', 'get_constraint_param',
             # Ray-tracing
             'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
             'look_at', 'camera_ray', 'camera_ray_ndc', 'offset_ray_origin',
@@ -390,7 +402,7 @@ class GLSLGenerator(ast.NodeVisitor):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 if node.func.id == 'apply_constraints':
                     self.user_applies_constraints = True
-                elif node.func.id in ('detect_collision', 'resolve_collision'):
+                elif node.func.id == 'resolve_collision':
                     self.user_handles_collisions = True
 
         # Check for return statement and capture its expression
@@ -405,9 +417,17 @@ class GLSLGenerator(ast.NodeVisitor):
             predefined = {'signal_object_idx', 'signal_payload', 'num_objects', 'dt',
                           'time', 'idx', 'group_count', 'i'}
         else:
-            predefined = {'x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
-                          'color', 'pos', 'vel', 'num_objects', 'dt', 'time', 'idx',
-                          'group_count', 'i', 'ax', 'ay', 'angular'}
+            predefined = {
+                'x', 'y', 'vx', 'vy',
+                'mass', 'charge', 'theta', 'omega',
+                'color', 'pos', 'vel',
+                'num_objects', 'dt', 'time', 'idx', 'group_count', 'i',
+                'ax', 'ay', 'angular',
+                # 3D state variables declared by main() in the object shader.
+                'z', 'vz', 'az',
+                'wx', 'wy', 'wz',
+                'angular_x', 'angular_y', 'angular_z',
+            }
         
         self.assigned_vars = collector.vars - predefined
         if self.mode == 'paint':
@@ -763,11 +783,87 @@ float fbm(vec2 p, int octaves) {
         if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
             func_name = node.value.func.id
             if func_name == 'apply_constraints':
-                self.lines.append(self.indent_str() + "apply_constraints();")
+                if self.mode != 'object':
+                    raise SyntaxError("apply_constraints() is only available in 'object' scripts.")
+                if node.value.args or node.value.keywords:
+                    raise SyntaxError("apply_constraints() takes no arguments")
+                ind = self.indent_str()
+                self.lines.extend([
+                    ind + "{",
+                    ind + "    pos = vec2(x, y);",
+                    ind + "    vel = vec2(vx, vy);",
+                    ind + "    applyConstraints(pos, vel, _self, _originalPos);",
+                    ind + "    x = pos.x; y = pos.y;",
+                    ind + "    vx = vel.x; vy = vel.y;",
+                    ind + "}",
+                ])
+                self.user_applies_constraints = True
                 return
             if func_name == 'resolve_collision':
-                args = [self._expr_to_glsl(a) for a in node.value.args]
-                self.lines.append(self.indent_str() + f"resolve_collision({', '.join(args)});")
+                if self.mode != 'object':
+                    raise SyntaxError("resolve_collision() is only available in 'object' scripts.")
+                if len(node.value.args) != 1 or node.value.keywords:
+                    raise SyntaxError("resolve_collision(other) takes exactly one positional argument")
+                other_expr = self._expr_to_glsl(node.value.args[0])
+                ind = self.indent_str()
+                self.lines.extend([
+                    ind + "{",
+                    ind + "    int _res_other = int(" + other_expr + ");",
+                    ind + "    if (_res_other >= 0 && _res_other < uNumObjects && _res_other != _self) {",
+                    ind + "        Object _o = objectsIn[_res_other];",
+                    ind + "        CollisionProperties _pa = collisionProps[_self];",
+                    ind + "        CollisionProperties _pb = collisionProps[_res_other];",
+                    ind + "        if (_pa.enabled != 0 && _pb.enabled != 0 &&",
+                    ind + "            _pa.shapeType != COLLISION_NONE && _pb.shapeType != COLLISION_NONE) {",
+                    ind + "            float _rest = min(_pa.restitution, _pb.restitution);",
+                    ind + "            float _fric = sqrt(_pa.friction * _pb.friction);",
+                    ind + "            float _mB   = max(EPSILON, _o.mass);",
+                    # Resolve 3D contacts using the current user-visible state.
+                    ind + "            if (_pa.shapeType >= COLLISION_SPHERE && _pb.shapeType >= COLLISION_SPHERE) {",
+                    ind + "                Object _me = p;",
+                    ind + "                _me.position    = vec4(x, y, z, 0.0);",
+                    ind + "                _me.orientation = _q;",
+                    ind + "                CollisionInfo3D _c3 = detectCollision3D(_me, _o, _pa.shapeType, _pb.shapeType);",
+                    ind + "                if (_c3.hasCollision) {",
+                    ind + "                    float _iA = getMomentOfInertia3D(mass, _pa.shapeType, p.visualData);",
+                    ind + "                    float _iB = getMomentOfInertia3D(_mB, _pb.shapeType, _o.visualData);",
+                    ind + "                    vec3 _pa3 = vec3(x, y, z), _va3 = vec3(vx, vy, vz), _wa3 = vec3(wx, wy, omega);",
+                    ind + "                    vec3 _pb3 = _o.position.xyz, _vb3 = _o.velocity.xyz, _wb3 = _o.spin.xyz;",
+                    ind + "                    resolveCollision3D(_pa3, _va3, _wa3, mass, _iA,",
+                    ind + "                                       _pb3, _vb3, _wb3, _mB,  _iB,",
+                    ind + "                                       _c3.normal, _c3.contactPoint, _c3.penetration, _rest, _fric);",
+                    ind + "                    x = _pa3.x; y = _pa3.y; z = _pa3.z;",
+                    ind + "                    vx = _va3.x; vy = _va3.y; vz = _va3.z;",
+                    ind + "                    wx = _wa3.x; wy = _wa3.y; omega = _wa3.z;",
+                    ind + "                }",
+                    ind + "            }",
+                    # Resolve 2D contacts using the current user-visible state.
+                    ind + "            else if (_pa.shapeType < COLLISION_SPHERE && _pb.shapeType < COLLISION_SPHERE) {",
+                    ind + "                Object _me = p;",
+                    ind + "                _me.position    = vec4(x, y, p.position.z, 0.0);",
+                    ind + "                _me.orientation = _q;",
+                    ind + "                CollisionInfo _col = detectCollision(_me, _o, _res_other, _self);",
+                    ind + "                if (_col.hasCollision) {",
+                    ind + "                    float _iA = getMomentOfInertia(mass, _pa.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);",
+                    ind + "                    float _iB = getMomentOfInertia(_mB, _pb.shapeType, _o.visualData.x, _o.visualData.y, _o.visualData.x * 0.5);",
+                    ind + "                    vec2 _pp = vec2(x, y), _pv = vec2(vx, vy);",
+                    ind + "                    vec2 _op = _o.position.xy, _ov = _o.velocity.xy;",
+                    ind + "                    float _ow = _o.spin.z;",
+                    ind + "                    resolveCollisionWithTorque(_pp, _pv, omega, mass, _iA,",
+                    ind + "                                               _op, _ov, _ow, _mB, _iB,",
+                    ind + "                                               _col.normal, _col.contactPoint, _col.penetration, _rest, _fric);",
+                    ind + "                    x = _pp.x; y = _pp.y; vx = _pv.x; vy = _pv.y;",
+                    ind + "                }",
+                    ind + "            }",
+                    # Keep angular velocity within the same bounds as the automatic path.
+                    ind + "            omega = clamp(omega, -100.0, 100.0);",
+                    ind + "            wx = clamp(wx, -100.0, 100.0);",
+                    ind + "            wy = clamp(wy, -100.0, 100.0);",
+                    ind + "        }",
+                    ind + "    }",
+                    ind + "}",
+                ])
+                self.user_handles_collisions = True
                 return
             if func_name == 'spring':
                 self._handle_spring(node.value)
@@ -791,58 +887,54 @@ float fbm(vec2 p, int octaves) {
         damping = self._expr_to_glsl(kwargs.get('damping', ast.Constant(value=0.0)))
         rest = self._expr_to_glsl(kwargs.get('rest_length', ast.Constant(value=1.0)))
 
-        code = f'''
-        {{
-            int other = int({target});
-            if (other >= 0 && other < uNumObjects && other != self) {{
-                vec2 otherPos = objectsIn[other].position;
-                vec2 otherVel = objectsIn[other].velocity;
-                float otherMass = max(EPSILON, objectsIn[other].mass);
-                vec2 delta = pos - otherPos;
-                float dist = length(delta);
-                if (dist > EPSILON) {{
-                    vec2 dir = delta / dist;
-                    float relVel = dot(vel - otherVel, dir);
-                    float forceMag = {stiffness} * (dist - {rest}) + {damping} * relVel;
-                    vec2 force = -dir * forceMag;
-                    ax += force.x / mass;
-                    ay += force.y / mass;
-                }}
-            }}
+        code = f"""{{
+    int _other = int({target});
+    if (_other >= 0 && _other < uNumObjects && _other != _self) {{
+        vec2 _otherPos = objectsIn[_other].position.xy;
+        vec2 _otherVel = objectsIn[_other].velocity.xy;
+        vec2 _delta = vec2(x, y) - _otherPos;
+        float _dist = length(_delta);
+        if (_dist > EPSILON) {{
+            vec2 _dir = _delta / _dist;
+            float _relVel = dot(vec2(vx, vy) - _otherVel, _dir);
+            float _forceMag = {stiffness} * (_dist - {rest}) + {damping} * _relVel;
+            vec2 _force = -_dir * _forceMag;
+            ax += _force.x / mass;
+            ay += _force.y / mass;
         }}
-        '''
-        self.lines.append(self.indent_str() + code.strip())
+    }}
+}}"""
+        self.lines.append(self.indent_str() + code)
 
     def _handle_distance(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
         length = self._expr_to_glsl(kwargs.get('length', ast.Constant(value=1.0)))
-        beta = 0.2
-        gamma = 0.0
+        beta, gamma = 0.2, 0.0
 
-        code = f'''
-        {{
-            int other = int({target});
-            if (other >= 0 && other < uNumObjects && other != self) {{
-                vec2 otherPos = objectsIn[other].position;
-                vec2 otherVel = objectsIn[other].velocity;
-                float otherMass = max(EPSILON, objectsIn[other].mass);
-                vec2 delta = pos - otherPos;
-                float dist = length(delta);
-                if (dist > EPSILON) {{
-                    vec2 n = delta / dist;
-                    float C = dist - {length};
-                    float vn = dot(vel - otherVel, n);
-                    float invMassSum = (1.0 / mass) + (1.0 / otherMass);
-                    float lambda = -(vn + {beta} * C / uDt) / (invMassSum + {gamma});
-                    vec2 impulse = lambda * n;
-                    vel += impulse / mass;
-                    pos += n * ({beta} * C);
-                }}
-            }}
+        code = f"""{{
+    int _other = int({target});
+    if (_other >= 0 && _other < uNumObjects && _other != _self) {{
+        vec2 _otherPos = objectsIn[_other].position.xy;
+        vec2 _otherVel = objectsIn[_other].velocity.xy;
+        float _otherMass = max(EPSILON, objectsIn[_other].mass);
+        vec2 _delta = vec2(x, y) - _otherPos;
+        float _dist = length(_delta);
+        if (_dist > EPSILON) {{
+            vec2 _n = _delta / _dist;
+            float _C = _dist - {length};
+            float _vn = dot(vec2(vx, vy) - _otherVel, _n);
+            float _invMassSum = (1.0 / mass) + (1.0 / _otherMass);
+            float _lambda = -(_vn + {beta} * _C / uDt) / (_invMassSum + {gamma});
+            vec2 _impulse = _lambda * _n;
+            vx += _impulse.x / mass;
+            vy += _impulse.y / mass;
+            x += _n.x * ({beta} * _C);
+            y += _n.y * ({beta} * _C);
         }}
-        '''
-        self.lines.append(self.indent_str() + code.strip())
+    }}
+}}"""
+        self.lines.append(self.indent_str() + code)
 
     def _handle_boundary(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
@@ -853,76 +945,66 @@ float fbm(vec2 p, int octaves) {
         elasticity = 0.7
         friction = 0.95
 
-        code = f'''
-        {{
-            const float elasticity = {elasticity};
-            const float friction = {friction};
-            if (pos.x < {min_x}) {{ pos.x = {min_x}; vel.x = abs(vel.x) * elasticity; vel.y *= friction; }}
-            else if (pos.x > {max_x}) {{ pos.x = {max_x}; vel.x = -abs(vel.x) * elasticity; vel.y *= friction; }}
-            if (pos.y < {min_y}) {{ pos.y = {min_y}; vel.y = abs(vel.y) * elasticity; vel.x *= friction; }}
-            else if (pos.y > {max_y}) {{ pos.y = {max_y}; vel.y = -abs(vel.y) * elasticity; vel.x *= friction; }}
-        }}
-        '''
-        self.lines.append(self.indent_str() + code.strip())
+        code = f"""{{
+    const float _elast = {elasticity};
+    const float _fric = {friction};
+    if (x < {min_x}) {{ x = {min_x}; vx = abs(vx) * _elast; vy *= _fric; }}
+    else if (x > {max_x}) {{ x = {max_x}; vx = -abs(vx) * _elast; vy *= _fric; }}
+    if (y < {min_y}) {{ y = {min_y}; vy = abs(vy) * _elast; vx *= _fric; }}
+    else if (y > {max_y}) {{ y = {max_y}; vy = -abs(vy) * _elast; vx *= _fric; }}
+}}"""
+        self.lines.append(self.indent_str() + code)
 
     def _handle_angle(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
         target1 = self._expr_to_glsl(kwargs.get('target1', ast.Constant(value=0)))
         target2 = self._expr_to_glsl(kwargs.get('target2', ast.Constant(value=0)))
         target_angle = self._expr_to_glsl(kwargs.get('angle', ast.Constant(value=0.0)))
-        beta = 0.2
-        gamma = 0.0
+        beta, gamma = 0.2, 0.0
 
-        code = f'''
-        {{
-            int other1 = int({target1});
-            int other2 = int({target2});
-            if (other1 >= 0 && other1 < uNumObjects && other1 != self &&
-                other2 >= 0 && other2 < uNumObjects && other2 != self &&
-                other1 != other2) {{
+        code = f"""{{
+    int _o1 = int({target1});
+    int _o2 = int({target2});
+    if (_o1 >= 0 && _o1 < uNumObjects && _o1 != _self &&
+        _o2 >= 0 && _o2 < uNumObjects && _o2 != _self &&
+        _o1 != _o2) {{
+        vec2 _B = objectsIn[_o1].position.xy;
+        vec2 _C = objectsIn[_o2].position.xy;
+        vec2 _P = vec2(x, y);
+        vec2 _r1 = _B - _P;
+        vec2 _r2 = _C - _P;
+        float _dotP = dot(_r1, _r2);
+        float _crossP = _r1.x * _r2.y - _r1.y * _r2.x;
+        float _curA = atan(_crossP, _dotP);
+        float _err = _curA - {target_angle};
 
-                vec2 B = objectsIn[other1].position;
-                vec2 C = objectsIn[other2].position;
-                vec2 r1 = B - pos;
-                vec2 r2 = C - pos;
-                float dotProd = dot(r1, r2);
-                float crossProd = r1.x*r2.y - r1.y*r2.x;
-                float currentAngle = atan(crossProd, dotProd);
+        float _eps = EPSILON;
+        vec2 _Pxp = _P + vec2(_eps, 0.0);
+        vec2 _Pxm = _P - vec2(_eps, 0.0);
+        vec2 _Pyp = _P + vec2(0.0, _eps);
+        vec2 _Pym = _P - vec2(0.0, _eps);
 
-                // Error
-                float C_err = currentAngle - {target_angle};
+        float _axp = atan((_B - _Pxp).x * (_C - _Pxp).y - (_B - _Pxp).y * (_C - _Pxp).x, dot(_B - _Pxp, _C - _Pxp));
+        float _axm = atan((_B - _Pxm).x * (_C - _Pxm).y - (_B - _Pxm).y * (_C - _Pxm).x, dot(_B - _Pxm, _C - _Pxm));
+        float _ayp = atan((_B - _Pyp).x * (_C - _Pyp).y - (_B - _Pyp).y * (_C - _Pyp).x, dot(_B - _Pyp, _C - _Pyp));
+        float _aym = atan((_B - _Pym).x * (_C - _Pym).y - (_B - _Pym).y * (_C - _Pym).x, dot(_B - _Pym, _C - _Pym));
 
-                // Compute gradient of angle w.r.t. pos (self) using finite differences
-                float eps = EPSILON;
-                vec2 pos_xp = pos + vec2(eps, 0.0);
-                vec2 pos_xm = pos - vec2(eps, 0.0);
-                vec2 pos_yp = pos + vec2(0.0, eps);
-                vec2 pos_ym = pos - vec2(0.0, eps);
+        vec2 _grad = vec2((_axp - _axm) / (2.0 * _eps),
+                          (_ayp - _aym) / (2.0 * _eps));
 
-                float angle_xp = atan( (B-pos_xp).x*(C-pos_xp).y - (B-pos_xp).y*(C-pos_xp).x,
-                                       dot(B-pos_xp, C-pos_xp) );
-                float angle_xm = atan( (B-pos_xm).x*(C-pos_xm).y - (B-pos_xm).y*(C-pos_xm).x,
-                                       dot(B-pos_xm, C-pos_xm) );
-                float angle_yp = atan( (B-pos_yp).x*(C-pos_yp).y - (B-pos_yp).y*(C-pos_yp).x,
-                                       dot(B-pos_yp, C-pos_yp) );
-                float angle_ym = atan( (B-pos_ym).x*(C-pos_ym).y - (B-pos_ym).y*(C-pos_ym).x,
-                                       dot(B-pos_ym, C-pos_ym) );
-
-                vec2 g = vec2( (angle_xp - angle_xm) / (2.0*eps),
-                               (angle_yp - angle_ym) / (2.0*eps) );
-
-                float g2 = dot(g, g);
-                if (g2 > 1e-10) {{
-                    float vn = dot(vel, g);
-                    float lambda = -(vn + {beta} * C_err / uDt) / (g2 / mass + {gamma});
-                    vel += lambda * g / mass;
-                    float posCorr = -{beta} * C_err / g2;
-                    pos += posCorr * g;
-                }}
-            }}
+        float _g2 = dot(_grad, _grad);
+        if (_g2 > 1e-10) {{
+            float _vn = dot(vec2(vx, vy), _grad);
+            float _lambda = -(_vn + {beta} * _err / uDt) / (_g2 / mass + {gamma});
+            vx += _lambda * _grad.x / mass;
+            vy += _lambda * _grad.y / mass;
+            float _posCorr = -{beta} * _err / _g2;
+            x += _posCorr * _grad.x;
+            y += _posCorr * _grad.y;
         }}
-        '''
-        self.lines.append(self.indent_str() + code.strip())
+    }}
+}}"""
+        self.lines.append(self.indent_str() + code)
 
     # ---- Assign (with tuple unpacking support) ----
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -1189,6 +1271,8 @@ float fbm(vec2 p, int octaves) {
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
             if not func_name:
                 return None
+            if func_name == 'detect_collision':
+                return 'bool'
             # Ray-tracing
             if func_name in ('sphere', 'plane'):
                 return "GeoObject"
@@ -1358,11 +1442,12 @@ float fbm(vec2 p, int octaves) {
                             return f"{var_name}.{attr}"
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
             mapping = {
-                'x': 'position.x', 'y': 'position.y',
-                'vx': 'velocity.x', 'vy': 'velocity.y',
+                'x': 'x', 'y': 'y', 'z': 'z',
+                'vx': 'vx', 'vy': 'vy', 'vz': 'vz',
                 'mass': 'mass', 'charge': 'charge',
-                'theta': 'visualData.z', 'omega': 'visualData.w',
-                'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a'
+                'theta': 'theta', 'omega': 'omega',
+                'wx': 'wx', 'wy': 'wy', 'wz': 'wz',
+                'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a',
             }
             if node.attr in mapping:
                 return mapping[node.attr]
@@ -1373,14 +1458,21 @@ float fbm(vec2 p, int octaves) {
                 idx_expr = self._expr_to_glsl(slice_expr)
                 obj_ref = f"objectsIn[{idx_expr}]"
                 field_map = {
-                    'x': 'position.x', 'y': 'position.y',
-                    'vx': 'velocity.x', 'vy': 'velocity.y',
+                    'x': 'position.x', 'y': 'position.y', 'z': 'position.z',
+                    'vx': 'velocity.x', 'vy': 'velocity.y', 'vz': 'velocity.z',
                     'mass': 'mass', 'charge': 'charge',
-                    'theta': 'visualData.z', 'omega': 'visualData.w',
-                    'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a'
+                    'omega': 'spin.z',
+                    'wx': 'spin.x', 'wy': 'spin.y', 'wz': 'spin.z',
+                    'qx': 'orientation.x', 'qy': 'orientation.y',
+                    'qz': 'orientation.z', 'qw': 'orientation.w',
+                    'spin_x': 'spin.x', 'spin_y': 'spin.y', 'spin_z': 'spin.z',
+                    'mesh_id': 'meshID',
+                    'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a',
                 }
                 if node.attr in field_map:
                     return f"{obj_ref}.{field_map[node.attr]}"
+                if node.attr == 'theta':
+                    return f"quat_extract_2d_angle({obj_ref}.orientation)"
                 raise SyntaxError(f"Unknown property for p[index]: {node.attr}")
         base_str = self._expr_to_glsl(node.value)
         if self._is_complex_expr(node.value):
@@ -1556,7 +1648,15 @@ float fbm(vec2 p, int octaves) {
                     return f"signal_enqueue(int({args[0]}), {args[1]})"
                 raise SyntaxError("signal(agent_id, payload)")
 
-            if func_name in ('apply_constraints', 'detect_collision', 'resolve_collision'):
+            if func_name == 'detect_collision':
+                if self.mode != 'object':
+                    raise SyntaxError("detect_collision() is only available in 'object' scripts.")
+                if len(node.args) != 1 or node.keywords:
+                    raise SyntaxError("detect_collision(other) takes exactly one positional argument")
+                other_expr = self._expr_to_glsl(node.args[0])
+                return f"_dc_inline(int({other_expr}), _self, vec2(x, y), z, _q, p)"
+
+            if func_name in ('apply_constraints', 'resolve_collision'):
                 if self.mode != 'object':
                     raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
 
