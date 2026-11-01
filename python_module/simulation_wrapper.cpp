@@ -768,6 +768,37 @@ std::pair<bool, int> SimulationWrapper::get_collision_parameters() const
     return std::make_pair(enable_warm_start, max_contact_iterations);
 }
 
+void SimulationWrapper::set_collision_layer(int index, uint32_t layer)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    Objects::SetCollisionLayer(index, layer);
+}
+
+void SimulationWrapper::set_collision_mask(int index, uint32_t mask)
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    Objects::SetCollisionMask(index, mask);
+}
+
+uint32_t SimulationWrapper::get_collision_layer(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    return Objects::GetCollisionLayer(index);
+}
+
+uint32_t SimulationWrapper::get_collision_mask(int index) const
+{
+    ensure_initialized();
+    if (index < 0 || index >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
+    return Objects::GetCollisionMask(index);
+}
 // ============================================================================
 // Update simulation physics
 // ============================================================================
@@ -1103,8 +1134,6 @@ CollisionConfig SimulationWrapper::get_collision_config(int index)
 
     return config;
 }
-
-
 
 // Check if collisions are enabled for an object
 bool SimulationWrapper::is_collision_enabled(int index)
@@ -2266,6 +2295,8 @@ void SimulationWrapper::save_to_file(
 
         fprintf(file, "collision_shape = %d\n", props.shapeType);
         fprintf(file, "collision_enabled = %d\n", props.enabled);
+        fprintf(file, "collision_layer = %u\n", props.layer);
+        fprintf(file, "collision_mask  = %u\n", props.mask);
         fprintf(file, "restitution = %.6f\n", props.restitution);
         fprintf(file, "friction = %.6f\n", props.friction);
 
@@ -2321,6 +2352,8 @@ void SimulationWrapper::load_from_file(const std::string &filename)
     int current_collision_enabled = 1;
     float current_restitution = 0.7f;
     float current_friction = 0.3f;
+    uint32_t current_collision_layer = 0x01;
+    uint32_t current_collision_mask = 0xFFFFFFFF;
 
     bool has_position3 = false;
     bool has_velocity3 = false;
@@ -2364,6 +2397,8 @@ void SimulationWrapper::load_from_file(const std::string &filename)
         current_collision_enabled = 1;
         current_restitution = 0.7f;
         current_friction = 0.3f;
+        current_collision_layer = 0x01;
+        current_collision_mask = 0xFFFFFFFF;
     };
 
     auto emit_object = [&]()
@@ -2446,6 +2481,8 @@ void SimulationWrapper::load_from_file(const std::string &filename)
         set_collision_shape(slot, static_cast<PyCollisionShape>(current_collision_shape));
         set_collision_enabled(slot, current_collision_enabled != 0);
         set_collision_properties(slot, current_restitution, current_friction);
+        set_collision_layer(slot, current_collision_layer);
+        set_collision_mask(slot, current_collision_mask);
     };
 
     try
@@ -2633,6 +2670,14 @@ void SimulationWrapper::load_from_file(const std::string &filename)
             else if (k == "collision_enabled")
             {
                 current_collision_enabled = std::stoi(v);
+            }
+            else if (k == "collision_layer")
+            {
+                current_collision_layer = static_cast<uint32_t>(std::stoul(v));
+            }
+            else if (k == "collision_mask")
+            {
+                current_collision_mask = static_cast<uint32_t>(std::stoul(v));
             }
             else if (k == "restitution")
             {

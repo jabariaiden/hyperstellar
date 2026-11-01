@@ -231,7 +231,7 @@ GLFW_INCLUDE_DIR:UNINITIALIZED=/home/jaybird/Aidens_stuff/hyperstellar-public/_d
 GLFW_LIBRARY:UNINITIALIZED=/home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-build/src/libglfw3.a
 
 //No help, variable specified on the command line.
-Python3_EXECUTABLE:UNINITIALIZED=/home/jaybird/hyperstellar_env/bin/python
+Python3_EXECUTABLE:UNINITIALIZED=/home/jaybird/Aidens_stuff/testing/test/bin/python
 
 //Path to a library.
 X11_LIB:FILEPATH=/usr/lib64/libX11.so
@@ -249,7 +249,7 @@ Xinerama_LIB:FILEPATH=/usr/lib64/libXinerama.so
 Xrandr_LIB:FILEPATH=/usr/lib64/libXrandr.so
 
 //No help, variable specified on the command line.
-pybind11_DIR:UNINITIALIZED=/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11
+pybind11_DIR:UNINITIALIZED=/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11
 
 //Value Computed by CMake
 stellar_python_BINARY_DIR:STATIC=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux
@@ -415,11 +415,11 @@ CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //Details about finding Python3
-FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/hyperstellar_env/bin/python][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.16(3.9)]
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/Aidens_stuff/testing/test/bin/python][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.16(3.9)]
 //Test HAS_FLTO_AUTO
 HAS_FLTO_AUTO:INTERNAL=1
 //Python executable during the last CMake run
-PYBIND11_PYTHON_EXECUTABLE_LAST:INTERNAL=/home/jaybird/hyperstellar_env/bin/python
+PYBIND11_PYTHON_EXECUTABLE_LAST:INTERNAL=/home/jaybird/Aidens_stuff/testing/test/bin/python
 //Python debug status
 PYTHON_IS_DEBUG:INTERNAL=0
 PYTHON_MODULE_DEBUG_POSTFIX:INTERNAL=
@@ -431,14 +431,14 @@ _Python3_Compiler_REASON_FAILURE:INTERNAL=
 _Python3_DEVELOPMENT_MODULE_SIGNATURE:INTERNAL=a95b148aac5e04f29e19ad19bf7876a8
 //Development reason failure
 _Python3_Development_REASON_FAILURE:INTERNAL=
-_Python3_EXECUTABLE:INTERNAL=/home/jaybird/hyperstellar_env/bin/python
+_Python3_EXECUTABLE:INTERNAL=/home/jaybird/Aidens_stuff/testing/test/bin/python
 //Path to a file.
 _Python3_INCLUDE_DIR:INTERNAL=/usr/include/python3.13
 //Python3 Properties
-_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;13;16;64;<none>;cpython-313-x86_64-linux-gnu;abi3;/usr/lib64/python3.13;/home/jaybird/hyperstellar_env/lib64/python3.13;/home/jaybird/hyperstellar_env/lib/python3.13/site-packages;/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages
-_Python3_INTERPRETER_SIGNATURE:INTERNAL=caee6ee88668d768ef8495b52a5e6240
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;13;16;64;<none>;cpython-313-x86_64-linux-gnu;abi3;/usr/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib/python3.13/site-packages;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=707ab3a78e0c26a1e46f1f0213c3625b
 //NumPy reason failure
 _Python3_NumPy_REASON_FAILURE:INTERNAL=
 //Directories where pybind11 and possibly Python headers are located
-pybind11_INCLUDE_DIRS:INTERNAL=/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/include;/usr/include/python3.13
+pybind11_INCLUDE_DIRS:INTERNAL=/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/include;/usr/include/python3.13
 

@@ -20,7 +20,7 @@ events:
     names:
       - "uname"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -31,7 +31,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/"
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/uname"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/uname"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/uname"
       - "/home/jaybird/.local/bin/uname"
       - "/home/jaybird/bin/uname"
@@ -39,7 +39,7 @@ events:
     found: "/usr/bin/uname"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -79,7 +79,7 @@ events:
       - "make"
       - "smake"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -90,7 +90,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/"
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/gmake"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gmake"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gmake"
       - "/home/jaybird/.local/bin/gmake"
       - "/home/jaybird/bin/gmake"
@@ -98,7 +98,7 @@ events:
     found: "/usr/bin/gmake"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -136,7 +136,7 @@ events:
       - "icx"
       - "clang"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -147,7 +147,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/"
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/cc"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/cc"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/cc"
       - "/home/jaybird/.local/bin/cc"
       - "/home/jaybird/bin/cc"
@@ -155,7 +155,7 @@ events:
     found: "/usr/bin/cc"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -194,7 +194,7 @@ events:
     found: "/usr/share/cmake/Modules/CMakeCCompilerId.c.in"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -249,7 +249,7 @@ events:
       - "ar"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -261,7 +261,7 @@ events:
     found: "/usr/bin/ar"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -294,7 +294,7 @@ events:
       - "ranlib"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -306,7 +306,7 @@ events:
     found: "/usr/bin/ranlib"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -339,7 +339,7 @@ events:
       - "strip"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -351,7 +351,7 @@ events:
     found: "/usr/bin/strip"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -384,7 +384,7 @@ events:
       - "ld"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -396,7 +396,7 @@ events:
     found: "/usr/bin/ld"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -429,7 +429,7 @@ events:
       - "nm"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -441,7 +441,7 @@ events:
     found: "/usr/bin/nm"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -474,7 +474,7 @@ events:
       - "objdump"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -486,7 +486,7 @@ events:
     found: "/usr/bin/objdump"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -519,7 +519,7 @@ events:
       - "objcopy"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -531,7 +531,7 @@ events:
     found: "/usr/bin/objcopy"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -564,7 +564,7 @@ events:
       - "readelf"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -576,7 +576,7 @@ events:
     found: "/usr/bin/readelf"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -609,7 +609,7 @@ events:
       - "dlltool"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -620,7 +620,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/dlltool"
-      - "/home/jaybird/hyperstellar_env/bin/dlltool"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/dlltool"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/dlltool"
       - "/home/jaybird/.local/bin/dlltool"
       - "/home/jaybird/bin/dlltool"
@@ -632,7 +632,7 @@ events:
     found: false
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -665,7 +665,7 @@ events:
       - "addr2line"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -677,7 +677,7 @@ events:
     found: "/usr/bin/addr2line"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -710,7 +710,7 @@ events:
       - "tapi"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -721,7 +721,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/tapi"
-      - "/home/jaybird/hyperstellar_env/bin/tapi"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/tapi"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/tapi"
       - "/home/jaybird/.local/bin/tapi"
       - "/home/jaybird/bin/tapi"
@@ -733,7 +733,7 @@ events:
     found: false
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -769,7 +769,7 @@ events:
       - "gcc-ar"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -780,7 +780,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/gcc-ar-16.2"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.2"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar-16.2"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16.2"
       - "/home/jaybird/.local/bin/gcc-ar-16.2"
       - "/home/jaybird/bin/gcc-ar-16.2"
@@ -790,7 +790,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16.2"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16.2"
       - "/usr/bin/gcc-ar-16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar-16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16"
       - "/home/jaybird/.local/bin/gcc-ar-16"
       - "/home/jaybird/bin/gcc-ar-16"
@@ -800,7 +800,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16"
       - "/usr/bin/gcc-ar16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar16"
       - "/home/jaybird/.local/bin/gcc-ar16"
       - "/home/jaybird/bin/gcc-ar16"
@@ -812,7 +812,7 @@ events:
     found: "/usr/bin/gcc-ar"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -848,7 +848,7 @@ events:
       - "gcc-ranlib"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -859,7 +859,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/gcc-ranlib-16.2"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib-16.2"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16.2"
       - "/home/jaybird/.local/bin/gcc-ranlib-16.2"
       - "/home/jaybird/bin/gcc-ranlib-16.2"
@@ -869,7 +869,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16.2"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16.2"
       - "/usr/bin/gcc-ranlib-16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib-16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16"
       - "/home/jaybird/.local/bin/gcc-ranlib-16"
       - "/home/jaybird/bin/gcc-ranlib-16"
@@ -879,7 +879,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16"
       - "/usr/bin/gcc-ranlib16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib16"
       - "/home/jaybird/.local/bin/gcc-ranlib16"
       - "/home/jaybird/bin/gcc-ranlib16"
@@ -891,7 +891,7 @@ events:
     found: "/usr/bin/gcc-ranlib"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -936,7 +936,7 @@ events:
     found: "/usr/bin/c++"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -975,7 +975,7 @@ events:
     found: "/usr/share/cmake/Modules/CMakeCXXCompilerId.cpp.in"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1033,7 +1033,7 @@ events:
       - "gcc-ar"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -1044,7 +1044,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/gcc-ar-16.2"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16.2"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar-16.2"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16.2"
       - "/home/jaybird/.local/bin/gcc-ar-16.2"
       - "/home/jaybird/bin/gcc-ar-16.2"
@@ -1054,7 +1054,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16.2"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16.2"
       - "/usr/bin/gcc-ar-16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar-16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar-16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar-16"
       - "/home/jaybird/.local/bin/gcc-ar-16"
       - "/home/jaybird/bin/gcc-ar-16"
@@ -1064,7 +1064,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ar-16"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ar-16"
       - "/usr/bin/gcc-ar16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ar16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ar16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ar16"
       - "/home/jaybird/.local/bin/gcc-ar16"
       - "/home/jaybird/bin/gcc-ar16"
@@ -1076,7 +1076,7 @@ events:
     found: "/usr/bin/gcc-ar"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1112,7 +1112,7 @@ events:
       - "gcc-ranlib"
     candidate_directories:
       - "/usr/bin/"
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/home/jaybird/bin/"
@@ -1123,7 +1123,7 @@ events:
       - "/home/jaybird/Android/Sdk/platform-tools/"
     searched_directories:
       - "/usr/bin/gcc-ranlib-16.2"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16.2"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib-16.2"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16.2"
       - "/home/jaybird/.local/bin/gcc-ranlib-16.2"
       - "/home/jaybird/bin/gcc-ranlib-16.2"
@@ -1133,7 +1133,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16.2"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16.2"
       - "/usr/bin/gcc-ranlib-16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib-16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib-16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib-16"
       - "/home/jaybird/.local/bin/gcc-ranlib-16"
       - "/home/jaybird/bin/gcc-ranlib-16"
@@ -1143,7 +1143,7 @@ events:
       - "/home/jaybird/Android/Sdk/emulator/gcc-ranlib-16"
       - "/home/jaybird/Android/Sdk/platform-tools/gcc-ranlib-16"
       - "/usr/bin/gcc-ranlib16"
-      - "/home/jaybird/hyperstellar_env/bin/gcc-ranlib16"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/gcc-ranlib16"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/gcc-ranlib16"
       - "/home/jaybird/.local/bin/gcc-ranlib16"
       - "/home/jaybird/bin/gcc-ranlib16"
@@ -1155,7 +1155,7 @@ events:
     found: "/usr/bin/gcc-ranlib"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1176,8 +1176,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK"
     cmakeVariables:
       CMAKE_CXX_STDLIB_MODULES_JSON: ""
       CMAKE_C_FLAGS: ""
@@ -1187,13 +1187,13 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_c6f2f/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_c6f2f.dir/build.make CMakeFiles/cmTC_c6f2f.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK'
-        Building C object CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o
-        /usr/bin/cc   -v -o CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_22895/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_22895.dir/build.make CMakeFiles/cmTC_22895.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK'
+        Building C object CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o
+        /usr/bin/cc   -v -o CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
@@ -1203,8 +1203,8 @@ events:
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
         gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_c6f2f.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccJrjz4r.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_22895.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccov2imc.s
         GNU C23 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)
         	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
         
@@ -1218,14 +1218,14 @@ events:
          /usr/include
         End of search list.
         Compiler executable checksum: 9bab69ee039b57e5d63c6dcf5d331ec2
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/'
-         as -v --64 -o CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o /tmp/ccJrjz4r.s
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/'
+         as -v --64 -o CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o /tmp/ccov2imc.s
         GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.'
-        Linking C executable cmTC_c6f2f
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c6f2f.dir/link.txt --verbose=1
+        COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.'
+        Linking C executable cmTC_22895
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_22895.dir/link.txt --verbose=1
         Using built-in specs.
         COLLECT_GCC=/usr/bin/cc
         COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper
@@ -1238,14 +1238,14 @@ events:
         gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_c6f2f' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_c6f2f.'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccdG0dh4.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_c6f2f /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_22895' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_22895.'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccKxV647.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_22895 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)
-        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccdG0dh4.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_c6f2f /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccKxV647.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_22895 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         GNU ld version 2.46.1-1.fc44
-        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_c6f2f' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_c6f2f.'
-        /usr/bin/cc  -v -Wl,-v CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -o cmTC_c6f2f
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK'
+        COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_22895' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_22895.'
+        /usr/bin/cc  -v -Wl,-v CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -o cmTC_22895
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK'
         
       exitCode: 0
   -
@@ -1278,13 +1278,13 @@ events:
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK']
+        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_c6f2f/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_c6f2f.dir/build.make CMakeFiles/cmTC_c6f2f.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-CNsPxK']
-        ignore line: [Building C object CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o]
-        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_22895/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_22895.dir/build.make CMakeFiles/cmTC_22895.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-g6KIxK']
+        ignore line: [Building C object CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/usr/bin/cc   -v -o CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -c /usr/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
@@ -1294,8 +1294,8 @@ events:
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
         ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/']
-        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_c6f2f.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccJrjz4r.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/']
+        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1 -quiet -v /usr/share/cmake/Modules/CMakeCCompilerABI.c -quiet -dumpdir CMakeFiles/cmTC_22895.dir/ -dumpbase CMakeCCompilerABI.c.c -dumpbase-ext .c -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccov2imc.s]
         ignore line: [GNU C23 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)]
         ignore line: [	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
         ignore line: []
@@ -1309,14 +1309,14 @@ events:
         ignore line: [ /usr/include]
         ignore line: [End of search list.]
         ignore line: [Compiler executable checksum: 9bab69ee039b57e5d63c6dcf5d331ec2]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o /tmp/ccJrjz4r.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o /tmp/ccov2imc.s]
         ignore line: [GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.']
-        ignore line: [Linking C executable cmTC_c6f2f]
-        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c6f2f.dir/link.txt --verbose=1]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o' '-c' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.']
+        ignore line: [Linking C executable cmTC_22895]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_22895.dir/link.txt --verbose=1]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/cc]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper]
@@ -1329,13 +1329,13 @@ events:
         ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_c6f2f' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_c6f2f.']
-        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccdG0dh4.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_c6f2f /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-v' '-o' 'cmTC_22895' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_22895.']
+        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccKxV647.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_22895 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/ccdG0dh4.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccKxV647.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s_asneeded] ==> ignore
           arg [-plugin-opt=-pass-through=-latomic_asneeded] ==> ignore
@@ -1351,7 +1351,7 @@ events:
           arg [-dynamic-linker] ==> ignore
           arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_c6f2f] ==> ignore
+          arg [cmTC_22895] ==> ignore
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o]
@@ -1363,7 +1363,7 @@ events:
           arg [-L/lib] ==> dir [/lib]
           arg [-L/usr/lib] ==> dir [/usr/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o] ==> ignore
           arg [-lgcc] ==> lib [gcc]
           arg [-lgcc_s_asneeded] ==> lib [gcc_s_asneeded]
           arg [-latomic_asneeded] ==> lib [atomic_asneeded]
@@ -1373,7 +1373,7 @@ events:
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         ignore line: [collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)]
-        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccdG0dh4.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_c6f2f /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_c6f2f.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccKxV647.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s_asneeded --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_22895 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_22895.dir/CMakeCCompilerABI.c.o -lgcc -lgcc_s_asneeded -latomic_asneeded -lc -lgcc -lgcc_s_asneeded /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         linker tool for 'C': /usr/bin/ld
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
@@ -1410,8 +1410,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -1422,13 +1422,13 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_438dc/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_438dc.dir/build.make CMakeFiles/cmTC_438dc.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD'
-        Building CXX object CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o
-        /usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_708b4/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_708b4.dir/build.make CMakeFiles/cmTC_708b4.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu'
+        Building CXX object CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o
+        /usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
@@ -1438,8 +1438,8 @@ events:
         Thread model: posix
         Supported LTO compression algorithms: zlib zstd
         gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_438dc.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccR0nIBh.s
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_708b4.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/cc1EZDgR.s
         GNU C++20 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)
         	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.4.1, isl version isl-0.24-GMP
         
@@ -1456,14 +1456,14 @@ events:
          /usr/include
         End of search list.
         Compiler executable checksum: 65ab9aa42e0ee60985a3e473fe6610c4
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/'
-         as -v --64 -o CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o /tmp/ccR0nIBh.s
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/'
+         as -v --64 -o CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc1EZDgR.s
         GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.'
-        Linking CXX executable cmTC_438dc
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_438dc.dir/link.txt --verbose=1
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.'
+        Linking CXX executable cmTC_708b4
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_708b4.dir/link.txt --verbose=1
         Using built-in specs.
         COLLECT_GCC=/usr/bin/c++
         COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper
@@ -1476,14 +1476,14 @@ events:
         gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) 
         COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/
         LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_438dc' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_438dc.'
-         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccU3tU7A.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_438dc /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_708b4' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_708b4.'
+         /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccC1Vvy3.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_708b4 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)
-        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccU3tU7A.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_438dc /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
+        /usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccC1Vvy3.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_708b4 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o
         GNU ld version 2.46.1-1.fc44
-        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_438dc' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_438dc.'
-        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1   -v -Wl,-v CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_438dc
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD'
+        COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_708b4' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_708b4.'
+        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1   -v -Wl,-v CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -o cmTC_708b4
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu'
         
       exitCode: 0
   -
@@ -1522,13 +1522,13 @@ events:
       Parsed CXX implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD']
+        ignore line: [Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu']
         ignore line: []
-        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_438dc/fast]
-        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_438dc.dir/build.make CMakeFiles/cmTC_438dc.dir/build]
-        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-MCdjdD']
-        ignore line: [Building CXX object CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o]
-        ignore line: [/usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
+        ignore line: [Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_708b4/fast]
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_708b4.dir/build.make CMakeFiles/cmTC_708b4.dir/build]
+        ignore line: [gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-5og3hu']
+        ignore line: [Building CXX object CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o]
+        ignore line: [/usr/bin/c++   -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -v -o CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa]
@@ -1538,8 +1538,8 @@ events:
         ignore line: [Thread model: posix]
         ignore line: [Supported LTO compression algorithms: zlib zstd]
         ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/']
-        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_438dc.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/ccR0nIBh.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/']
+        ignore line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/cc1plus -quiet -v -D_GNU_SOURCE -D NO_TEXT_RENDERING -D PYTHON_MODULE=1 /usr/share/cmake/Modules/CMakeCXXCompilerABI.cpp -quiet -dumpdir CMakeFiles/cmTC_708b4.dir/ -dumpbase CMakeCXXCompilerABI.cpp.cpp -dumpbase-ext .cpp -mtune=generic -march=x86-64 -mtls-dialect=gnu2 -version -o /tmp/cc1EZDgR.s]
         ignore line: [GNU C++20 (GCC) version 16.2.1 20260819 (Red Hat 16.2.1-2) (x86_64-redhat-linux)]
         ignore line: [	compiled by GNU C version 16.2.1 20260819 (Red Hat 16.2.1-2)  GMP version 6.3.0  MPFR version 4.2.2  MPC version 1.4.1  isl version isl-0.24-GMP]
         ignore line: []
@@ -1556,14 +1556,14 @@ events:
         ignore line: [ /usr/include]
         ignore line: [End of search list.]
         ignore line: [Compiler executable checksum: 65ab9aa42e0ee60985a3e473fe6610c4]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/']
-        ignore line: [ as -v --64 -o CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o /tmp/ccR0nIBh.s]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/']
+        ignore line: [ as -v --64 -o CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o /tmp/cc1EZDgR.s]
         ignore line: [GNU assembler version 2.46.1 (x86_64-redhat-linux) using BFD version version 2.46.1-1.fc44]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.']
-        ignore line: [Linking CXX executable cmTC_438dc]
-        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_438dc.dir/link.txt --verbose=1]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o' '-c' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.']
+        ignore line: [Linking CXX executable cmTC_708b4]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_708b4.dir/link.txt --verbose=1]
         ignore line: [Using built-in specs.]
         ignore line: [COLLECT_GCC=/usr/bin/c++]
         ignore line: [COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper]
@@ -1576,13 +1576,13 @@ events:
         ignore line: [gcc version 16.2.1 20260819 (Red Hat 16.2.1-2) (GCC) ]
         ignore line: [COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/16/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/]
         ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/16/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/16/../../../:/lib/:/usr/lib/]
-        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_438dc' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_438dc.']
-        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccU3tU7A.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_438dc /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [COLLECT_GCC_OPTIONS='-D' 'NO_TEXT_RENDERING' '-D' 'PYTHON_MODULE=1' '-v' '-o' 'cmTC_708b4' '-foffload-options=-l_GCC_stdc++' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-mtune=generic' '-march=x86-64' '-mtls-dialect=gnu2' '-dumpdir' 'cmTC_708b4.']
+        link line: [ /usr/libexec/gcc/x86_64-redhat-linux/16/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccC1Vvy3.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_708b4 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/collect2] ==> ignore
           arg [-plugin] ==> ignore
           arg [/usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so] ==> ignore
           arg [-plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper] ==> ignore
-          arg [-plugin-opt=-fresolution=/tmp/ccU3tU7A.res] ==> ignore
+          arg [-plugin-opt=-fresolution=/tmp/ccC1Vvy3.res] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
           arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
           arg [-plugin-opt=-pass-through=-latomic_asneeded] ==> ignore
@@ -1598,7 +1598,7 @@ events:
           arg [-dynamic-linker] ==> ignore
           arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_438dc] ==> ignore
+          arg [cmTC_708b4] ==> ignore
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o]
@@ -1610,7 +1610,7 @@ events:
           arg [-L/lib] ==> dir [/lib]
           arg [-L/usr/lib] ==> dir [/usr/lib]
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+          arg [CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
           arg [-lstdc++] ==> lib [stdc++]
           arg [-lm] ==> lib [m]
           arg [-lgcc_s] ==> lib [gcc_s]
@@ -1622,7 +1622,7 @@ events:
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/crtend.o]
           arg [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         ignore line: [collect2 version 16.2.1 20260819 (Red Hat 16.2.1-2)]
-        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccU3tU7A.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_438dc /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_438dc.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
+        ignore line: [/usr/bin/ld -plugin /usr/libexec/gcc/x86_64-redhat-linux/16/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/16/lto-wrapper -plugin-opt=-fresolution=/tmp/ccC1Vvy3.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-latomic_asneeded -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o cmTC_708b4 /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/16/crtbegin.o -L/usr/lib/gcc/x86_64-redhat-linux/16 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/16/../../.. -L/lib -L/usr/lib -v CMakeFiles/cmTC_708b4.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -latomic_asneeded -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/16/crtend.o /usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crtn.o]
         linker tool for 'CXX': /usr/bin/ld
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
         collapse obj [/usr/lib/gcc/x86_64-redhat-linux/16/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
@@ -1674,7 +1674,7 @@ events:
     found: "/usr/include/python3.13/"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1704,16 +1704,16 @@ events:
       - "/usr/share/cmake/Modules/Internal/CheckSourceCompiles.cmake:104 (try_compile)"
       - "/usr/share/cmake/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
       - "/usr/share/cmake/Modules/CheckCXXCompilerFlag.cmake:103 (cmake_check_compiler_flag)"
-      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:338 (check_cxx_compiler_flag)"
-      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:387 (_pybind11_return_if_cxx_and_linker_flags_work)"
-      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:448 (_pybind11_generate_lto)"
-      - "/home/jaybird/hyperstellar_env/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Config.cmake:257 (include)"
+      - "/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:338 (check_cxx_compiler_flag)"
+      - "/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:387 (_pybind11_return_if_cxx_and_linker_flags_work)"
+      - "/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Common.cmake:448 (_pybind11_generate_lto)"
+      - "/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages/pybind11/share/cmake/pybind11/pybind11Config.cmake:257 (include)"
       - "CMakeLists.txt:21 (find_package)"
     checks:
       - "Performing Test HAS_FLTO_AUTO"
     directories:
-      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj"
-      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj"
+      source: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik"
+      binary: "/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "-DNO_TEXT_RENDERING -DPYTHON_MODULE=1"
       CMAKE_CXX_FLAGS_DEBUG: "-g"
@@ -1723,17 +1723,17 @@ events:
       variable: "HAS_FLTO_AUTO"
       cached: true
       stdout: |
-        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj'
+        Change Dir: '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik'
         
-        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_89e04/fast
-        /usr/bin/gmake  -f CMakeFiles/cmTC_89e04.dir/build.make CMakeFiles/cmTC_89e04.dir/build
-        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj'
-        Building CXX object CMakeFiles/cmTC_89e04.dir/src.cxx.o
-        /usr/bin/c++ -DHAS_FLTO_AUTO  -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -flto=auto -fno-fat-lto-objects -o CMakeFiles/cmTC_89e04.dir/src.cxx.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj/src.cxx
-        Linking CXX executable cmTC_89e04
-        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_89e04.dir/link.txt --verbose=1
-        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1  CMakeFiles/cmTC_89e04.dir/src.cxx.o -o cmTC_89e04  -flto=auto
-        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-DhavLj'
+        Run Build Command(s): /usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_545db/fast
+        /usr/bin/gmake  -f CMakeFiles/cmTC_545db.dir/build.make CMakeFiles/cmTC_545db.dir/build
+        gmake[1]: Entering directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik'
+        Building CXX object CMakeFiles/cmTC_545db.dir/src.cxx.o
+        /usr/bin/c++ -DHAS_FLTO_AUTO  -DNO_TEXT_RENDERING -DPYTHON_MODULE=1    -flto=auto -fno-fat-lto-objects -o CMakeFiles/cmTC_545db.dir/src.cxx.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik/src.cxx
+        Linking CXX executable cmTC_545db
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_545db.dir/link.txt --verbose=1
+        /usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1  CMakeFiles/cmTC_545db.dir/src.cxx.o -o cmTC_545db  -flto=auto
+        gmake[1]: Leaving directory '/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles/CMakeScratch/TryCompile-7r42Ik'
         
       exitCode: 0
   -
@@ -1754,7 +1754,7 @@ events:
     names:
       - "X11"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1774,7 +1774,7 @@ events:
       - "/opt/"
       - "/usr/lib64/X11/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1789,7 +1789,7 @@ events:
     found: "/usr/lib64/libX11.so"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1831,7 +1831,7 @@ events:
     names:
       - "Xrandr"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1851,7 +1851,7 @@ events:
       - "/opt/"
       - "/usr/lib64/X11/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1866,7 +1866,7 @@ events:
     found: "/usr/lib64/libXrandr.so"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1908,7 +1908,7 @@ events:
     names:
       - "Xi"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1928,7 +1928,7 @@ events:
       - "/opt/"
       - "/usr/lib64/X11/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -1943,7 +1943,7 @@ events:
     found: "/usr/lib64/libXi.so"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -1985,7 +1985,7 @@ events:
     names:
       - "Xinerama"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -2005,7 +2005,7 @@ events:
       - "/opt/"
       - "/usr/lib64/X11/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -2020,7 +2020,7 @@ events:
     found: "/usr/lib64/libXinerama.so"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"
@@ -2062,7 +2062,7 @@ events:
     names:
       - "Xcursor"
     candidate_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -2082,7 +2082,7 @@ events:
       - "/opt/"
       - "/usr/lib64/X11/"
     searched_directories:
-      - "/home/jaybird/hyperstellar_env/bin/"
+      - "/home/jaybird/Aidens_stuff/testing/test/bin/"
       - "/home/jaybird/.nvm/versions/node/v24.22.0/bin/"
       - "/home/jaybird/.local/bin/"
       - "/usr/local/bin/"
@@ -2097,7 +2097,7 @@ events:
     found: "/usr/lib64/libXcursor.so"
     search_context:
       ENV{PATH}:
-        - "/home/jaybird/hyperstellar_env/bin"
+        - "/home/jaybird/Aidens_stuff/testing/test/bin"
         - "/home/jaybird/.nvm/versions/node/v24.22.0/bin"
         - "/home/jaybird/.local/bin"
         - "/home/jaybird/bin"

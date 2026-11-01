@@ -92,7 +92,9 @@ struct CollisionProperties
     float restitution;
     float friction;
     float mass_factor;
-    int _pad1, _pad2, _pad3;
+    uint32_t layer;
+    uint32_t mask;
+    int _pad3;
 };
 
 struct CollisionEvent;
@@ -108,7 +110,7 @@ namespace Objects
 
     // renderer access
     GLuint GetObjectSSBO(int bufferIndex);
-   const std::unordered_map<int, std::vector<int>>& GetMeshGroups(int sourceIndex);
+    const std::unordered_map<int, std::vector<int>> &GetMeshGroups(int sourceIndex);
     void MarkMeshGroupsDirty();
     void AddObject(int meshID = -1);
     void Draw(int sourceIndex,
@@ -191,6 +193,10 @@ namespace Objects
     bool IsCollisionEnabled(int objectIndex);
     void SetCollisionParameters(bool enableWarmStart, int maxContactIterations);
     void GetCollisionParameters(bool &enableWarmStart, int &maxContactIterations);
+    void SetCollisionLayer(int objectIndex, uint32_t layer);
+    void SetCollisionMask(int objectIndex, uint32_t mask);
+    uint32_t GetCollisionLayer(int objectIndex);
+    uint32_t GetCollisionMask(int objectIndex);
 
     // In namespace Objects
     GLuint GetContactBuffer(); // returns g_contactBufferSSBO

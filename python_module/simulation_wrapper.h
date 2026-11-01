@@ -400,6 +400,10 @@ public:
     bool is_collision_enabled(int index);
     void set_collision_parameters(bool enable_warm_start, int max_contact_iterations);
     std::pair<bool, int> get_collision_parameters() const;
+    void set_collision_layer(int index, uint32_t layer);
+    void set_collision_mask(int index, uint32_t mask);
+    uint32_t get_collision_layer(int index) const;
+    uint32_t get_collision_mask(int index) const;
 
     // ---- Collision callback ----
     void set_collision_callback(std::function<void(const CollisionEvent &)> callback);

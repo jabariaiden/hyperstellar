@@ -136,12 +136,10 @@ static GLuint g_collisionPropsSSBO = 0;
 static GLuint g_contactBufferSSBO = 0; //  Contact persistence buffer
 static std::vector<CollisionProperties> g_collisionProperties(Objects::MAX_OBJECTS);
 
-
 //  Collision system parameters
 static bool g_enableWarmStart = false;
 static int g_maxContactIterations = 3;
 static bool g_useAnalyticalCollision = true; // Use analytical elastic collisions
-
 
 // Object count and data storage
 static int g_numObjects = 0;
@@ -1153,7 +1151,6 @@ static void dispatchGroupWithProgram(GLuint program,
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
     // ---------------------------------------------------------------------------
 
-
     // Set group count and common uniforms
     GLint countLoc = glGetUniformLocation(program, "uGroupCount");
     if (countLoc != -1)
@@ -1294,12 +1291,14 @@ bool Objects::Init(void *glfwWindow)
         // Initialize collision properties with defaults
         for (auto &prop : g_collisionProperties)
         {
-            prop.enabled = 1; // Collisions enabled by default
+            prop.enabled = 1;
             prop.shapeType = COLLISION_NONE;
-            prop.restitution = 0.7f; // Default bounciness
-            prop.friction = 0.3f;    // Default friction
+            prop.restitution = 0.7f;
+            prop.friction = 0.3f;
             prop.mass_factor = 1.0f;
-            prop._pad1 = prop._pad2 = prop._pad3 = 0;
+            prop.layer = 0x01;
+            prop.mask = 0xFFFFFFFF;
+            prop._pad3 = 0;
         }
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
@@ -1740,6 +1739,8 @@ void Objects::AddObject(int meshID)
         fresh.restitution = 0.7f;
         fresh.friction = 0.3f;
         fresh.mass_factor = 1.0f;
+        fresh.layer = 0x01;
+        fresh.mask = 0xFFFFFFFF;
         g_collisionProperties[g_numObjects] = fresh;
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER,
@@ -1949,6 +1950,8 @@ void Objects::RemoveObject(int index)
     fresh.restitution = 0.7f;
     fresh.friction = 0.3f;
     fresh.mass_factor = 1.0f;
+    fresh.layer = 0x01;
+    fresh.mask = 0xFFFFFFFF;
     g_collisionProperties[lastObjectIdx] = fresh;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,
@@ -2767,14 +2770,52 @@ CollisionProperties Objects::GetCollisionProperties(int objectIndex)
     return g_collisionProperties[objectIndex];
 }
 
-
-
 // Check if collisions are enabled for an object
 bool Objects::IsCollisionEnabled(int objectIndex)
 {
     if (objectIndex < 0 || objectIndex >= g_numObjects)
         return false;
     return g_collisionProperties[objectIndex].enabled == 1;
+}
+
+void Objects::SetCollisionLayer(int objectIndex, uint32_t layer)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
+    g_collisionProperties[objectIndex].layer = layer;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                    objectIndex * sizeof(CollisionProperties),
+                    sizeof(CollisionProperties),
+                    &g_collisionProperties[objectIndex]);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void Objects::SetCollisionMask(int objectIndex, uint32_t mask)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return;
+    g_collisionProperties[objectIndex].mask = mask;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER,
+                    objectIndex * sizeof(CollisionProperties),
+                    sizeof(CollisionProperties),
+                    &g_collisionProperties[objectIndex]);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+uint32_t Objects::GetCollisionLayer(int objectIndex)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return 0x01;
+    return g_collisionProperties[objectIndex].layer;
+}
+
+uint32_t Objects::GetCollisionMask(int objectIndex)
+{
+    if (objectIndex < 0 || objectIndex >= g_numObjects)
+        return 0xFFFFFFFF;
+    return g_collisionProperties[objectIndex].mask;
 }
 
 // ============================================================================

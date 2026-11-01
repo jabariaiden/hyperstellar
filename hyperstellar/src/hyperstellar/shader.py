@@ -448,14 +448,14 @@ struct ObjectConstraints {{
 }};
 
 struct CollisionProperties {{
-    int enabled;
-    int shapeType;
+    int  enabled;
+    int  shapeType;
     float restitution;
     float friction;
     float mass_factor;
-    int _pad1;
-    int _pad2;
-    int _pad3;
+    uint layer;
+    uint mask;
+    int  _pad3;
 }};
 
 struct CollisionInfo {{
@@ -675,6 +675,10 @@ bool _dc_inline(int other, int selfIdx, vec2 pos, float z, vec4 q, Object p) {{
         _me.orientation = q;
         return detectCollision3D(_me, _o, _pa.shapeType, _pb.shapeType).hasCollision;
     }}
+    if (_pa.shapeType == COLLISION_NONE || _pb.shapeType == COLLISION_NONE) return false;
+    if (_pa.enabled == 0 || _pb.enabled == 0) return false;
+    if ((_pa.layer & _pb.mask) == 0u || (_pb.layer & _pa.mask) == 0u) return false;
+    
     // Mixed 2D/3D pairs report no hit, matching the auto path.
     if (_pa.shapeType >= COLLISION_SPHERE || _pb.shapeType >= COLLISION_SPHERE) return false;
     return detectCollision(p, _o, other, selfIdx).hasCollision;
@@ -1258,6 +1262,9 @@ void main() {{
         CollisionProperties propB = collisionProps[i];
         if (propA.enabled == 0 || propB.enabled == 0) continue;
         if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
+        if (propA.enabled == 0 || propB.enabled == 0) continue;
+        if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
+        if ((propA.layer & propB.mask) == 0u || (propB.layer & propA.mask) == 0u) continue;
 
         // ---- 3D shapes ----
         if (propA.shapeType >= COLLISION_SPHERE || propB.shapeType >= COLLISION_SPHERE) {{
