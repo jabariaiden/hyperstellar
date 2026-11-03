@@ -7,8 +7,8 @@
 //
 // FEATURES:
 // • Complex numbers (i, real, imag, conj, arg)
-// • Derivatives D(expr, var, order) for any variable (x, y, vx, vy, theta, omega, mass, charge)
-// • Tensor literals [a,b,c] (vectors of length 2–4)
+// • Derivatives D(expr, var, order) for any supported scalar variable (orders 1–4)
+// • Small tensor literals [a,b,c] (vectors of length 2–4; higher ranks fall back to scalar)
 // • dot(v1, v2), cross(v1, v2), norm(v)
 // • select(condition, a, b) – condition can use <, <=, >, >=, ==, !=
 // • sum_neighbors(weight, body) – loops over all other objects
@@ -16,7 +16,7 @@
 // • Object references: p[id].x, p[id].y, p[id].vx, ..., p[id].theta, p[id].radius, etc.
 // • Collisions: circle, AABB, convex polygon (SAT)
 // • Constraints: distance, boundary, angle
-// • Warm starting for contacts
+// • Contact aging support (impulse warm-start hooks are reserved for future use)
 // • Symplectic Euler integration
 //
 // Author: Aiden Jabari
@@ -48,13 +48,34 @@ struct Object {
 };
 
 struct EquationMapping {
-    int tokenOffset_ax;      int tokenCount_ax;      int constantOffset_ax;      int _pad1;
-    int tokenOffset_ay;      int tokenCount_ay;      int constantOffset_ay;      int _pad2;
-    int tokenOffset_angular; int tokenCount_angular; int constantOffset_angular; int _pad3;
-    int tokenOffset_r;       int tokenCount_r;       int constantOffset_r;       int _pad4;
-    int tokenOffset_g;       int tokenCount_g;       int constantOffset_g;       int _pad5;
-    int tokenOffset_b;       int tokenCount_b;       int constantOffset_b;       int _pad6;
-    int tokenOffset_a;       int tokenCount_a;       int constantOffset_a;       int _pad7;
+    int tokenOffset_ax;
+    int tokenCount_ax;
+    int constantOffset_ax;
+    int _pad1;
+    int tokenOffset_ay;
+    int tokenCount_ay;
+    int constantOffset_ay;
+    int _pad2;
+    int tokenOffset_angular;
+    int tokenCount_angular;
+    int constantOffset_angular;
+    int _pad3;
+    int tokenOffset_r;
+    int tokenCount_r;
+    int constantOffset_r;
+    int _pad4;
+    int tokenOffset_g;
+    int tokenCount_g;
+    int constantOffset_g;
+    int _pad5;
+    int tokenOffset_b;
+    int tokenCount_b;
+    int constantOffset_b;
+    int _pad6;
+    int tokenOffset_a;
+    int tokenCount_a;
+    int constantOffset_a;
+    int _pad7;
 };
 
 struct Constraint {
@@ -77,12 +98,12 @@ struct ObjectConstraints {
 
 struct CollisionProperties {
     int enabled;
-    int shapeType;           // 0 = none, 1 = circle, 2 = AABB, 3 = polygon
+    int shapeType;           // 0 = none, 1 = circle, 2 = AABB, 3 = polygon, 4 = sphere, 5 = box
     float restitution;
     float friction;
     float mass_factor;
-    int _pad1;
-    int _pad2;
+    uint layer;
+    uint mask;
     int _pad3;
 };
 
@@ -94,1941 +115,2026 @@ struct CollisionInfo {
     vec2 contactPoint;
 };
 
+// ----------------------------------------------------------------------------
+// QUATERNION HELPERS
+// Mirrors the helpers in hyperstellar/shader.py (_QUAT_HELPERS). All vectors
+// are stored as vec4 with .w as the scalar part.
+// ----------------------------------------------------------------------------
+vec4 quat_mul(vec4 a, vec4 b) {
+    return vec4(a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y, a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x, a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w, a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z);
+}
+
+vec4 quat_axis_angle(vec3 axis, float angle) {
+    float h = angle*0.5;
+    return vec4(normalize(axis)*sin(h), cos(h));
+}
+
+// 2D objects store rotation as Rz(theta) = (0, 0, sin(theta/2), cos(theta/2)).
+// Recover theta from the .z and .w components of the orientation quaternion.
+float quat_extract_2d_angle(vec4 orientation) {
+    return 2.0*atan(orientation.z, orientation.w);
+}
+
 struct ContactPoint {
-    vec2 normal;
-    vec2 position;
-    float penetration;
-    float accumulatedNormalImpulse;
-    float accumulatedTangentImpulse;
-    int frameCount;
+    vec2 normal;                     // offset 0
+    vec2 position;                   // offset 8
+    float penetration;               // offset 16
+    float accumulatedNormalImpulse;  // offset 20
+    float accumulatedTangentImpulse; // offset 24
+    int frameCount;                  // offset 28
+    int _padding[4];                 // offset 32..47 — keep stride == 48
 };
 
 // ----------------------------------------------------------------------------
 // BUFFERS AND UNIFORMS
 // ----------------------------------------------------------------------------
-layout(std430, binding = 0) readonly buffer ObjectsIn { Object objectsIn[]; };
-layout(std430, binding = 1) writeonly buffer ObjectsOut { Object objectsOut[]; };
-layout(std430, binding = 2) readonly buffer AllEquationTokens { int allTokens[]; };
-layout(std430, binding = 3) readonly buffer AllEquationConstants { float allConstants[]; };
-layout(std430, binding = 4) readonly buffer EquationMappings { EquationMapping mappings[256]; };
-layout(std430, binding = 5) readonly buffer Constraints { Constraint constraints[]; };
-layout(std430, binding = 6) readonly buffer ObjectConstraintMappings { ObjectConstraints objectConstraints[]; };
-layout(std430, binding = 7) readonly buffer CollisionProps { CollisionProperties collisionProps[]; };
-layout(std430, binding = 8) buffer ContactBuffer { ContactPoint contacts[]; };
+layout(std430, binding = 0) readonly buffer ObjectsIn {
+Object objectsIn[];
+};
+layout(std430, binding = 1) writeonly buffer ObjectsOut {
+Object objectsOut[];
+};
+layout(std430, binding = 2) readonly buffer AllEquationTokens {
+int allTokens[];
+};
+layout(std430, binding = 3) readonly buffer AllEquationConstants {
+float allConstants[];
+};
+layout(std430, binding = 4) readonly buffer EquationMappings {
+EquationMapping mappings[256];
+};
+layout(std430, binding = 5) readonly buffer Constraints {
+Constraint constraints[];
+};
+layout(std430, binding = 6) readonly buffer ObjectConstraintMappings {
+ObjectConstraints objectConstraints[];
+};
+layout(std430, binding = 7) readonly buffer CollisionProps {
+CollisionProperties collisionProps[];
+};
+layout(std430, binding = 8) buffer ContactBuffer {
+ContactPoint contacts[];
+};
 
 uniform float uDt;                   // time step
 uniform float uTime;                 // global time
 uniform float k;                     // spring constant
 uniform float b;                     // damping coefficient
 uniform float g;                     // gravity strength
-uniform vec2  uGravityDir;           // gravity direction
+uniform vec2 uGravityDir;           // gravity direction
 uniform float uRestitution;          // default restitution
 uniform float uCoupling;             // coupling constant
-uniform vec2  uExternalForce;        // constant external force
+uniform vec2 uExternalForce;        // constant external force
 uniform float uDriveFreq;            // driving frequency
 uniform float uDriveAmp;             // driving amplitude
-uniform int   uEquationMode;         // 0 = use equations, else default
-uniform int   uNumObjects;           // number of objects
-uniform int   uEnableWarmStart;      // 1 = enable warm starting
-uniform int   uMaxContactIterations; // maximum contact iterations
+uniform int uEquationMode;         // 0 = use equations, else default
+uniform int uNumObjects;           // number of objects
+uniform int uEnableWarmStart;      // 1 = enable warm starting
+uniform int uMaxContactIterations; // maximum contact iterations
 uniform float uDerivativeEpsilon;    // step size for numerical derivatives
 
 // ----------------------------------------------------------------------------
 // TOKEN CODES (must match CPU serializer)
 // ----------------------------------------------------------------------------
-const int TOKEN_NUMBER        = 0;
-const int TOKEN_VARIABLE      = 1;
-const int TOKEN_OBJECT_REF    = 2;
-const int TOKEN_ADD           = 3;
-const int TOKEN_SUB           = 4;
-const int TOKEN_MUL           = 5;
-const int TOKEN_DIV           = 6;
-const int TOKEN_NEG           = 7;
-const int TOKEN_POW           = 8;
-const int TOKEN_SIN           = 9;
-const int TOKEN_COS           = 10;
-const int TOKEN_TAN           = 11;
-const int TOKEN_SQRT          = 12;
-const int TOKEN_LOG           = 13;
-const int TOKEN_EXP           = 14;
-const int TOKEN_ABS           = 15;
-const int TOKEN_MIN           = 16;
-const int TOKEN_MAX           = 17;
-const int TOKEN_CLAMP         = 18;
-const int TOKEN_FLOOR         = 19;
-const int TOKEN_CEIL          = 20;
-const int TOKEN_FRAC          = 21;
-const int TOKEN_MOD           = 22;
-const int TOKEN_ATAN2         = 23;
-const int TOKEN_REAL          = 24;
-const int TOKEN_IMAG          = 25;
-const int TOKEN_CONJ          = 26;
-const int TOKEN_ARG           = 27;
-const int TOKEN_SIGN          = 28;
-const int TOKEN_STEP          = 29;
-const int TOKEN_OPEN_PAREN    = 30;
-const int TOKEN_CLOSE_PAREN   = 31;
-const int TOKEN_COMMA         = 32;
-const int TOKEN_DERIVATIVE    = 33;
-const int TOKEN_DOT           = 34;
-const int TOKEN_CROSS         = 35;
-const int TOKEN_NORM          = 36;
-const int TOKEN_SELECT        = 37;
-const int TOKEN_NOISE         = 38;
-const int TOKEN_RAND          = 39;
+const int TOKEN_NUMBER = 0;
+const int TOKEN_VARIABLE = 1;
+const int TOKEN_OBJECT_REF = 2;
+const int TOKEN_ADD = 3;
+const int TOKEN_SUB = 4;
+const int TOKEN_MUL = 5;
+const int TOKEN_DIV = 6;
+const int TOKEN_NEG = 7;
+const int TOKEN_POW = 8;
+const int TOKEN_SIN = 9;
+const int TOKEN_COS = 10;
+const int TOKEN_TAN = 11;
+const int TOKEN_SQRT = 12;
+const int TOKEN_LOG = 13;
+const int TOKEN_EXP = 14;
+const int TOKEN_ABS = 15;
+const int TOKEN_MIN = 16;
+const int TOKEN_MAX = 17;
+const int TOKEN_CLAMP = 18;
+const int TOKEN_FLOOR = 19;
+const int TOKEN_CEIL = 20;
+const int TOKEN_FRAC = 21;
+const int TOKEN_MOD = 22;
+const int TOKEN_ATAN2 = 23;
+const int TOKEN_REAL = 24;
+const int TOKEN_IMAG = 25;
+const int TOKEN_CONJ = 26;
+const int TOKEN_ARG = 27;
+const int TOKEN_SIGN = 28;
+const int TOKEN_STEP = 29;
+const int TOKEN_OPEN_PAREN = 30;
+const int TOKEN_CLOSE_PAREN = 31;
+const int TOKEN_COMMA = 32;
+const int TOKEN_DERIVATIVE = 33;
+const int TOKEN_DOT = 34;
+const int TOKEN_CROSS = 35;
+const int TOKEN_NORM = 36;
+const int TOKEN_SELECT = 37;
+const int TOKEN_NOISE = 38;
+const int TOKEN_RAND = 39;
 const int TOKEN_SUM_NEIGHBORS = 40;
-const int TOKEN_NEIGHBOR_INDEX= 41;
-const int TOKEN_TENSOR_LIT    = 42;
+const int TOKEN_NEIGHBOR_INDEX = 41;
+const int TOKEN_TENSOR_LIT = 42;
 // Comparison operators (return 1.0 if true, else 0.0)
-const int TOKEN_LT            = 43;   // <
-const int TOKEN_LE            = 44;   // <=
-const int TOKEN_GT            = 45;   // >
-const int TOKEN_GE            = 46;   // >=
-const int TOKEN_EQ            = 47;   // ==
-const int TOKEN_NE            = 48;   // !=
+const int TOKEN_LT = 43;   // <
+const int TOKEN_LE = 44;   // <=
+const int TOKEN_GT = 45;   // >
+const int TOKEN_GE = 46;   // >=
+const int TOKEN_EQ = 47;   // ==
+const int TOKEN_NE = 48;   // !=
 // gets a single component from a vector
-const int TOKEN_COMP          = 49;
+const int TOKEN_COMP = 49;
 
 // Variable hashes
-const int VAR_HASH_X        = 1;
-const int VAR_HASH_Y        = 2;
-const int VAR_HASH_VX       = 3;
-const int VAR_HASH_VY       = 4;
-const int VAR_HASH_AX       = 5;
-const int VAR_HASH_AY       = 6;
-const int VAR_HASH_T        = 7;
-const int VAR_HASH_THETA    = 8;
-const int VAR_HASH_OMEGA    = 27;
-const int VAR_HASH_MASS     = 22;
-const int VAR_HASH_CHARGE   = 23;
-const int VAR_HASH_R        = 9;
-const int VAR_HASH_G        = 10;
-const int VAR_HASH_B        = 11;
-const int VAR_HASH_A        = 12;
-const int VAR_HASH_VIS_X    = 100;
-const int VAR_HASH_VIS_Y    = 101;
-const int VAR_HASH_RADIUS   = 102;
-const int VAR_HASH_WIDTH    = 103;
-const int VAR_HASH_HEIGHT   = 104;
-const int VAR_HASH_PI       = 17;
-const int VAR_HASH_E        = 18;
-const int VAR_HASH_I        = 16;
-const int VAR_HASH_K        = 19;
-const int VAR_HASH_B_DAMP   = 20;
-const int VAR_HASH_G_GRAV   = 21;
+const int VAR_HASH_X = 1;
+const int VAR_HASH_Y = 2;
+const int VAR_HASH_VX = 3;
+const int VAR_HASH_VY = 4;
+const int VAR_HASH_AX = 5;
+const int VAR_HASH_AY = 6;
+const int VAR_HASH_T = 7;
+const int VAR_HASH_THETA = 8;
+const int VAR_HASH_OMEGA = 27;
+const int VAR_HASH_MASS = 22;
+const int VAR_HASH_CHARGE = 23;
+const int VAR_HASH_R = 9;
+const int VAR_HASH_G = 10;
+const int VAR_HASH_B = 11;
+const int VAR_HASH_A = 12;
+const int VAR_HASH_VIS_X = 100;
+const int VAR_HASH_VIS_Y = 101;
+const int VAR_HASH_RADIUS = 102;
+const int VAR_HASH_WIDTH = 103;
+const int VAR_HASH_HEIGHT = 104;
+const int VAR_HASH_PI = 17;
+const int VAR_HASH_E = 18;
+const int VAR_HASH_I = 16;
+const int VAR_HASH_K = 19;
+const int VAR_HASH_B_DAMP = 20;
+const int VAR_HASH_G_GRAV = 21;
 const int VAR_HASH_COUPLING = 24;
-const int VAR_HASH_FREQ     = 25;
-const int VAR_HASH_AMP      = 26;
+const int VAR_HASH_FREQ = 25;
+const int VAR_HASH_AMP = 26;
 
 // Limits and constants
-const int MAX_RPN_STACK_SIZE    = 128;
+const int MAX_RPN_STACK_SIZE = 32;
 const int MAX_TOKEN_BUFFER_SIZE = 10000;
 const int MAX_CONSTANT_BUFFER_SIZE = 10000;
-const int MAX_EQUATION_COUNT    = 256;
-const float PI                  = 3.14159265359;
-const float E                   = 2.71828182846;
-const float EPSILON             = 1e-6;
-const float SAFE_MIN_VALUE      = 1e-6;
-const float SAFE_MAX_EXP        = 50.0;
-const int MAX_DERIV_EXPR_SIZE   = 500;
-const int CONSTRAINT_DISTANCE   = 0;
-const int CONSTRAINT_BOUNDARY   = 1;
-const int CONSTRAINT_ANGLE      = 2;
+const int MAX_EQUATION_COUNT = 256;
+const float PI = 3.14159265359;
+const float E = 2.71828182846;
+const float EPSILON = 1e-6;
+const float SAFE_MIN_VALUE = 1e-6;
+const float SAFE_MAX_EXP = 50.0;
+const int MAX_DERIV_EXPR_SIZE = 500;
+const int CONSTRAINT_DISTANCE = 0;
+const int CONSTRAINT_BOUNDARY = 1;
+const int CONSTRAINT_ANGLE = 2;
 const float CONSTRAINT_STIFFNESS = 1.0;
 const int MAX_CONSTRAINT_ITERATIONS = 3;
 
-const int COLLISION_NONE   = 0;
+const int COLLISION_NONE = 0;
 const int COLLISION_CIRCLE = 1;
-const int COLLISION_AABB   = 2;
+const int COLLISION_AABB = 2;
 const int COLLISION_POLYGON = 3;
 const int MAX_CONTACTS_PER_OBJECT = 4;
 const int MAX_CONTACT_FRAMES = 5;
+const int MAX_POLYGON_SIDES = 32;
 
 // ----------------------------------------------------------------------------
 // UTILITY FUNCTIONS
 // ----------------------------------------------------------------------------
 //safety first! Avoids Nans and Infs. Those are nasty in shaders
 float safeDivide(float n, float d) {
-    return (abs(d) < EPSILON) ? 0.0 : n / d;
+return (abs(d)<EPSILON) ? 0.0 : n/d;
 }
 float safePow(float base, float exp) {
     // For negative base with integer exponent, compute correctly
-    if (base < 0.0) {
-        float intPart;
-        if (abs(modf(exp, intPart)) < EPSILON) {
+if(base<0.0) {
+float intPart;
+if(abs(modf(exp, intPart))<EPSILON) {
             // Exponent is an integer
-            float result = pow(-base, exp);
-            if (int(intPart) % 2 == 1) result = -result;
-            return result;
-        }
-    }
+float result = pow(-base, exp);
+if(int(intPart)%2==1) result = -result;
+return result;
+}
+}
     // Otherwise clamp base to non‑negative
-    return pow(max(0.0, base), exp);
+return pow(max(0.0, base), exp);
 }
 float safeLog(float v) {
-    return log(max(SAFE_MIN_VALUE, v));
+return log(max(SAFE_MIN_VALUE, v));
 }
 float safeExp(float v) {
-    return exp(clamp(v, -SAFE_MAX_EXP, SAFE_MAX_EXP));
+return exp(clamp(v,-SAFE_MAX_EXP, SAFE_MAX_EXP));
 }
 bool isInvalid(float v) {
-    return isinf(v) || isnan(v);
+return isinf(v)||isnan(v);
 }
 vec2 sanitizeVec2(vec2 v) {
-    if (isInvalid(v.x)) v.x = 0.0;
-    if (isInvalid(v.y)) v.y = 0.0;
-    return v;
+if(isInvalid(v.x)) v.x = 0.0;
+if(isInvalid(v.y)) v.y = 0.0;
+return v;
 }
 vec4 sanitizeVec4(vec4 v) {
-    for (int i = 0; i < 4; ++i)
-        if (isInvalid(v[i])) v[i] = 0.0;
-    return v;
+for(int i = 0;
+i<4;
+++ i) if(isInvalid(v[i])) v[i] = 0.0;
+return v;
 }
-float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }
-float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0; }
+float signFunc(float x) {
+return (x>0.0) ? 1.0 : ((x<0.0) ? -1.0 : 0.0);
+}
+float stepFunc(float x) {
+return (x>=0.0) ? 1.0 : 0.0;
+}
 
 // ----------------------------------------------------------------------------
 // COMPLEX NUMBERS
 // ----------------------------------------------------------------------------
-vec2 cAdd(vec2 a, vec2 b) { return a + b; }
-vec2 cSub(vec2 a, vec2 b) { return a - b; }
 vec2 cMul(vec2 a, vec2 b) {
-    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+return vec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x);
 }
 vec2 cDiv(vec2 a, vec2 b) {
-    float d = b.x*b.x + b.y*b.y;
-    if (abs(d) < EPSILON) return vec2(0.0);
-    return vec2((a.x*b.x + a.y*b.y) / d, (a.y*b.x - a.x*b.y) / d);
+float d = b.x*b.x+b.y*b.y;
+if(abs(d)<EPSILON) return vec2(0.0);
+return vec2((a.x*b.x+a.y*b.y)/d, (a.y*b.x-a.x*b.y)/d);
 }
 vec2 cLog(vec2 z) {
-    return vec2(safeLog(length(z)), atan(z.y, z.x));
+return vec2(safeLog(length(z)), atan(z.y, z.x));
 }
 vec2 cExp(vec2 z) {
-    float ea = safeExp(z.x);
-    return vec2(ea * cos(z.y), ea * sin(z.y));
+float ea = safeExp(z.x);
+return vec2(ea*cos(z.y), ea*sin(z.y));
 }
 vec2 cPow(vec2 b, vec2 e) {
-    if (length(b) < EPSILON) return vec2(0.0);
-    return cExp(cMul(e, cLog(b)));
+if(length(b)<EPSILON) return vec2(0.0);
+return cExp(cMul(e, cLog(b)));
 }
-vec2 cSin(vec2 z) { return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y)); }
-vec2 cCos(vec2 z) { return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y)); }
-vec2 cTan(vec2 z) { return cDiv(cSin(z), cCos(z)); }
+vec2 cSin(vec2 z) {
+return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y));
+}
+vec2 cCos(vec2 z) {
+return vec2(cos(z.x)*cosh(z.y),-sin(z.x)*sinh(z.y));
+}
+vec2 cTan(vec2 z) {
+return cDiv(cSin(z), cCos(z));
+}
 
 // ----------------------------------------------------------------------------
 // RANDOM AND SMOOTH NOISE
 // ----------------------------------------------------------------------------
 float rand(vec2 seed) {
-    return fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
+return fract(sin(dot(seed, vec2(12.9898, 78.233)))*43758.5453);
 }
 float smoothNoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    float a = rand(i);
-    float b = rand(i + vec2(1.0, 0.0));
-    float c = rand(i + vec2(0.0, 1.0));
-    float d = rand(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+vec2 i = floor(p);
+vec2 f = fract(p);
+vec2 u = f*f*(3.0-2.0*f);
+float a = rand(i);
+float b = rand(i+vec2(1.0, 0.0));
+float c = rand(i+vec2(0.0, 1.0));
+float d = rand(i+vec2(1.0, 1.0));
+return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 float noise(vec2 p) {
-    float sum = 0.0;
-    float amp = 0.5;
-    float freq = 4.0;
-    for (int i = 0; i < 3; ++i) {
-        sum += amp * smoothNoise(p * freq);
-        amp *= 0.5;
-        freq *= 2.0;
-    }
-    return sum;
+float sum = 0.0;
+float amp = 0.5;
+float freq = 4.0;
+for(int i = 0;
+i<3;
+++ i) {
+sum += amp*smoothNoise(p*freq);
+amp *= 0.5;
+freq *= 2.0;
+}
+return sum;
 }
 
 // ----------------------------------------------------------------------------
 // OBJECT PROPERTY GETTER
 // ----------------------------------------------------------------------------
 float getObjectProperty(int idx, int hash, int self) {
-    if (idx < 0 || idx >= uNumObjects || idx == self) return 0.0;
-    Object o = objectsIn[idx];
-    switch (hash) {
-        case VAR_HASH_X:       return o.position.x;
-        case VAR_HASH_Y:       return o.position.y;
-        case VAR_HASH_VX:      return o.velocity.x;
-        case VAR_HASH_VY:      return o.velocity.y;
-        case VAR_HASH_AX:      return o.collisionData.x;
-        case VAR_HASH_AY:      return o.collisionData.y;
-        case VAR_HASH_MASS:    return o.mass;
-        case VAR_HASH_CHARGE:  return o.charge;
-        case VAR_HASH_THETA:   return o.visualData.z;
-        case VAR_HASH_OMEGA:   return o.visualData.w;
-        case VAR_HASH_R:       return o.color.r;
-        case VAR_HASH_G:       return o.color.g;
-        case VAR_HASH_B:       return o.color.b;
-        case VAR_HASH_A:       return o.color.a;
-        case VAR_HASH_VIS_X:   return o.visualData.x;
-        case VAR_HASH_VIS_Y:   return o.visualData.y;
-        case VAR_HASH_RADIUS:  return o.visualData.x;
-        case VAR_HASH_WIDTH:   return o.visualData.x;
-        case VAR_HASH_HEIGHT:  return o.visualData.y;
-        default:               return 0.0;
-    }
+if(idx<0||idx>=uNumObjects||idx==self) return 0.0;
+Object o = objectsIn[idx];
+switch(hash) {
+case VAR_HASH_X : return o.position.x;
+case VAR_HASH_Y : return o.position.y;
+case VAR_HASH_VX : return o.velocity.x;
+case VAR_HASH_VY : return o.velocity.y;
+case VAR_HASH_AX : return o.collisionData.x;
+case VAR_HASH_AY : return o.collisionData.y;
+case VAR_HASH_MASS : return o.mass;
+case VAR_HASH_CHARGE : return o.charge;
+case VAR_HASH_THETA : return quat_extract_2d_angle(o.orientation);
+case VAR_HASH_OMEGA : return o.spin.z;
+case VAR_HASH_R : return o.color.r;
+case VAR_HASH_G : return o.color.g;
+case VAR_HASH_B : return o.color.b;
+case VAR_HASH_A : return o.color.a;
+case VAR_HASH_VIS_X : return o.visualData.x;
+case VAR_HASH_VIS_Y : return o.visualData.y;
+case VAR_HASH_RADIUS : return o.visualData.x;
+case VAR_HASH_WIDTH : return (o.visualSkinType==1) ? o.visualData.x : (o.visualData.x*2.0);
+case VAR_HASH_HEIGHT : return (o.visualSkinType==1) ? o.visualData.y : (o.visualData.x*2.0);
+default : return 0.0;
+}
 }
 
 // ----------------------------------------------------------------------------
 // GET VALUE OF A VARIABLE BY HASH
 // ----------------------------------------------------------------------------
-float getVariableValue(int hash,
-                       float x, float y, float vx, float vy, float ax, float ay,
-                       float theta, float omega, vec4 color,
-                       float mass, float charge) {
-    switch (hash) {
-        case VAR_HASH_X:       return x;
-        case VAR_HASH_Y:       return y;
-        case VAR_HASH_VX:      return vx;
-        case VAR_HASH_VY:      return vy;
-        case VAR_HASH_AX:      return ax;
-        case VAR_HASH_AY:      return ay;
-        case VAR_HASH_T:       return uTime;
-        case VAR_HASH_THETA:   return theta;
-        case VAR_HASH_OMEGA:   return omega;
-        case VAR_HASH_R:       return color.r;
-        case VAR_HASH_G:       return color.g;
-        case VAR_HASH_B:       return color.b;
-        case VAR_HASH_A:       return color.a;
-        case VAR_HASH_PI:      return PI;
-        case VAR_HASH_E:       return E;
-        case VAR_HASH_K:       return k;
-        case VAR_HASH_B_DAMP:  return b;
-        case VAR_HASH_G_GRAV:  return g;
-        case VAR_HASH_MASS:    return mass;
-        case VAR_HASH_CHARGE:  return charge;
-        case VAR_HASH_COUPLING:return uCoupling;
-        case VAR_HASH_FREQ:    return uDriveFreq;
-        case VAR_HASH_AMP:     return uDriveAmp;
-        default:               return 0.0;
-    }
+float getVariableValue(int hash, float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge) {
+switch(hash) {
+case VAR_HASH_X : return x;
+case VAR_HASH_Y : return y;
+case VAR_HASH_VX : return vx;
+case VAR_HASH_VY : return vy;
+case VAR_HASH_AX : return ax;
+case VAR_HASH_AY : return ay;
+case VAR_HASH_T : return uTime;
+case VAR_HASH_THETA : return theta;
+case VAR_HASH_OMEGA : return omega;
+case VAR_HASH_R : return color.r;
+case VAR_HASH_G : return color.g;
+case VAR_HASH_B : return color.b;
+case VAR_HASH_A : return color.a;
+case VAR_HASH_PI : return PI;
+case VAR_HASH_E : return E;
+case VAR_HASH_K : return k;
+case VAR_HASH_B_DAMP : return b;
+case VAR_HASH_G_GRAV : return g;
+case VAR_HASH_MASS : return mass;
+case VAR_HASH_CHARGE : return charge;
+case VAR_HASH_COUPLING : return uCoupling;
+case VAR_HASH_FREQ : return uDriveFreq;
+case VAR_HASH_AMP : return uDriveAmp;
+default : return 0.0;
+}
 }
 
 // ----------------------------------------------------------------------------
 // FORWARD DECLARATIONS (no recursion – derivatives are handled only in the main evaluator)
 // ----------------------------------------------------------------------------
-float evaluateScalarTokenList(float x, float y, float vx, float vy, float ax, float ay,
-                              float theta, float omega, vec4 color,
-                              float mass, float charge, int self,
-                              int offset, int count, int constOffset);
-float computeDerivative(float x, float y, float vx, float vy, float ax, float ay,
-                        float theta, float omega, vec4 color,
-                        float mass, float charge, int self,
-                        int wrtHash, int order,
-                        int exprOffset, int exprCount, int constOffset);
-float evaluateRPNComponent(float x, float y, float vx, float vy, float ax, float ay,
-                           float theta, float omega, vec4 color,
-                           float mass, float charge, int self,
-                           int componentType,
-                           int tokenOffset, int tokenCount, int constantOffset);
+float evaluateScalarTokenList(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int offset, int count, int constOffset);
+float computeDerivative(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int wrtHash, int order, int exprOffset, int exprCount, int constOffset);
+float evaluateRPNComponent(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int componentType, int tokenOffset, int tokenCount, int constantOffset);
 
 // ----------------------------------------------------------------------------
 // SCALAR TOKEN LIST EVALUATOR (no derivative handling – used inside derivatives)
 // ----------------------------------------------------------------------------
-float evaluateScalarTokenList(float x, float y, float vx, float vy, float ax, float ay,
-                              float theta, float omega, vec4 color,
-                              float mass, float charge, int self,
-                              int offset, int count, int constOffset) {
-    float stack[32];
-    int sp = 0;
-    int idx = offset;
-    int end = offset + count;
-    while (idx < end) {
-        int token = allTokens[idx++];
-        if (token == TOKEN_NUMBER) {
-            int cidx = allTokens[idx++];
-            stack[sp++] = allConstants[constOffset + cidx];
-        }
-        else if (token == TOKEN_VARIABLE) {
-            int h = allTokens[idx++];
-            if (h == VAR_HASH_I) {
-                stack[sp++] = 0.0;
-                continue;
-            }
-            stack[sp++] = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
-        }
-        else if (token == TOKEN_OBJECT_REF) {
-            int obj = allTokens[idx++];
-            int prop = allTokens[idx++];
-            stack[sp++] = getObjectProperty(obj, prop, self);
-        }
-        else if (token == TOKEN_DERIVATIVE) {
-            // Nested derivatives are disabled: skip and return 0. Gotta HATE recursion, am I right?
-            int dummy1 = allTokens[idx++];
-            int dummy2 = allTokens[idx++];
-            int dummy3 = allTokens[idx++];
-            int subc = allTokens[idx++];
-            idx += subc;
-            stack[sp++] = 0.0;
-        }
+float evaluateScalarTokenList(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int offset, int count, int constOffset) {
+float stack[MAX_RPN_STACK_SIZE];
+int sp = 0;
+int idx = offset;
+int end = min(offset+count, allTokens.length());
+if(offset<0||offset>=end) return 0.0;
+#pragma unroll 1
+while(idx<end) {
+int token = allTokens[idx ++];
+if(sp>=MAX_RPN_STACK_SIZE&&(token==TOKEN_NUMBER||token==TOKEN_VARIABLE||token==TOKEN_OBJECT_REF||token==TOKEN_DERIVATIVE||token==TOKEN_RAND)) break;
+if(token==TOKEN_NUMBER) {
+int cidx = allTokens[idx ++];
+int constantIndex = constOffset+cidx;
+stack[sp ++] = (constantIndex>=0&&constantIndex<allConstants.length()) ? allConstants[constantIndex] : 0.0;
+} else if(token==TOKEN_VARIABLE) {
+int h = allTokens[idx ++];
+if(h==VAR_HASH_I) {
+stack[sp ++] = 0.0;
+continue;
+}
+stack[sp ++] = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
+} else if(token==TOKEN_OBJECT_REF) {
+int obj = allTokens[idx ++];
+int prop = allTokens[idx ++];
+stack[sp ++] = getObjectProperty(obj, prop, self);
+} else if(token==TOKEN_DERIVATIVE) {
+            // Nested derivatives are not evaluated by the scalar derivative interpreter.
+int dummy1 = allTokens[idx ++];
+int dummy2 = allTokens[idx ++];
+int dummy3 = allTokens[idx ++];
+int subc = allTokens[idx ++];
+idx += subc;
+stack[sp ++] = 0.0;
+}
         // Binary arithmetic and comparisons
-        else if (token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-                 token == TOKEN_DIV || token == TOKEN_POW ||
-                 token == TOKEN_LT || token == TOKEN_LE || token == TOKEN_GT ||
-                 token == TOKEN_GE || token == TOKEN_EQ || token == TOKEN_NE) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            if (token == TOKEN_ADD)      stack[sp++] = a + b;
-            else if (token == TOKEN_SUB) stack[sp++] = a - b;
-            else if (token == TOKEN_MUL) stack[sp++] = a * b;
-            else if (token == TOKEN_DIV) stack[sp++] = safeDivide(a, b);
-            else if (token == TOKEN_POW) stack[sp++] = safePow(a, b);
-            else if (token == TOKEN_LT)  stack[sp++] = (a < b) ? 1.0 : 0.0;
-            else if (token == TOKEN_LE)  stack[sp++] = (a <= b) ? 1.0 : 0.0;
-            else if (token == TOKEN_GT)  stack[sp++] = (a > b) ? 1.0 : 0.0;
-            else if (token == TOKEN_GE)  stack[sp++] = (a >= b) ? 1.0 : 0.0;
-            else if (token == TOKEN_EQ)  stack[sp++] = (abs(a - b) < EPSILON) ? 1.0 : 0.0;
-            else                         stack[sp++] = (abs(a - b) >= EPSILON) ? 1.0 : 0.0; // NE
-        }
+else if(token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW||token==TOKEN_LT||token==TOKEN_LE||token==TOKEN_GT||token==TOKEN_GE||token==TOKEN_EQ||token==TOKEN_NE) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+if(token==TOKEN_ADD) stack[sp ++] = a+b;
+else if(token==TOKEN_SUB) stack[sp ++] = a-b;
+else if(token==TOKEN_MUL) stack[sp ++] = a*b;
+else if(token==TOKEN_DIV) stack[sp ++] = safeDivide(a, b);
+else if(token==TOKEN_POW) stack[sp ++] = safePow(a, b);
+else if(token==TOKEN_LT) stack[sp ++] = (a<b) ? 1.0 : 0.0;
+else if(token==TOKEN_LE) stack[sp ++] = (a<=b) ? 1.0 : 0.0;
+else if(token==TOKEN_GT) stack[sp ++] = (a>b) ? 1.0 : 0.0;
+else if(token==TOKEN_GE) stack[sp ++] = (a>=b) ? 1.0 : 0.0;
+else if(token==TOKEN_EQ) stack[sp ++] = (abs(a-b)<EPSILON) ? 1.0 : 0.0;
+else stack[sp ++] = (abs(a-b)>=EPSILON) ? 1.0 : 0.0; // NE
+}
         // Unary operators
-        else if (token == TOKEN_NEG || token == TOKEN_SIN || token == TOKEN_COS || token == TOKEN_TAN ||
-                 token == TOKEN_EXP || token == TOKEN_LOG || token == TOKEN_SQRT || token == TOKEN_ABS ||
-                 token == TOKEN_FLOOR || token == TOKEN_CEIL || token == TOKEN_FRAC ||
-                 token == TOKEN_SIGN || token == TOKEN_STEP) {
-            if (sp < 1) { stack[0] = 0.0; sp = 1; continue; }
-            float a = stack[--sp];
-            if (token == TOKEN_NEG)      stack[sp++] = -a;
-            else if (token == TOKEN_SIN) stack[sp++] = sin(a);
-            else if (token == TOKEN_COS) stack[sp++] = cos(a);
-            else if (token == TOKEN_TAN) stack[sp++] = tan(a);
-            else if (token == TOKEN_EXP) stack[sp++] = safeExp(a);
-            else if (token == TOKEN_LOG) stack[sp++] = safeLog(a);
-            else if (token == TOKEN_SQRT)stack[sp++] = sqrt(max(0.0, a));
-            else if (token == TOKEN_ABS) stack[sp++] = abs(a);
-            else if (token == TOKEN_FLOOR)stack[sp++] = floor(a);
-            else if (token == TOKEN_CEIL)stack[sp++] = ceil(a);
-            else if (token == TOKEN_FRAC)stack[sp++] = fract(a);
-            else if (token == TOKEN_SIGN)stack[sp++] = signFunc(a);
-            else                         stack[sp++] = stepFunc(a);
-        }
-        else if (token == TOKEN_MOD) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            stack[sp++] = (abs(b) < EPSILON) ? 0.0 : mod(a, b);
-        }
-        else if (token == TOKEN_MIN || token == TOKEN_MAX) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            stack[sp++] = (token == TOKEN_MIN) ? min(a, b) : max(a, b);
-        }
-        else if (token == TOKEN_ATAN2) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float xv = stack[--sp];
-            float yv = stack[--sp];
-            stack[sp++] = atan(yv, xv);
-        }
-        else if (token == TOKEN_CLAMP) {
-            if (sp < 3) { stack[0] = 0.0; sp = 1; continue; }
-            float maxv = stack[--sp];
-            float minv = stack[--sp];
-            float val = stack[--sp];
-            stack[sp++] = clamp(val, minv, maxv);
-        }
-        else if (token == TOKEN_NOISE) {
-            if (sp < 2) { stack[sp++] = 0.0; continue; }
-            float yv = stack[--sp];
-            float xv = stack[--sp];
-            stack[sp++] = noise(vec2(xv, yv));
-        }
-        else if (token == TOKEN_RAND) {
-            stack[sp++] = rand(vec2(uTime, float(self)));
-        }
-        // Other tokens (SELECT, SUM_NEIGHBORS, TENSOR_LIT, DOT, CROSS, NORM) are not used here. Too lazy too add them.
-    }
-    return (sp > 0) ? stack[0] : 0.0; // Return top of stack or 0 if empty
+else if(token==TOKEN_NEG||token==TOKEN_SIN||token==TOKEN_COS||token==TOKEN_TAN||token==TOKEN_EXP||token==TOKEN_LOG||token==TOKEN_SQRT||token==TOKEN_ABS||token==TOKEN_FLOOR||token==TOKEN_CEIL||token==TOKEN_FRAC||token==TOKEN_SIGN||token==TOKEN_STEP) {
+if(sp<1) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float a = stack[-- sp];
+if(token==TOKEN_NEG) stack[sp ++] = -a;
+else if(token==TOKEN_SIN) stack[sp ++] = sin(a);
+else if(token==TOKEN_COS) stack[sp ++] = cos(a);
+else if(token==TOKEN_TAN) stack[sp ++] = tan(a);
+else if(token==TOKEN_EXP) stack[sp ++] = safeExp(a);
+else if(token==TOKEN_LOG) stack[sp ++] = safeLog(a);
+else if(token==TOKEN_SQRT) stack[sp ++] = sqrt(max(0.0, a));
+else if(token==TOKEN_ABS) stack[sp ++] = abs(a);
+else if(token==TOKEN_FLOOR) stack[sp ++] = floor(a);
+else if(token==TOKEN_CEIL) stack[sp ++] = ceil(a);
+else if(token==TOKEN_FRAC) stack[sp ++] = fract(a);
+else if(token==TOKEN_SIGN) stack[sp ++] = signFunc(a);
+else stack[sp ++] = stepFunc(a);
+} else if(token==TOKEN_MOD) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+stack[sp ++] = (abs(b)<EPSILON) ? 0.0 : mod(a, b);
+} else if(token==TOKEN_MIN||token==TOKEN_MAX) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+stack[sp ++] = (token==TOKEN_MIN) ? min(a, b) : max(a, b);
+} else if(token==TOKEN_ATAN2) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float xv = stack[-- sp];
+float yv = stack[-- sp];
+stack[sp ++] = atan(yv, xv);
+} else if(token==TOKEN_CLAMP) {
+if(sp<3) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float maxv = stack[-- sp];
+float minv = stack[-- sp];
+float val = stack[-- sp];
+stack[sp ++] = clamp(val, minv, maxv);
+} else if(token==TOKEN_NOISE) {
+if(sp<2) {
+stack[sp ++] = 0.0;
+continue;
+}
+float yv = stack[-- sp];
+float xv = stack[-- sp];
+stack[sp ++] = noise(vec2(xv, yv));
+} else if(token==TOKEN_RAND) {
+stack[sp ++] = rand(vec2(uTime, float(self)));
+}
+        // Typed-only tokens are ignored by this scalar interpreter.
+}
+return (sp>0) ? stack[0] : 0.0; // Return top of stack or 0 if empty
 }
 
 // ----------------------------------------------------------------------------
-// NUMERICAL DERIVATIVE (orders 1-4, any variable)
+// DERIVATIVE SAMPLE EVALUATION
 // ----------------------------------------------------------------------------
-float computeDerivative(float x, float y, float vx, float vy, float ax, float ay,
-                        float theta, float omega, vec4 color,
-                        float mass, float charge, int self,
-                        int wrtHash, int order,
-                        int exprOffset, int exprCount, int constOffset) {
-    if (order <= 0) {
-        return evaluateScalarTokenList(x, y, vx, vy, ax, ay, theta, omega, color,
-                                       mass, charge, self,
-                                       exprOffset, exprCount, constOffset);
-    }
-    if (order > 4) return 0.0;
+// Evaluate the expression after perturbing one supported scalar variable.
+// Keeping the interpreter call in this single helper avoids expanding it once
+// for every finite-difference sampleVar during shader inlining.
+float evaluateScalarAtOffset(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int wrtHash, float delta, int exprOffset, int exprCount, int constOffset) {
 
-    float eps = uDerivativeEpsilon;
-    float h = eps;
-    float orig = getVariableValue(wrtHash, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
-    if (abs(orig) > EPSILON) h = eps * abs(orig);
+float px = x;
+float py = y;
+float pvx = vx;
+float pvy = vy;
+float pax = ax;
+float pay = ay;
+float ptheta = theta;
+float pomega = omega;
+float pmass = mass;
+float pcharge = charge;
 
-    // Helper macro to create a perturbed state
-    #define PERTURB(delta, xo, yo, vxo, vyo, axo, ayo, tho, omo, colo, masso, chargeo) \
-        xo = x; yo = y; vxo = vx; vyo = vy; axo = ax; ayo = ay; \
-        tho = theta; omo = omega; colo = color; masso = mass; chargeo = charge; \
-        switch (wrtHash) { \
-            case VAR_HASH_X:       xo = x + delta; break; \
-            case VAR_HASH_Y:       yo = y + delta; break; \
-            case VAR_HASH_VX:      vxo = vx + delta; break; \
-            case VAR_HASH_VY:      vyo = vy + delta; break; \
-            case VAR_HASH_AX:      axo = ax + delta; break; \
-            case VAR_HASH_AY:      ayo = ay + delta; break; \
-            case VAR_HASH_THETA:   tho = theta + delta; break; \
-            case VAR_HASH_OMEGA:   omo = omega + delta; break; \
-            case VAR_HASH_MASS:    masso = mass + delta; break; \
-            case VAR_HASH_CHARGE:  chargeo = charge + delta; break; \
-            default: break; \
-        }
-    // Compute derivative using central difference formulas
-    //I love my life :)
-    if (order == 1) {
-        float xp, yp, vxp, vyp, axp, ayp, thp, omop; vec4 colp; float massp, chargep;
-        float xm, ym, vxm, vym, axm, aym, thm, omom; vec4 colm; float massm, chargem;
-        PERTURB( h, xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep);
-        PERTURB(-h, xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem);
-        float fp = evaluateScalarTokenList(xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep,self,
-                                           exprOffset, exprCount, constOffset);
-        float fm = evaluateScalarTokenList(xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem,self,
-                                           exprOffset, exprCount, constOffset);
-        return (fp - fm) / (2.0 * h);
-    }
-    else if (order == 2) {
-        float x0,y0,vx0,vy0,ax0,ay0,th0,om0; vec4 col0; float mass0,charge0;
-        float xp,yp,vxp,vyp,axp,ayp,thp,omop; vec4 colp; float massp,chargep;
-        float xm,ym,vxm,vym,axm,aym,thm,omom; vec4 colm; float massm,chargem;
-        PERTURB(0.0, x0,y0,vx0,vy0,ax0,ay0,th0,om0,col0,mass0,charge0);
-        PERTURB( h, xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep);
-        PERTURB(-h, xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem);
-        float f0 = evaluateScalarTokenList(x0,y0,vx0,vy0,ax0,ay0,th0,om0,col0,mass0,charge0,self,
-                                           exprOffset, exprCount, constOffset);
-        float fp = evaluateScalarTokenList(xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep,self,
-                                           exprOffset, exprCount, constOffset);
-        float fm = evaluateScalarTokenList(xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem,self,
-                                           exprOffset, exprCount, constOffset);
-        return (fp - 2.0*f0 + fm) / (h * h);
-    }
-    else if (order == 3) {
-        float x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p; vec4 col2p; float mass2p,charge2p;
-        float xp,yp,vxp,vyp,axp,ayp,thp,omop; vec4 colp; float massp,chargep;
-        float xm,ym,vxm,vym,axm,aym,thm,omom; vec4 colm; float massm,chargem;
-        float x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m; vec4 col2m; float mass2m,charge2m;
-        PERTURB( 2.0*h, x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p,col2p,mass2p,charge2p);
-        PERTURB( h, xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep);
-        PERTURB(-h, xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem);
-        PERTURB(-2.0*h, x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m,col2m,mass2m,charge2m);
-        float f2p = evaluateScalarTokenList(x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p,col2p,mass2p,charge2p,self,
-                                            exprOffset, exprCount, constOffset);
-        float fp = evaluateScalarTokenList(xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep,self,
-                                           exprOffset, exprCount, constOffset);
-        float fm = evaluateScalarTokenList(xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem,self,
-                                           exprOffset, exprCount, constOffset);
-        float f2m = evaluateScalarTokenList(x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m,col2m,mass2m,charge2m,self,
-                                            exprOffset, exprCount, constOffset);
-        return (f2p - 2.0*fp + 2.0*fm - f2m) / (2.0 * h * h * h);
-    }
-    else { // order == 4
-        float x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p; vec4 col2p; float mass2p,charge2p;
-        float xp,yp,vxp,vyp,axp,ayp,thp,omop; vec4 colp; float massp,chargep;
-        float x0,y0,vx0,vy0,ax0,ay0,th0,om0; vec4 col0; float mass0,charge0;
-        float xm,ym,vxm,vym,axm,aym,thm,omom; vec4 colm; float massm,chargem;
-        float x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m; vec4 col2m; float mass2m,charge2m;
-        PERTURB( 2.0*h, x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p,col2p,mass2p,charge2p);
-        PERTURB( h, xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep);
-        PERTURB(0.0, x0,y0,vx0,vy0,ax0,ay0,th0,om0,col0,mass0,charge0);
-        PERTURB(-h, xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem);
-        PERTURB(-2.0*h, x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m,col2m,mass2m,charge2m);
-        float f2p = evaluateScalarTokenList(x2p,y2p,vx2p,vy2p,ax2p,ay2p,th2p,om2p,col2p,mass2p,charge2p,self,
-                                            exprOffset, exprCount, constOffset);
-        float fp = evaluateScalarTokenList(xp,yp,vxp,vyp,axp,ayp,thp,omop,colp,massp,chargep,self,
-                                           exprOffset, exprCount, constOffset);
-        float f0 = evaluateScalarTokenList(x0,y0,vx0,vy0,ax0,ay0,th0,om0,col0,mass0,charge0,self,
-                                           exprOffset, exprCount, constOffset);
-        float fm = evaluateScalarTokenList(xm,ym,vxm,vym,axm,aym,thm,omom,colm,massm,chargem,self,
-                                           exprOffset, exprCount, constOffset);
-        float f2m = evaluateScalarTokenList(x2m,y2m,vx2m,vy2m,ax2m,ay2m,th2m,om2m,col2m,mass2m,charge2m,self,
-                                            exprOffset, exprCount, constOffset);
-        return (f2p - 4.0*fp + 6.0*f0 - 4.0*fm + f2m) / (h * h * h * h);
-    }
-    #undef PERTURB
+switch(wrtHash) {
+case VAR_HASH_X : px += delta;
+break;
+case VAR_HASH_Y : py += delta;
+break;
+case VAR_HASH_VX : pvx += delta;
+break;
+case VAR_HASH_VY : pvy += delta;
+break;
+case VAR_HASH_AX : pax += delta;
+break;
+case VAR_HASH_AY : pay += delta;
+break;
+case VAR_HASH_THETA : ptheta += delta;
+break;
+case VAR_HASH_OMEGA : pomega += delta;
+break;
+case VAR_HASH_MASS : pmass += delta;
+break;
+case VAR_HASH_CHARGE : pcharge += delta;
+break;
+default : break;
+}
+
+return evaluateScalarTokenList(px, py, pvx, pvy, pax, pay, ptheta, pomega, color, pmass, pcharge, self, exprOffset, exprCount, constOffset);
+}
+
+// ----------------------------------------------------------------------------
+// NUMERICAL DERIVATIVE (central finite differences, orders 1-4)
+// ----------------------------------------------------------------------------
+float computeDerivative(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int wrtHash, int order, int exprOffset, int exprCount, int constOffset) {
+
+if(order<=0) {
+return evaluateScalarTokenList(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, exprOffset, exprCount, constOffset);
+}
+if(order>4) return 0.0;
+
+float h = max(abs(uDerivativeEpsilon), 1e-5);
+float original = getVariableValue(wrtHash, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
+if(abs(original)>EPSILON) h *= abs(original);
+
+float offsets[5];
+float weights[5];
+int sampleCount = 0;
+float denominator = 1.0;
+
+if(order==1) {
+sampleCount = 2;
+offsets[0] = 1.0;
+weights[0] = 1.0;
+offsets[1] = -1.0;
+weights[1] = -1.0;
+denominator = 2.0*h;
+} else if(order==2) {
+sampleCount = 3;
+offsets[0] = 1.0;
+weights[0] = 1.0;
+offsets[1] = 0.0;
+weights[1] = -2.0;
+offsets[2] = -1.0;
+weights[2] = 1.0;
+denominator = h*h;
+} else if(order==3) {
+sampleCount = 4;
+offsets[0] = 2.0;
+weights[0] = 1.0;
+offsets[1] = 1.0;
+weights[1] = -2.0;
+offsets[2] = -1.0;
+weights[2] = 2.0;
+offsets[3] = -2.0;
+weights[3] = -1.0;
+denominator = 2.0*h*h*h;
+} else {
+sampleCount = 5;
+offsets[0] = 2.0;
+weights[0] = 1.0;
+offsets[1] = 1.0;
+weights[1] = -4.0;
+offsets[2] = 0.0;
+weights[2] = 6.0;
+offsets[3] = -1.0;
+weights[3] = -4.0;
+offsets[4] = -2.0;
+weights[4] = 1.0;
+denominator = h*h*h*h;
+}
+
+float sum = 0.0;
+    #pragma unroll 1
+for(int sampleVar = 0;
+sampleVar<sampleCount;
+++ sampleVar) {
+float value = evaluateScalarAtOffset(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, wrtHash, offsets[sampleVar]*h, exprOffset, exprCount, constOffset);
+sum += weights[sampleVar]*value;
+}
+return sum/denominator;
 }
 
 // ----------------------------------------------------------------------------
 // SCALAR SUB‑EXPRESSION EVALUATOR (for select, sum_neighbors, tensor components)
 // ----------------------------------------------------------------------------
-float evalScalarSubExpr(float x, float y, float vx, float vy, float ax, float ay,
-                        float theta, float omega, vec4 color,
-                        float mass, float charge, int self,
-                        int offset, int count, int constOffset, int neighbor) {
-    if (count <= 0) return 0.0;
-    float stack[32];
-    int sp = 0;
-    int idx = offset;
-    int end = offset + count;
-    while (idx < end) {
-        int token = allTokens[idx++];
-        if (token == TOKEN_NUMBER) {
-            int cidx = allTokens[idx++];
-            stack[sp++] = allConstants[constOffset + cidx];
-        }
-        else if (token == TOKEN_VARIABLE) {
-            int h = allTokens[idx++];
-            if (h == VAR_HASH_I) {
-                stack[sp++] = 0.0;
-                continue;
-            }
-            stack[sp++] = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
-        }
-        else if (token == TOKEN_OBJECT_REF) {
-            int obj = allTokens[idx++];
-            int prop = allTokens[idx++];
-            stack[sp++] = getObjectProperty(obj, prop, self);
-        }
-        else if (token == TOKEN_NEIGHBOR_INDEX) {
-            stack[sp++] = float(neighbor);
-        }
-        else if (token == TOKEN_DERIVATIVE) {
-            // Derivatives are not allowed inside select / sum_neighbors / tensors: return 0. Too lazy to implement
-            int dummy1 = allTokens[idx++];
-            int dummy2 = allTokens[idx++];
-            int dummy3 = allTokens[idx++];
-            int subc = allTokens[idx++];
-            idx += subc;
-            stack[sp++] = 0.0;
-        }
-        else if (token == TOKEN_COMP) {
-            int index = allTokens[idx++];
-            if (sp < 1) { stack[0] = 0.0; sp = 1; continue; }
-            float result = 0.0;
+float evalScalarSubExpr(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int offset, int count, int constOffset, int neighbor) {
+if(count<=0) return 0.0;
+float stack[MAX_RPN_STACK_SIZE];
+int sp = 0;
+int idx = offset;
+int end = min(offset+count, allTokens.length());
+if(offset<0||offset>=end) return 0.0;
+#pragma unroll 1
+while(idx<end) {
+int token = allTokens[idx ++];
+if(sp>=MAX_RPN_STACK_SIZE&&(token==TOKEN_NUMBER||token==TOKEN_VARIABLE||token==TOKEN_OBJECT_REF||token==TOKEN_NEIGHBOR_INDEX||token==TOKEN_DERIVATIVE||token==TOKEN_COMP||token==TOKEN_RAND)) break;
+if(token==TOKEN_NUMBER) {
+int cidx = allTokens[idx ++];
+int constantIndex = constOffset+cidx;
+stack[sp ++] = (constantIndex>=0&&constantIndex<allConstants.length()) ? allConstants[constantIndex] : 0.0;
+} else if(token==TOKEN_VARIABLE) {
+int h = allTokens[idx ++];
+if(h==VAR_HASH_I) {
+stack[sp ++] = 0.0;
+continue;
+}
+stack[sp ++] = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
+} else if(token==TOKEN_OBJECT_REF) {
+int obj = allTokens[idx ++];
+int prop = allTokens[idx ++];
+stack[sp ++] = getObjectProperty(obj, prop, self);
+} else if(token==TOKEN_NEIGHBOR_INDEX) {
+stack[sp ++] = float(neighbor);
+} else if(token==TOKEN_DERIVATIVE) {
+            // Nested derivatives are unsupported in scalar sub-expressions.
+int dummy1 = allTokens[idx ++];
+int dummy2 = allTokens[idx ++];
+int dummy3 = allTokens[idx ++];
+int subc = allTokens[idx ++];
+idx += subc;
+stack[sp ++] = 0.0;
+} else if(token==TOKEN_COMP) {
+int index = allTokens[idx ++];
+if(sp<1) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float result = 0.0;
             // We should not encounter TOKEN_COMP here. We'll just push 0.
-            stack[sp++] = 0.0;
-        }
+stack[sp ++] = 0.0;
+}
 
         // Binary arithmetic and comparisons
-        else if (token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-                 token == TOKEN_DIV || token == TOKEN_POW ||
-                 token == TOKEN_LT || token == TOKEN_LE || token == TOKEN_GT ||
-                 token == TOKEN_GE || token == TOKEN_EQ || token == TOKEN_NE) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            if (token == TOKEN_ADD)      stack[sp++] = a + b;
-            else if (token == TOKEN_SUB) stack[sp++] = a - b;
-            else if (token == TOKEN_MUL) stack[sp++] = a * b;
-            else if (token == TOKEN_DIV) stack[sp++] = safeDivide(a, b);
-            else if (token == TOKEN_POW) stack[sp++] = safePow(a, b);
-            else if (token == TOKEN_LT)  stack[sp++] = (a < b) ? 1.0 : 0.0;
-            else if (token == TOKEN_LE)  stack[sp++] = (a <= b) ? 1.0 : 0.0;
-            else if (token == TOKEN_GT)  stack[sp++] = (a > b) ? 1.0 : 0.0;
-            else if (token == TOKEN_GE)  stack[sp++] = (a >= b) ? 1.0 : 0.0;
-            else if (token == TOKEN_EQ)  stack[sp++] = (abs(a - b) < EPSILON) ? 1.0 : 0.0;
-            else                         stack[sp++] = (abs(a - b) >= EPSILON) ? 1.0 : 0.0;
-        }
+else if(token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW||token==TOKEN_LT||token==TOKEN_LE||token==TOKEN_GT||token==TOKEN_GE||token==TOKEN_EQ||token==TOKEN_NE) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+if(token==TOKEN_ADD) stack[sp ++] = a+b;
+else if(token==TOKEN_SUB) stack[sp ++] = a-b;
+else if(token==TOKEN_MUL) stack[sp ++] = a*b;
+else if(token==TOKEN_DIV) stack[sp ++] = safeDivide(a, b);
+else if(token==TOKEN_POW) stack[sp ++] = safePow(a, b);
+else if(token==TOKEN_LT) stack[sp ++] = (a<b) ? 1.0 : 0.0;
+else if(token==TOKEN_LE) stack[sp ++] = (a<=b) ? 1.0 : 0.0;
+else if(token==TOKEN_GT) stack[sp ++] = (a>b) ? 1.0 : 0.0;
+else if(token==TOKEN_GE) stack[sp ++] = (a>=b) ? 1.0 : 0.0;
+else if(token==TOKEN_EQ) stack[sp ++] = (abs(a-b)<EPSILON) ? 1.0 : 0.0;
+else stack[sp ++] = (abs(a-b)>=EPSILON) ? 1.0 : 0.0;
+}
         // Unary operators
-        else if (token == TOKEN_NEG || token == TOKEN_SIN || token == TOKEN_COS || token == TOKEN_TAN ||
-                 token == TOKEN_EXP || token == TOKEN_LOG || token == TOKEN_SQRT || token == TOKEN_ABS ||
-                 token == TOKEN_FLOOR || token == TOKEN_CEIL || token == TOKEN_FRAC ||
-                 token == TOKEN_SIGN || token == TOKEN_STEP) {
-            if (sp < 1) { stack[0] = 0.0; sp = 1; continue; }
-            float a = stack[--sp];
-            if (token == TOKEN_NEG)      stack[sp++] = -a;
-            else if (token == TOKEN_SIN) stack[sp++] = sin(a);
-            else if (token == TOKEN_COS) stack[sp++] = cos(a);
-            else if (token == TOKEN_TAN) stack[sp++] = tan(a);
-            else if (token == TOKEN_EXP) stack[sp++] = safeExp(a);
-            else if (token == TOKEN_LOG) stack[sp++] = safeLog(a);
-            else if (token == TOKEN_SQRT)stack[sp++] = sqrt(max(0.0, a));
-            else if (token == TOKEN_ABS) stack[sp++] = abs(a);
-            else if (token == TOKEN_FLOOR)stack[sp++] = floor(a);
-            else if (token == TOKEN_CEIL)stack[sp++] = ceil(a);
-            else if (token == TOKEN_FRAC)stack[sp++] = fract(a);
-            else if (token == TOKEN_SIGN)stack[sp++] = signFunc(a);
-            else                         stack[sp++] = stepFunc(a);
-        }
-        else if (token == TOKEN_MOD) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            stack[sp++] = (abs(b) < EPSILON) ? 0.0 : mod(a, b);
-        }
-        else if (token == TOKEN_MIN || token == TOKEN_MAX) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float b = stack[--sp];
-            float a = stack[--sp];
-            stack[sp++] = (token == TOKEN_MIN) ? min(a, b) : max(a, b);
-        }
-        else if (token == TOKEN_ATAN2) {
-            if (sp < 2) { stack[0] = 0.0; sp = 1; continue; }
-            float xv = stack[--sp];
-            float yv = stack[--sp];
-            stack[sp++] = atan(yv, xv);
-        }
-        else if (token == TOKEN_CLAMP) {
-            if (sp < 3) { stack[0] = 0.0; sp = 1; continue; }
-            float maxv = stack[--sp];
-            float minv = stack[--sp];
-            float val = stack[--sp];
-            stack[sp++] = clamp(val, minv, maxv);
-        }
-        else if (token == TOKEN_NOISE) {
-            if (sp < 2) { stack[sp++] = 0.0; continue; }
-            float yv = stack[--sp];
-            float xv = stack[--sp];
-            stack[sp++] = noise(vec2(xv, yv));
-        }
-        else if (token == TOKEN_RAND) {
-            stack[sp++] = rand(vec2(uTime, float(self)));
-        }
+else if(token==TOKEN_NEG||token==TOKEN_SIN||token==TOKEN_COS||token==TOKEN_TAN||token==TOKEN_EXP||token==TOKEN_LOG||token==TOKEN_SQRT||token==TOKEN_ABS||token==TOKEN_FLOOR||token==TOKEN_CEIL||token==TOKEN_FRAC||token==TOKEN_SIGN||token==TOKEN_STEP) {
+if(sp<1) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float a = stack[-- sp];
+if(token==TOKEN_NEG) stack[sp ++] = -a;
+else if(token==TOKEN_SIN) stack[sp ++] = sin(a);
+else if(token==TOKEN_COS) stack[sp ++] = cos(a);
+else if(token==TOKEN_TAN) stack[sp ++] = tan(a);
+else if(token==TOKEN_EXP) stack[sp ++] = safeExp(a);
+else if(token==TOKEN_LOG) stack[sp ++] = safeLog(a);
+else if(token==TOKEN_SQRT) stack[sp ++] = sqrt(max(0.0, a));
+else if(token==TOKEN_ABS) stack[sp ++] = abs(a);
+else if(token==TOKEN_FLOOR) stack[sp ++] = floor(a);
+else if(token==TOKEN_CEIL) stack[sp ++] = ceil(a);
+else if(token==TOKEN_FRAC) stack[sp ++] = fract(a);
+else if(token==TOKEN_SIGN) stack[sp ++] = signFunc(a);
+else stack[sp ++] = stepFunc(a);
+} else if(token==TOKEN_MOD) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+stack[sp ++] = (abs(b)<EPSILON) ? 0.0 : mod(a, b);
+} else if(token==TOKEN_MIN||token==TOKEN_MAX) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float b = stack[-- sp];
+float a = stack[-- sp];
+stack[sp ++] = (token==TOKEN_MIN) ? min(a, b) : max(a, b);
+} else if(token==TOKEN_ATAN2) {
+if(sp<2) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float xv = stack[-- sp];
+float yv = stack[-- sp];
+stack[sp ++] = atan(yv, xv);
+} else if(token==TOKEN_CLAMP) {
+if(sp<3) {
+stack[0] = 0.0;
+sp = 1;
+continue;
+}
+float maxv = stack[-- sp];
+float minv = stack[-- sp];
+float val = stack[-- sp];
+stack[sp ++] = clamp(val, minv, maxv);
+} else if(token==TOKEN_NOISE) {
+if(sp<2) {
+stack[sp ++] = 0.0;
+continue;
+}
+float yv = stack[-- sp];
+float xv = stack[-- sp];
+stack[sp ++] = noise(vec2(xv, yv));
+} else if(token==TOKEN_RAND) {
+stack[sp ++] = rand(vec2(uTime, float(self)));
+}
         // Other tokens (DOT, CROSS, NORM, SELECT, SUM_NEIGHBORS, TENSOR_LIT) are not used here.
-    }
-    return (sp > 0) ? stack[0] : 0.0;
+}
+return (sp>0) ? stack[0] : 0.0;
 }
 
 // ----------------------------------------------------------------------------
 // MAIN TYPED EVALUATOR (handles all tokens, including derivatives and comparisons)
 // ----------------------------------------------------------------------------
-float evaluateRPNComponent(float x, float y, float vx, float vy, float ax, float ay,
-                           float theta, float omega, vec4 color,
-                           float mass, float charge, int self,
-                           int componentType,
-                           int tokenOffset, int tokenCount, int constantOffset) {
-    if (tokenCount <= 0) {
-        if (componentType == 2) return 0.0;               // angular acceleration default
-        if (componentType >= 3 && componentType <= 6) return 1.0; // color default
-        return 0.0;
-    }
+float evaluateRPNComponent(float x, float y, float vx, float vy, float ax, float ay, float theta, float omega, vec4 color, float mass, float charge, int self, int componentType, int tokenOffset, int tokenCount, int constantOffset) {
+if(tokenCount<=0) {
+if(componentType==2) return 0.0;               // angular acceleration default
+if(componentType>=3&&componentType<=6) return 1.0; // color default
+return 0.0;
+}
 
     // Typed stack: each entry is a scalar, vector (vec2/vec3/vec4), or complex
-    int   stack_type[128];        // 0=scalar, 1=vec2, 2=vec3, 3=vec4
-    float stack_data[128][4];
-    int   stack_rank[128];
-    int   stack_shape[128][4];
-    int   stack_size[128];
-    bool  stack_isComplex[128];
-    int sp = 0;
+vec4 stack_data[MAX_RPN_STACK_SIZE];
+int stack_size[MAX_RPN_STACK_SIZE];
+bool stack_isComplex[MAX_RPN_STACK_SIZE];
+int sp = 0;
 
-    int idx = tokenOffset;
-    int end = tokenOffset + tokenCount;
-    while (idx < end) {
-        int token = allTokens[idx++];
+int idx = tokenOffset;
+int end = min(tokenOffset+tokenCount, allTokens.length());
+if(tokenOffset<0||tokenOffset>=end) return (componentType>=3&&componentType<=6) ? 1.0 : 0.0;
+#pragma unroll 1
+while(idx<end) {
+int token = allTokens[idx ++];
+if(sp>=MAX_RPN_STACK_SIZE&&(token==TOKEN_DERIVATIVE||token==TOKEN_TENSOR_LIT||token==TOKEN_SELECT||token==TOKEN_SUM_NEIGHBORS||token==TOKEN_NUMBER||token==TOKEN_VARIABLE||token==TOKEN_OBJECT_REF||token==TOKEN_NEIGHBOR_INDEX||token==TOKEN_RAND)) break;
 
         // ----- DERIVATIVE (handled only here – no recursion) -----
-        if (token == TOKEN_DERIVATIVE) {
-            int wrtHash = allTokens[idx++];
-            int order = allTokens[idx++];
-            int method = allTokens[idx++];
-            int subCount = allTokens[idx++];
-            int subOffset = idx;
-            idx += subCount;
-            float deriv = computeDerivative(x, y, vx, vy, ax, ay, theta, omega, color,
-                                            mass, charge, self,
-                                            wrtHash, order, subOffset, subCount, constantOffset);
-            stack_type[sp] = 0;
-            stack_data[sp][0] = deriv;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_DERIVATIVE) {
+int wrtHash = allTokens[idx ++];
+int order = allTokens[idx ++];
+int method = allTokens[idx ++];
+int subCount = allTokens[idx ++];
+int subOffset = idx;
+idx += subCount;
+float deriv = computeDerivative(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, wrtHash, order, subOffset, subCount, constantOffset);
+stack_data[sp][0] = deriv;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- TENSOR LITERAL -----
-        if (token == TOKEN_TENSOR_LIT) {
-            int rank = allTokens[idx++];
-            int shape[4] = {0,0,0,0};
-            int total = 1;
-            for (int d = 0; d < rank; ++d) {
-                shape[d] = allTokens[idx++];
-                total *= shape[d];
-            }
-            if (total > 4) {
-                // Skip unsupported high‑rank tensors
-                for (int c = 0; c < total; ++c) {
-                    int compCount = allTokens[idx++];
-                    idx += compCount;
-                }
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            // rank‑1 vector (length 2,3,4)
-            if (rank == 1 && total >= 2 && total <= 4) {
-                float comps[4];
-                for (int c = 0; c < total; ++c) {
-                    int compCount = allTokens[idx++];
-                    int compOffset = idx;
-                    idx += compCount;
-                    comps[c] = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                                 mass, charge, self,
-                                                 compOffset, compCount, constantOffset, -1);
-                }
-                int vecType = (total == 2) ? 1 : (total == 3) ? 2 : 3;
-                stack_type[sp] = vecType;
-                for (int c = 0; c < total; ++c) stack_data[sp][c] = comps[c];
-                stack_rank[sp] = 1;
-                stack_shape[sp][0] = total;
-                stack_size[sp] = total;
-                stack_isComplex[sp] = false;
-                sp++;
-            } else {
-                // Higher rank: fallback to first component as scalar
-                int firstCount = allTokens[idx++];
-                int firstOffset = idx;
-                idx += firstCount;
-                float firstVal = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                                   mass, charge, self,
-                                                   firstOffset, firstCount, constantOffset, -1);
-                for (int c = 1; c < total; ++c) {
-                    int compCount = allTokens[idx++];
-                    idx += compCount;
-                }
-                stack_type[sp] = 0;
-                stack_data[sp][0] = firstVal;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-            }
-            continue;
-        }
+if(token==TOKEN_TENSOR_LIT) {
+int rank = allTokens[idx ++];
+int total = 1;
+for(int d = 0;
+d<rank;
+++ d) {
+int dimension = allTokens[idx ++];
+total *= dimension;
+}
+if(total>4) {
+    // Higher-rank or oversized tensors are skipped and evaluate as zero.
+for(int c = 0;
+c<total;
+++ c) {
+int compCount = allTokens[idx ++];
+idx += compCount;
+}
+stack_data[sp][0] = 0.0;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+
+float components[4];
+for(int c = 0;
+c<total;
+++ c) {
+int compCount = allTokens[idx ++];
+int compOffset = idx;
+idx += compCount;
+if(rank==1||c==0) {
+components[c] = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, compOffset, compCount, constantOffset,-1);
+}
+}
+if(rank==1&&total>=2) {
+for(int c = 0;
+c<total;
+++ c) stack_data[sp][c] = components[c];
+stack_size[sp] = total;
+} else {
+stack_data[sp][0] = components[0];
+stack_size[sp] = 1;
+}
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
 
         // ----- SELECT -----
-        if (token == TOKEN_SELECT) {
-            int condCount = allTokens[idx++];
-            int condOffset = idx; idx += condCount;
-            int aCount = allTokens[idx++];
-            int aOffset = idx; idx += aCount;
-            int bCount = allTokens[idx++];
-            int bOffset = idx; idx += bCount;
-            float cond = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                           mass, charge, self,
-                                           condOffset, condCount, constantOffset, -1);
-            if (cond > 0.0) {
-                float aVal = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                               mass, charge, self,
-                                               aOffset, aCount, constantOffset, -1);
-                stack_type[sp] = 0;
-                stack_data[sp][0] = aVal;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            } else {
-                float bVal = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                               mass, charge, self,
-                                               bOffset, bCount, constantOffset, -1);
-                stack_type[sp] = 0;
-                stack_data[sp][0] = bVal;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            }
-            sp++;
-            continue;
-        }
+if(token==TOKEN_SELECT) {
+int condCount = allTokens[idx ++];
+int condOffset = idx;
+idx += condCount;
+int aCount = allTokens[idx ++];
+int aOffset = idx;
+idx += aCount;
+int bCount = allTokens[idx ++];
+int bOffset = idx;
+idx += bCount;
+float condition = 0.0;
+float selectedValue = 0.0;
+#pragma unroll 1
+for(int stage = 0;
+stage<2;
+++ stage) {
+int expressionOffset = condOffset;
+int expressionCount = condCount;
+if(stage==1) {
+expressionOffset = (condition>0.0) ? aOffset : bOffset;
+expressionCount = (condition>0.0) ? aCount : bCount;
+}
+float value = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, expressionOffset, expressionCount, constantOffset,-1);
+if(stage==0) condition = value;
+else selectedValue = value;
+}
+stack_data[sp][0] = selectedValue;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- SUM_NEIGHBORS -----
-        if (token == TOKEN_SUM_NEIGHBORS) {
-            int weightCount = allTokens[idx++];
-            int weightOffset = idx; idx += weightCount;
-            int bodyCount = allTokens[idx++];
-            int bodyOffset = idx; idx += bodyCount;
-            float sum = 0.0;
-            for (int n = 0; n < uNumObjects; ++n) {
-                if (n == self) continue;
-                float w = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                            mass, charge, self,
-                                            weightOffset, weightCount, constantOffset, n);
-                if (abs(w) < EPSILON) continue;
-                float v = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color,
-                                            mass, charge, self,
-                                            bodyOffset, bodyCount, constantOffset, n);
-                sum += w * v;
-            }
-            stack_type[sp] = 0;
-            stack_data[sp][0] = sum;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_SUM_NEIGHBORS) {
+int weightCount = allTokens[idx ++];
+int weightOffset = idx;
+idx += weightCount;
+int bodyCount = allTokens[idx ++];
+int bodyOffset = idx;
+idx += bodyCount;
+float sum = 0.0;
+for(int n = 0;
+n<uNumObjects;
+++ n) {
+if(n==self) continue;
+float weight = 0.0;
+float body = 0.0;
+    #pragma unroll 1
+for(int part = 0;
+part<2;
+++ part) {
+if(part==1&&abs(weight)<EPSILON) continue;
+int expressionOffset = (part==0) ? weightOffset : bodyOffset;
+int expressionCount = (part==0) ? weightCount : bodyCount;
+float value = evalScalarSubExpr(x, y, vx, vy, ax, ay, theta, omega, color, mass, charge, self, expressionOffset, expressionCount, constantOffset, n);
+if(part==0) weight = value;
+else body = value;
+}
+sum += weight*body;
+}
+stack_data[sp][0] = sum;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- NUMBERS -----
-        if (token == TOKEN_NUMBER) {
-            int constIdx = allTokens[idx++];
-            float val = allConstants[constantOffset + constIdx];
-            stack_type[sp] = 0;
-            stack_data[sp][0] = val;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_NUMBER) {
+int constIdx = allTokens[idx ++];
+int constantIndex = constantOffset+constIdx;
+float val = (constantIndex>=0&&constantIndex<allConstants.length()) ? allConstants[constantIndex] : 0.0;
+stack_data[sp][0] = val;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- VARIABLES (including imaginary unit i) -----
-        if (token == TOKEN_VARIABLE) {
-            int h = allTokens[idx++];
-            if (h == VAR_HASH_I) {
+if(token==TOKEN_VARIABLE) {
+int h = allTokens[idx ++];
+if(h==VAR_HASH_I) {
                 // Imaginary unit
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_data[sp][1] = 1.0;
-                stack_isComplex[sp] = true;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            float val = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
-            stack_type[sp] = 0;
-            stack_data[sp][0] = val;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+stack_data[sp][0] = 0.0;
+stack_data[sp][1] = 1.0;
+stack_isComplex[sp] = true;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+float val = getVariableValue(h, x, y, vx, vy, ax, ay, theta, omega, color, mass, charge);
+stack_data[sp][0] = val;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- OBJECT REFERENCE -----
-        if (token == TOKEN_OBJECT_REF) {
-            int obj = allTokens[idx++];
-            int prop = allTokens[idx++];
-            float val = getObjectProperty(obj, prop, self);
-            stack_type[sp] = 0;
-            stack_data[sp][0] = val;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_OBJECT_REF) {
+int obj = allTokens[idx ++];
+int prop = allTokens[idx ++];
+float val = getObjectProperty(obj, prop, self);
+stack_data[sp][0] = val;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- NEIGHBOR INDEX -----
-        if (token == TOKEN_NEIGHBOR_INDEX) {
-            stack_type[sp] = 0;
-            stack_data[sp][0] = -1.0;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_NEIGHBOR_INDEX) {
+stack_data[sp][0] = -1.0;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- NOISE -----
-        if (token == TOKEN_NOISE) {
-            if (sp < 2) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            float yv = stack_data[sp-1][0]; sp--;
-            float xv = stack_data[sp-1][0]; sp--;
-            stack_type[sp] = 0;
-            stack_data[sp][0] = noise(vec2(xv, yv));
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_NOISE) {
+if(sp<2) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+float yv = stack_data[sp-1][0];
+sp --;
+float xv = stack_data[sp-1][0];
+sp --;
+stack_data[sp][0] = noise(vec2(xv, yv));
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- RAND -----
-        if (token == TOKEN_RAND) {
-            stack_type[sp] = 0;
-            stack_data[sp][0] = rand(vec2(uTime, float(self)));
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_RAND) {
+stack_data[sp][0] = rand(vec2(uTime, float(self)));
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- DOT PRODUCT -----
-        if (token == TOKEN_DOT) {
-            if (sp < 2) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            sp--; int b = sp;
-            sp--; int a = sp;
-            int sz = min(stack_size[a], stack_size[b]);
-            float result = 0.0;
-            for (int c = 0; c < sz; ++c) {
-                float av = stack_isComplex[a] ? stack_data[a][0] : stack_data[a][c];
-                float bv = stack_isComplex[b] ? stack_data[b][0] : stack_data[b][c];
-                result += av * bv;
-            }
-            stack_type[sp] = 0;
-            stack_data[sp][0] = result;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_DOT) {
+if(sp<2) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+sp --;
+int b = sp;
+sp --;
+int a = sp;
+int sz = min(stack_size[a], stack_size[b]);
+float result = 0.0;
+for(int c = 0;
+c<sz;
+++ c) {
+float av = stack_isComplex[a] ? stack_data[a][0] : stack_data[a][c];
+float bv = stack_isComplex[b] ? stack_data[b][0] : stack_data[b][c];
+result += av*bv;
+}
+stack_data[sp][0] = result;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- CROSS PRODUCT (pads to 3D with zeroes) -----
-        if (token == TOKEN_CROSS) {
-            if (sp < 2) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            sp--; int b = sp;
-            sp--; int a = sp;
-            vec3 va = vec3(0.0), vb = vec3(0.0);
-            for (int c = 0; c < min(stack_size[a], 3); ++c) va[c] = stack_data[a][c];
-            for (int c = 0; c < min(stack_size[b], 3); ++c) vb[c] = stack_data[b][c];
-            vec3 cr = cross(va, vb);
-            stack_type[sp] = 2; // vec3
-            stack_data[sp][0] = cr.x;
-            stack_data[sp][1] = cr.y;
-            stack_data[sp][2] = cr.z;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 1;
-            stack_shape[sp][0] = 3;
-            stack_size[sp] = 3;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_CROSS) {
+if(sp<2) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+sp --;
+int b = sp;
+sp --;
+int a = sp;
+vec3 va = vec3(0.0), vb = vec3(0.0);
+for(int c = 0;
+c<min(stack_size[a], 3);
+++ c) va[c] = stack_data[a][c];
+for(int c = 0;
+c<min(stack_size[b], 3);
+++ c) vb[c] = stack_data[b][c];
+vec3 cr = cross(va, vb);
+stack_data[sp][0] = cr.x;
+stack_data[sp][1] = cr.y;
+stack_data[sp][2] = cr.z;
+stack_isComplex[sp] = false;
+stack_size[sp] = 3;
+sp ++;
+continue;
+}
 
         // ----- NORM (Euclidean length) -----
-        if (token == TOKEN_NORM) {
-            if (sp < 1) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            sp--; int a = sp;
-            float lenSq = 0.0;
-            for (int c = 0; c < stack_size[a]; ++c) {
-                float v = stack_isComplex[a] ? stack_data[a][0] : stack_data[a][c];
-                lenSq += v * v;
-            }
-            stack_type[sp] = 0;
-            stack_data[sp][0] = sqrt(lenSq);
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+if(token==TOKEN_NORM) {
+if(sp<1) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+sp --;
+int a = sp;
+float lenSq = 0.0;
+for(int c = 0;
+c<stack_size[a];
+++ c) {
+float v = stack_isComplex[a] ? stack_data[a][0] : stack_data[a][c];
+lenSq += v*v;
+}
+stack_data[sp][0] = sqrt(lenSq);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
         // ----- COMP (extract component from a vector/tensor) -----
-        if (token == TOKEN_COMP) {
+if(token==TOKEN_COMP) {
             // The index is the next token in the stream
-            int index = allTokens[idx++]; // 0‑based index
-            if (sp < 1) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            sp--; // pop the tensor/vector
-            int a_idx = sp;
-            float result = 0.0;
-            if (index >= 0 && index < stack_size[a_idx]) {
-                result = stack_data[a_idx][index];
-            }
-            stack_type[sp] = 0;
-            stack_data[sp][0] = result;
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
+int index = allTokens[idx ++]; // 0‑based index
+if(sp<1) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+sp --; // pop the tensor/vector
+int a_idx = sp;
+float result = 0.0;
+if(index>=0&&index<stack_size[a_idx]) {
+result = stack_data[a_idx][index];
+}
+stack_data[sp][0] = result;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
           // ----- POWER OPERATOR (supports scalar and non-complex) ----- a lazy solution that bypasses the other pow down the line
-        else if (token == TOKEN_POW) {
-          if (sp < 2) {
-            stack_type[sp] = 0;
-            stack_data[sp][0] = 0.0;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            stack_isComplex[sp] = false;
-            sp++;
-            continue;
-          }
+else if(token==TOKEN_POW) {
+if(sp<2) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
           // Pop exponent first (top of stack)
-          sp--;
-          int b_idx = sp;
-          sp--;
-          int a_idx = sp;
-          bool use_complex = stack_isComplex[a_idx] || stack_isComplex[b_idx];
-          if (!use_complex) {
+sp --;
+int b_idx = sp;
+sp --;
+int a_idx = sp;
+bool use_complex = stack_isComplex[a_idx]||stack_isComplex[b_idx];
+if(! use_complex) {
             // Scalar power (real base, real exponent)
-            float base_val = stack_data[a_idx][0];
-            float exp_val = stack_data[b_idx][0];
-            float result = safePow(base_val, exp_val);
-            stack_type[sp] = 0;
-            stack_data[sp][0] = result;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            stack_isComplex[sp] = false;
-          } else {
+float base_val = stack_data[a_idx][0];
+float exp_val = stack_data[b_idx][0];
+float result = safePow(base_val, exp_val);
+stack_data[sp][0] = result;
+stack_size[sp] = 1;
+stack_isComplex[sp] = false;
+} else {
             // Complex power
-            vec2 base_c = vec2(stack_data[a_idx][0], stack_data[a_idx][1]);
-            vec2 exp_c = vec2(stack_data[b_idx][0], stack_data[b_idx][1]);
-            vec2 result = cPow(base_c, exp_c);
-            stack_type[sp] = 0;
-            stack_data[sp][0] = result.x;
-            stack_data[sp][1] = result.y;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            stack_isComplex[sp] = true;
-          }
-          sp++;
-          continue;
-        }
+vec2 base_c = vec2(stack_data[a_idx][0], stack_data[a_idx][1]);
+vec2 exp_c = vec2(stack_data[b_idx][0], stack_data[b_idx][1]);
+vec2 result = cPow(base_c, exp_c);
+stack_data[sp][0] = result.x;
+stack_data[sp][1] = result.y;
+stack_size[sp] = 1;
+stack_isComplex[sp] = true;
+}
+sp ++;
+continue;
+}
         // ----- BINARY OPERATORS (arithmetic + comparisons) -----
-        if (token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-            token == TOKEN_DIV || token == TOKEN_POW ||
-            token == TOKEN_LT || token == TOKEN_LE || token == TOKEN_GT ||
-            token == TOKEN_GE || token == TOKEN_EQ || token == TOKEN_NE) {
+if(token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW||token==TOKEN_LT||token==TOKEN_LE||token==TOKEN_GT||token==TOKEN_GE||token==TOKEN_EQ||token==TOKEN_NE) {
 
-            if (sp < 2) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
-            sp--; int b = sp;
-            sp--; int a = sp;
+if(sp<2) {
+stack_data[sp][0] = 0.0;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+sp --;
+int b = sp;
+sp --;
+int a = sp;
 
             // Complex arithmetic for ADD, SUB, MUL, DIV, POW
-            if ((token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-                 token == TOKEN_DIV || token == TOKEN_POW) &&
-                (stack_isComplex[a] || stack_isComplex[b])) {
-                vec2 ca = stack_isComplex[a] ? vec2(stack_data[a][0], stack_data[a][1])
-                                             : vec2(stack_data[a][0], 0.0);
-                vec2 cb = stack_isComplex[b] ? vec2(stack_data[b][0], stack_data[b][1])
-                                             : vec2(stack_data[b][0], 0.0);
-                vec2 cr;
-                if (token == TOKEN_ADD) cr = ca + cb;
-                else if (token == TOKEN_SUB) cr = ca - cb;
-                else if (token == TOKEN_MUL) cr = cMul(ca, cb);
-                else if (token == TOKEN_DIV) cr = cDiv(ca, cb);
-                else cr = cPow(ca, cb);
-                stack_type[sp] = 0;
-                stack_data[sp][0] = cr.x;
-                stack_data[sp][1] = cr.y;
-                stack_isComplex[sp] = true;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
+if((token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW)&&(stack_isComplex[a]||stack_isComplex[b])) {
+vec2 ca = stack_isComplex[a] ? vec2(stack_data[a][0], stack_data[a][1]) : vec2(stack_data[a][0], 0.0);
+vec2 cb = stack_isComplex[b] ? vec2(stack_data[b][0], stack_data[b][1]) : vec2(stack_data[b][0], 0.0);
+vec2 cr;
+if(token==TOKEN_ADD) cr = ca+cb;
+else if(token==TOKEN_SUB) cr = ca-cb;
+else if(token==TOKEN_MUL) cr = cMul(ca, cb);
+else if(token==TOKEN_DIV) cr = cDiv(ca, cb);
+else cr = cPow(ca, cb);
+stack_data[sp][0] = cr.x;
+stack_data[sp][1] = cr.y;
+stack_isComplex[sp] = true;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
             // Scalar * vector (broadcast)
-            if ((token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-                 token == TOKEN_DIV || token == TOKEN_POW) &&
-                stack_type[a] == 0 && !stack_isComplex[a] && stack_type[b] != 0) {
-                float s = stack_data[a][0];
-                for (int c = 0; c < stack_size[b]; ++c) {
-                    if (token == TOKEN_ADD)      stack_data[b][c] += s;
-                    else if (token == TOKEN_SUB) stack_data[b][c] -= s;
-                    else if (token == TOKEN_MUL) stack_data[b][c] *= s;
-                    else if (token == TOKEN_DIV) stack_data[b][c] = safeDivide(stack_data[b][c], s);
-                    else                         stack_data[b][c] = safePow(stack_data[b][c], s);
-                }
-                stack_type[sp] = stack_type[b];
-                stack_rank[sp] = stack_rank[b];
-                for (int d = 0; d < 4; ++d) stack_shape[sp][d] = stack_shape[b][d];
-                stack_size[sp] = stack_size[b];
-                stack_isComplex[sp] = false;
-                sp++;
-                continue;
-            }
-            if ((token == TOKEN_ADD || token == TOKEN_SUB || token == TOKEN_MUL ||
-                 token == TOKEN_DIV || token == TOKEN_POW) &&
-                stack_type[b] == 0 && !stack_isComplex[b] && stack_type[a] != 0) {
-                float s = stack_data[b][0];
-                for (int c = 0; c < stack_size[a]; ++c) {
-                    if (token == TOKEN_ADD)      stack_data[a][c] += s;
-                    else if (token == TOKEN_SUB) stack_data[a][c] -= s;
-                    else if (token == TOKEN_MUL) stack_data[a][c] *= s;
-                    else if (token == TOKEN_DIV) stack_data[a][c] = safeDivide(stack_data[a][c], s);
-                    else                         stack_data[a][c] = safePow(stack_data[a][c], s);
-                }
-                stack_type[sp] = stack_type[a];
-                stack_rank[sp] = stack_rank[a];
-                for (int d = 0; d < 4; ++d) stack_shape[sp][d] = stack_shape[a][d];
-                stack_size[sp] = stack_size[a];
-                stack_isComplex[sp] = false;
-                sp++;
-                continue;
-            }
+if((token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW)&&stack_size[a]==1&&! stack_isComplex[a]&&stack_size[b]>1) {
+float s = stack_data[a][0];
+for(int c = 0;
+c<stack_size[b];
+++ c) {
+if(token==TOKEN_ADD) stack_data[b][c] += s;
+else if(token==TOKEN_SUB) stack_data[b][c] -= s;
+else if(token==TOKEN_MUL) stack_data[b][c] *= s;
+else if(token==TOKEN_DIV) stack_data[b][c] = safeDivide(stack_data[b][c], s);
+else stack_data[b][c] = safePow(stack_data[b][c], s);
+}
+stack_size[sp] = stack_size[b];
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
+if((token==TOKEN_ADD||token==TOKEN_SUB||token==TOKEN_MUL||token==TOKEN_DIV||token==TOKEN_POW)&&stack_size[b]==1&&! stack_isComplex[b]&&stack_size[a]>1) {
+float s = stack_data[b][0];
+for(int c = 0;
+c<stack_size[a];
+++ c) {
+if(token==TOKEN_ADD) stack_data[a][c] += s;
+else if(token==TOKEN_SUB) stack_data[a][c] -= s;
+else if(token==TOKEN_MUL) stack_data[a][c] *= s;
+else if(token==TOKEN_DIV) stack_data[a][c] = safeDivide(stack_data[a][c], s);
+else stack_data[a][c] = safePow(stack_data[a][c], s);
+}
+stack_size[sp] = stack_size[a];
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
 
             // Component‑wise for vectors; comparisons always produce scalar.
-            int sz = max(stack_size[a], stack_size[b]);
+int sz = max(stack_size[a], stack_size[b]);
 
             // If both operands are scalars, compute directly and push a scalar result.
-            if (stack_size[a] == 1 && stack_size[b] == 1 && !stack_isComplex[a] && !stack_isComplex[b]) {
-                float av = stack_data[a][0];
-                float bv = stack_data[b][0];
-                float res;
-                if (token == TOKEN_ADD)      res = av + bv;
-                else if (token == TOKEN_SUB) res = av - bv;
-                else if (token == TOKEN_MUL) res = av * bv;
-                else if (token == TOKEN_DIV) res = safeDivide(av, bv);
-                else                         res = safePow(av, bv); // for completeness
-                stack_type[sp] = 0;
-                stack_data[sp][0] = res;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                stack_isComplex[sp] = false;
-                sp++;
-                continue;
-            }
-            
-            stack_type[sp] = (token >= TOKEN_LT) ? 0 : stack_type[a];
-            stack_rank[sp] = (token >= TOKEN_LT) ? 0 : stack_rank[a];
-            for (int d = 0; d < 4; ++d) stack_shape[sp][d] = (token >= TOKEN_LT) ? 0 : stack_shape[a][d];
-            stack_size[sp] = (token >= TOKEN_LT) ? 1 : sz;
-            for (int c = 0; c < sz && c < 4; ++c) {
-                float av = (c < stack_size[a]) ? stack_data[a][c] : 0.0;
-                float bv = (c < stack_size[b]) ? stack_data[b][c] : 0.0;
-                if (token == TOKEN_ADD)      stack_data[sp][c] = av + bv;
-                else if (token == TOKEN_SUB) stack_data[sp][c] = av - bv;
-                else if (token == TOKEN_MUL) stack_data[sp][c] = av * bv;
-                else if (token == TOKEN_DIV) stack_data[sp][c] = safeDivide(av, bv);
-                else if (token == TOKEN_POW) stack_data[sp][c] = safePow(av, bv);
-                else if (token == TOKEN_LT)  stack_data[sp][c] = (av < bv) ? 1.0 : 0.0;
-                else if (token == TOKEN_LE)  stack_data[sp][c] = (av <= bv) ? 1.0 : 0.0;
-                else if (token == TOKEN_GT)  stack_data[sp][c] = (av > bv) ? 1.0 : 0.0;
-                else if (token == TOKEN_GE)  stack_data[sp][c] = (av >= bv) ? 1.0 : 0.0;
-                else if (token == TOKEN_EQ)  stack_data[sp][c] = (abs(av - bv) < EPSILON) ? 1.0 : 0.0;
-                else                         stack_data[sp][c] = (abs(av - bv) >= EPSILON) ? 1.0 : 0.0;
-            }
-            stack_isComplex[sp] = false;
-            sp++;
-            continue;
-        }
+if(stack_size[a]==1&&stack_size[b]==1&&! stack_isComplex[a]&&! stack_isComplex[b]) {
+float av = stack_data[a][0];
+float bv = stack_data[b][0];
+float res;
+if(token==TOKEN_ADD) res = av+bv;
+else if(token==TOKEN_SUB) res = av-bv;
+else if(token==TOKEN_MUL) res = av*bv;
+else if(token==TOKEN_DIV) res = safeDivide(av, bv);
+else res = safePow(av, bv); // for completeness
+stack_data[sp][0] = res;
+stack_size[sp] = 1;
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
+stack_size[sp] = (token>=TOKEN_LT) ? 1 : sz;
+for(int c = 0;
+c<sz&&c<4;
+++ c) {
+float av = (c<stack_size[a]) ? stack_data[a][c] : 0.0;
+float bv = (c<stack_size[b]) ? stack_data[b][c] : 0.0;
+if(token==TOKEN_ADD) stack_data[sp][c] = av+bv;
+else if(token==TOKEN_SUB) stack_data[sp][c] = av-bv;
+else if(token==TOKEN_MUL) stack_data[sp][c] = av*bv;
+else if(token==TOKEN_DIV) stack_data[sp][c] = safeDivide(av, bv);
+else if(token==TOKEN_POW) stack_data[sp][c] = safePow(av, bv);
+else if(token==TOKEN_LT) stack_data[sp][c] = (av<bv) ? 1.0 : 0.0;
+else if(token==TOKEN_LE) stack_data[sp][c] = (av<=bv) ? 1.0 : 0.0;
+else if(token==TOKEN_GT) stack_data[sp][c] = (av>bv) ? 1.0 : 0.0;
+else if(token==TOKEN_GE) stack_data[sp][c] = (av>=bv) ? 1.0 : 0.0;
+else if(token==TOKEN_EQ) stack_data[sp][c] = (abs(av-bv)<EPSILON) ? 1.0 : 0.0;
+else stack_data[sp][c] = (abs(av-bv)>=EPSILON) ? 1.0 : 0.0;
+}
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
 
         // ----- UNARY OPERATORS -----
-        if (token == TOKEN_NEG || token == TOKEN_SIN || token == TOKEN_COS ||
-            token == TOKEN_TAN || token == TOKEN_EXP || token == TOKEN_LOG ||
-            token == TOKEN_SQRT || token == TOKEN_ABS || token == TOKEN_FLOOR ||
-            token == TOKEN_CEIL || token == TOKEN_FRAC || token == TOKEN_SIGN ||
-            token == TOKEN_STEP) {
-            if (sp < 1) continue;
-            sp--; int a = sp;
+if(token==TOKEN_NEG||token==TOKEN_SIN||token==TOKEN_COS||token==TOKEN_TAN||token==TOKEN_EXP||token==TOKEN_LOG||token==TOKEN_SQRT||token==TOKEN_ABS||token==TOKEN_FLOOR||token==TOKEN_CEIL||token==TOKEN_FRAC||token==TOKEN_SIGN||token==TOKEN_STEP) {
+if(sp<1) continue;
+sp --;
+int a = sp;
 
-            if (stack_isComplex[a]) {
-                vec2 z = vec2(stack_data[a][0], stack_data[a][1]);
-                vec2 r;
-                if (token == TOKEN_NEG)      r = -z;
-                else if (token == TOKEN_SIN) r = cSin(z);
-                else if (token == TOKEN_COS) r = cCos(z);
-                else if (token == TOKEN_TAN) r = cTan(z);
-                else if (token == TOKEN_EXP) r = cExp(z);
-                else if (token == TOKEN_LOG) r = cLog(z);
-                else if (token == TOKEN_SQRT)r = cPow(z, vec2(0.5, 0.0));
-                else if (token == TOKEN_ABS) {
-                    stack_type[sp] = 0;
-                    stack_data[sp][0] = length(z);
-                    stack_isComplex[sp] = false;
-                    stack_rank[sp] = 0;
-                    stack_size[sp] = 1;
-                    sp++;
-                    continue;
-                } else {
-                    r = z;
-                }
-                stack_type[sp] = 0;
-                stack_data[sp][0] = r.x;
-                stack_data[sp][1] = r.y;
-                stack_isComplex[sp] = true;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-                sp++;
-                continue;
-            }
+if(stack_isComplex[a]) {
+vec2 z = vec2(stack_data[a][0], stack_data[a][1]);
+vec2 r;
+if(token==TOKEN_NEG) r = -z;
+else if(token==TOKEN_SIN) r = cSin(z);
+else if(token==TOKEN_COS) r = cCos(z);
+else if(token==TOKEN_TAN) r = cTan(z);
+else if(token==TOKEN_EXP) r = cExp(z);
+else if(token==TOKEN_LOG) r = cLog(z);
+else if(token==TOKEN_SQRT) r = cPow(z, vec2(0.5, 0.0));
+else if(token==TOKEN_ABS) {
+stack_data[sp][0] = length(z);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+} else {
+r = z;
+}
+stack_data[sp][0] = r.x;
+stack_data[sp][1] = r.y;
+stack_isComplex[sp] = true;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
 
             // Real case: elementwise
-            for (int c = 0; c < stack_size[a]; ++c) {
-                float v = stack_data[a][c];
-                if (token == TOKEN_NEG)      stack_data[a][c] = -v;
-                else if (token == TOKEN_SIN) stack_data[a][c] = sin(v);
-                else if (token == TOKEN_COS) stack_data[a][c] = cos(v);
-                else if (token == TOKEN_TAN) stack_data[a][c] = tan(v);
-                else if (token == TOKEN_EXP) stack_data[a][c] = safeExp(v);
-                else if (token == TOKEN_LOG) stack_data[a][c] = safeLog(v);
-                else if (token == TOKEN_SQRT)stack_data[a][c] = sqrt(max(0.0, v));
-                else if (token == TOKEN_ABS) stack_data[a][c] = abs(v);
-                else if (token == TOKEN_FLOOR)stack_data[a][c] = floor(v);
-                else if (token == TOKEN_CEIL)stack_data[a][c] = ceil(v);
-                else if (token == TOKEN_FRAC)stack_data[a][c] = fract(v);
-                else if (token == TOKEN_SIGN)stack_data[a][c] = signFunc(v);
-                else                         stack_data[a][c] = stepFunc(v);
-            }
-            stack_type[sp] = stack_type[a];
-            stack_rank[sp] = stack_rank[a];
-            for (int d = 0; d < 4; ++d) stack_shape[sp][d] = stack_shape[a][d];
-            stack_size[sp] = stack_size[a];
-            stack_isComplex[sp] = false;
-            sp++;
-            continue;
-        }
+for(int c = 0;
+c<stack_size[a];
+++ c) {
+float v = stack_data[a][c];
+if(token==TOKEN_NEG) stack_data[a][c] = -v;
+else if(token==TOKEN_SIN) stack_data[a][c] = sin(v);
+else if(token==TOKEN_COS) stack_data[a][c] = cos(v);
+else if(token==TOKEN_TAN) stack_data[a][c] = tan(v);
+else if(token==TOKEN_EXP) stack_data[a][c] = safeExp(v);
+else if(token==TOKEN_LOG) stack_data[a][c] = safeLog(v);
+else if(token==TOKEN_SQRT) stack_data[a][c] = sqrt(max(0.0, v));
+else if(token==TOKEN_ABS) stack_data[a][c] = abs(v);
+else if(token==TOKEN_FLOOR) stack_data[a][c] = floor(v);
+else if(token==TOKEN_CEIL) stack_data[a][c] = ceil(v);
+else if(token==TOKEN_FRAC) stack_data[a][c] = fract(v);
+else if(token==TOKEN_SIGN) stack_data[a][c] = signFunc(v);
+else stack_data[a][c] = stepFunc(v);
+}
+stack_size[sp] = stack_size[a];
+stack_isComplex[sp] = false;
+sp ++;
+continue;
+}
 
         // ----- COMPLEX OPERATIONS (REAL, IMAG, CONJ, ARG) -----
-        if (token == TOKEN_REAL) {
-            if (sp < 1) continue;
-            sp--; int a = sp;
-            if (stack_isComplex[a]) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = stack_data[a][0];
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            } else {
-                stack_type[sp] = stack_type[a];
-                stack_rank[sp] = stack_rank[a];
-                for (int d = 0; d < 4; ++d) stack_shape[sp][d] = stack_shape[a][d];
-                stack_size[sp] = stack_size[a];
-                stack_isComplex[sp] = false;
-            }
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_IMAG) {
-            if (sp < 1) continue;
-            sp--; int a = sp;
-            if (stack_isComplex[a]) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = stack_data[a][1];
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            } else {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = 0.0;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            }
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_CONJ) {
-            if (sp < 1) continue;
-            sp--; int a = sp;
-            if (stack_isComplex[a]) {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = stack_data[a][0];
-                stack_data[sp][1] = -stack_data[a][1];
-                stack_isComplex[sp] = true;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            } else {
-                stack_type[sp] = stack_type[a];
-                stack_rank[sp] = stack_rank[a];
-                for (int d = 0; d < 4; ++d) stack_shape[sp][d] = stack_shape[a][d];
-                stack_size[sp] = stack_size[a];
-                stack_isComplex[sp] = false;
-            }
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_ARG) {
-            if (sp < 1) continue;
-            sp--; int a = sp;
-            if (stack_isComplex[a]) {
-                float arg = atan(stack_data[a][1], stack_data[a][0]);
-                stack_type[sp] = 0;
-                stack_data[sp][0] = arg;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            } else {
-                stack_type[sp] = 0;
-                stack_data[sp][0] = (stack_data[a][0] >= 0.0) ? 0.0 : PI;
-                stack_isComplex[sp] = false;
-                stack_rank[sp] = 0;
-                stack_size[sp] = 1;
-            }
-            sp++;
-            continue;
-        }
+if(token==TOKEN_REAL) {
+if(sp<1) continue;
+sp --;
+int a = sp;
+if(stack_isComplex[a]) {
+stack_data[sp][0] = stack_data[a][0];
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+} else {
+stack_size[sp] = stack_size[a];
+stack_isComplex[sp] = false;
+}
+sp ++;
+continue;
+}
+if(token==TOKEN_IMAG) {
+if(sp<1) continue;
+sp --;
+int a = sp;
+if(stack_isComplex[a]) {
+stack_data[sp][0] = stack_data[a][1];
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+} else {
+stack_data[sp][0] = 0.0;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+}
+sp ++;
+continue;
+}
+if(token==TOKEN_CONJ) {
+if(sp<1) continue;
+sp --;
+int a = sp;
+if(stack_isComplex[a]) {
+stack_data[sp][0] = stack_data[a][0];
+stack_data[sp][1] = -stack_data[a][1];
+stack_isComplex[sp] = true;
+stack_size[sp] = 1;
+} else {
+stack_size[sp] = stack_size[a];
+stack_isComplex[sp] = false;
+}
+sp ++;
+continue;
+}
+if(token==TOKEN_ARG) {
+if(sp<1) continue;
+sp --;
+int a = sp;
+if(stack_isComplex[a]) {
+float arg = atan(stack_data[a][1], stack_data[a][0]);
+stack_data[sp][0] = arg;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+} else {
+stack_data[sp][0] = (stack_data[a][0]>=0.0) ? 0.0 : PI;
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+}
+sp ++;
+continue;
+}
 
         // ----- MOD, MIN, MAX, ATAN2, CLAMP -----
-        if (token == TOKEN_MOD) {
-            if (sp < 2) continue;
-            float bv = stack_data[--sp][0];
-            float av = stack_data[--sp][0];
-            stack_type[sp] = 0;
-            stack_data[sp][0] = (abs(bv) < EPSILON) ? 0.0 : mod(av, bv);
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_MIN || token == TOKEN_MAX) {
-            if (sp < 2) continue;
-            float bv = stack_data[--sp][0];
-            float av = stack_data[--sp][0];
-            stack_type[sp] = 0;
-            stack_data[sp][0] = (token == TOKEN_MIN) ? min(av, bv) : max(av, bv);
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_ATAN2) {
-            if (sp < 2) continue;
-            float xv = stack_data[--sp][0];
-            float yv = stack_data[--sp][0];
-            stack_type[sp] = 0;
-            stack_data[sp][0] = atan(yv, xv);
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
-        if (token == TOKEN_CLAMP) {
-            if (sp < 3) continue;
-            float maxv = stack_data[--sp][0];
-            float minv = stack_data[--sp][0];
-            float val = stack_data[--sp][0];
-            stack_type[sp] = 0;
-            stack_data[sp][0] = clamp(val, minv, maxv);
-            stack_isComplex[sp] = false;
-            stack_rank[sp] = 0;
-            stack_size[sp] = 1;
-            sp++;
-            continue;
-        }
-    }
+if(token==TOKEN_MOD) {
+if(sp<2) continue;
+float bv = stack_data[-- sp][0];
+float av = stack_data[-- sp][0];
+stack_data[sp][0] = (abs(bv)<EPSILON) ? 0.0 : mod(av, bv);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+if(token==TOKEN_MIN||token==TOKEN_MAX) {
+if(sp<2) continue;
+float bv = stack_data[-- sp][0];
+float av = stack_data[-- sp][0];
+stack_data[sp][0] = (token==TOKEN_MIN) ? min(av, bv) : max(av, bv);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+if(token==TOKEN_ATAN2) {
+if(sp<2) continue;
+float xv = stack_data[-- sp][0];
+float yv = stack_data[-- sp][0];
+stack_data[sp][0] = atan(yv, xv);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+if(token==TOKEN_CLAMP) {
+if(sp<3) continue;
+float maxv = stack_data[-- sp][0];
+float minv = stack_data[-- sp][0];
+float val = stack_data[-- sp][0];
+stack_data[sp][0] = clamp(val, minv, maxv);
+stack_isComplex[sp] = false;
+stack_size[sp] = 1;
+sp ++;
+continue;
+}
+}
 
     // Extract the final scalar result
-    if (sp == 0) return 0.0;
-    float result = 0.0;
-    if (stack_isComplex[0]) result = stack_data[0][0];
-    else if (stack_type[0] == 0) result = stack_data[0][0];
-    else if (stack_size[0] > 0) result = stack_data[0][0];
-    if (isInvalid(result)) {
-        if (componentType == 2) return 0.0;
-        if (componentType >= 3 && componentType <= 6) return 1.0;
-        return 0.0;
-    }
-    if (componentType >= 3 && componentType <= 6) result = clamp(result, 0.0, 1.0);
-    return result;
+if(sp==0) return 0.0;
+float result = 0.0;
+result = stack_data[0][0];
+if(isInvalid(result)) {
+if(componentType==2) return 0.0;
+if(componentType>=3&&componentType<=6) return 1.0;
+return 0.0;
+}
+if(componentType>=3&&componentType<=6) result = clamp(result, 0.0, 1.0);
+return result;
+}
+
+// Return the token range and constant base for one equation output channel.
+// component: 0=ax, 1=ay, 2=angular, 3=r, 4=g, 5=b, 6=a.
+void getEquationComponent(EquationMapping m, int component, out int tokenOffset, out int tokenCount, out int constantOffset) {
+tokenOffset = 0;
+tokenCount = 0;
+constantOffset = 0;
+switch(component) {
+case 0 : tokenOffset = m.tokenOffset_ax;
+tokenCount = m.tokenCount_ax;
+constantOffset = m.constantOffset_ax;
+break;
+case 1 : tokenOffset = m.tokenOffset_ay;
+tokenCount = m.tokenCount_ay;
+constantOffset = m.constantOffset_ay;
+break;
+case 2 : tokenOffset = m.tokenOffset_angular;
+tokenCount = m.tokenCount_angular;
+constantOffset = m.constantOffset_angular;
+break;
+case 3 : tokenOffset = m.tokenOffset_r;
+tokenCount = m.tokenCount_r;
+constantOffset = m.constantOffset_r;
+break;
+case 4 : tokenOffset = m.tokenOffset_g;
+tokenCount = m.tokenCount_g;
+constantOffset = m.constantOffset_g;
+break;
+case 5 : tokenOffset = m.tokenOffset_b;
+tokenCount = m.tokenCount_b;
+constantOffset = m.constantOffset_b;
+break;
+case 6 : tokenOffset = m.tokenOffset_a;
+tokenCount = m.tokenCount_a;
+constantOffset = m.constantOffset_a;
+break;
+}
 }
 
 // ----------------------------------------------------------------------------
 // DEFAULT PHYSICS (fallback)
 // ----------------------------------------------------------------------------
-vec2 calculateDefaultPhysics() { return vec2(0.0); }
+vec2 calculateDefaultPhysics() {
+return vec2(0.0);
+}
 
 // ----------------------------------------------------------------------------
-// CONSTRAINT SOLVERS(too lazy to implement full LCP solver, so just do a few iterations of position/velocity projection)
+// CONSTRAINT SOLVERS (iterative position and velocity projection)
 // ----------------------------------------------------------------------------
 void solveDistanceConstraint(inout vec2 pos, inout vec2 vel, Constraint c, int self) {
-    if (c.targetObjectID < 0 || c.targetObjectID >= uNumObjects || c.targetObjectID == self) return;
+if(c.targetObjectID<0||c.targetObjectID>=uNumObjects||c.targetObjectID==self) return;
 
-    Object target = objectsIn[c.targetObjectID];
-    vec2 offset = pos - target.position;
-    float dist = length(offset);
-    if (dist < EPSILON) return;
+Object target = objectsIn[c.targetObjectID];
+vec2 offset = pos-target.position.xy;
+float dist = length(offset);
+if(dist<EPSILON) return;
 
-    vec2 normal = offset / dist;
+vec2 normal = offset/dist;
 
     // 1. Fix Position Drift
-    vec2 desired = normal * c.param1;
-    pos -= (offset - desired) * CONSTRAINT_STIFFNESS;
+vec2 desired = normal*c.param1;
+pos -= (offset-desired)*CONSTRAINT_STIFFNESS;
 
     // 2. Project Velocity to Tangent (Conserves Momentum!)
-    vec2 relVel = vel - target.velocity;
-    vel -= dot(relVel, normal) * normal;
+vec2 relVel = vel-target.velocity.xy;
+vel -= dot(relVel, normal)*normal;
 }
 
 void solveBoundaryConstraint(inout vec2 pos, inout vec2 vel, Constraint c) {
-    float x1 = c.param1, x2 = c.param2, y1 = c.param3, y2 = c.param4;
-    float minX = min(x1, x2), maxX = max(x1, x2);
-    float minY = min(y1, y2), maxY = max(y1, y2);
-    const float elasticity = 0.7, friction = 0.95;
-    if (pos.x < minX) { pos.x = minX; vel.x = abs(vel.x) * elasticity; vel.y *= friction; }
-    else if (pos.x > maxX) { pos.x = maxX; vel.x = -abs(vel.x) * elasticity; vel.y *= friction; }
-    if (pos.y < minY) { pos.y = minY; vel.y = abs(vel.y) * elasticity; vel.x *= friction; }
-    else if (pos.y > maxY) { pos.y = maxY; vel.y = -abs(vel.y) * elasticity; vel.x *= friction; }
+float x1 = c.param1, x2 = c.param2, y1 = c.param3, y2 = c.param4;
+float minX = min(x1, x2), maxX = max(x1, x2);
+float minY = min(y1, y2), maxY = max(y1, y2);
+const float elasticity = 0.7, friction = 0.95;
+if(pos.x<minX) {
+pos.x = minX;
+vel.x = abs(vel.x)*elasticity;
+vel.y *= friction;
+} else if(pos.x>maxX) {
+pos.x = maxX;
+vel.x = -abs(vel.x)*elasticity;
+vel.y *= friction;
+}
+if(pos.y<minY) {
+pos.y = minY;
+vel.y = abs(vel.y)*elasticity;
+vel.x *= friction;
+} else if(pos.y>maxY) {
+pos.y = maxY;
+vel.y = -abs(vel.y)*elasticity;
+vel.x *= friction;
+}
 }
 
 //Too lazy to expose yet to API.
 void solveAngleConstraint(inout vec2 pos, inout vec2 vel, Constraint c, vec2 originalPos) {
-    vec2 dir = pos - originalPos;
-    float radius = length(dir);
-    if (radius < EPSILON) return;
-    float current = atan(dir.y, dir.x);
-    current = mod(current + 2.0*PI, 2.0*PI);
-    float minA = mod(c.param1 + 2.0*PI, 2.0*PI);
-    float maxA = mod(c.param2 + 2.0*PI, 2.0*PI);
-    bool outOfBounds = false;
-    float corrected = current;
-    if (minA <= maxA) {
-        if (current < minA || current > maxA) {
-            outOfBounds = true;
-            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
-        }
-    } else {
-        if (current < minA && current > maxA) {
-            outOfBounds = true;
-            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
-        }
-    }
-    if (outOfBounds) {
-        pos = originalPos + vec2(cos(corrected), sin(corrected)) * radius;
-        vec2 radial = normalize(pos - originalPos);
-        vec2 tangent = vec2(-radial.y, radial.x);
-        vel = tangent * dot(vel, tangent) * 0.9;
-    }
+vec2 dir = pos-originalPos;
+float radius = length(dir);
+if(radius<EPSILON) return;
+float current = atan(dir.y, dir.x);
+current = mod(current+2.0*PI, 2.0*PI);
+float minA = mod(c.param1+2.0*PI, 2.0*PI);
+float maxA = mod(c.param2+2.0*PI, 2.0*PI);
+bool outOfBounds = false;
+float corrected = current;
+if(minA<=maxA) {
+if(current<minA||current>maxA) {
+outOfBounds = true;
+corrected = (abs(current-minA)<abs(current-maxA)) ? minA : maxA;
+}
+} else {
+if(current<minA&&current>maxA) {
+outOfBounds = true;
+corrected = (abs(current-minA)<abs(current-maxA)) ? minA : maxA;
+}
+}
+if(outOfBounds) {
+pos = originalPos+vec2(cos(corrected), sin(corrected))*radius;
+vec2 radial = normalize(pos-originalPos);
+vec2 tangent = vec2(-radial.y, radial.x);
+vel = tangent*dot(vel, tangent)*0.9;
+}
 }
 void applyConstraints(inout vec2 pos, inout vec2 vel, int self, vec2 originalPos) {
-    ObjectConstraints pc = objectConstraints[self];
-    if (pc.numConstraints <= 0) return;
-    for (int iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; ++iter) {
-        for (int i = 0; i < pc.numConstraints; ++i) {
-            Constraint c = constraints[pc.constraintOffset + i];
-            if (c.type == CONSTRAINT_DISTANCE) solveDistanceConstraint(pos, vel, c, self);
-            else if (c.type == CONSTRAINT_BOUNDARY) solveBoundaryConstraint(pos, vel, c);
-            else if (c.type == CONSTRAINT_ANGLE) solveAngleConstraint(pos, vel, c, originalPos);
-        }
-    }
+ObjectConstraints pc = objectConstraints[self];
+if(pc.numConstraints<=0) return;
+for(int iter = 0;
+iter<MAX_CONSTRAINT_ITERATIONS;
+++ iter) {
+#pragma unroll 1
+for(int i = 0;
+i<pc.numConstraints;
+++ i) {
+int constraintIndex = pc.constraintOffset+i;
+if(constraintIndex<0||constraintIndex>=constraints.length()) break;
+Constraint c = constraints[constraintIndex];
+if(c.type==CONSTRAINT_DISTANCE) solveDistanceConstraint(pos, vel, c, self);
+else if(c.type==CONSTRAINT_BOUNDARY) solveBoundaryConstraint(pos, vel, c);
+else if(c.type==CONSTRAINT_ANGLE) solveAngleConstraint(pos, vel, c, originalPos);
+}
+}
 }
 
 // ----------------------------------------------------------------------------
 // ROTATION HELPERS
 // ----------------------------------------------------------------------------
 vec2 rotatePoint(vec2 p, float a) {
-    float ca = cos(a), sa = sin(a);
-    return vec2(p.x*ca - p.y*sa, p.x*sa + p.y*ca);
+float ca = cos(a), sa = sin(a);
+return vec2(p.x*ca-p.y*sa, p.x*sa+p.y*ca);
 }
 vec2 worldToLocal(vec2 wp, vec2 op, float r) {
-    return rotatePoint(wp - op, -r);
-}
-vec2 localToWorld(vec2 lp, vec2 op, float r) {
-    return op + rotatePoint(lp, r);
+return rotatePoint(wp-op,-r);
 }
 vec2 getSupportPoint(vec2 pos, vec2 halfExt, float rot, vec2 dir) {
-    float cr = cos(rot), sr = sin(rot);
-    vec2 localDir = vec2(dot(dir, vec2(cr, sr)), dot(dir, vec2(-sr, cr)));
-    vec2 localSupport = vec2(sign(localDir.x) * halfExt.x, sign(localDir.y) * halfExt.y);
-    return pos + vec2(localSupport.x*cr - localSupport.y*sr, localSupport.x*sr + localSupport.y*cr);
+float cr = cos(rot), sr = sin(rot);
+vec2 localDir = vec2(dot(dir, vec2(cr, sr)), dot(dir, vec2(-sr, cr)));
+vec2 localSupport = vec2(sign(localDir.x)*halfExt.x, sign(localDir.y)*halfExt.y);
+return pos+vec2(localSupport.x*cr-localSupport.y*sr, localSupport.x*sr+localSupport.y*cr);
 }
 float getMomentOfInertia(float mass, int shapeType, float w, float h, float r) {
-    if (shapeType == COLLISION_CIRCLE) return 0.5 * mass * r * r;
-    if (shapeType == COLLISION_AABB) return (1.0/12.0) * mass * (w*w + h*h);
-    return 0.5 * mass * r * r;
+float inertia = 0.5*mass*r*r;
+if(shapeType==COLLISION_AABB) inertia = (1.0/12.0)*mass*(w*w+h*h);
+return max(inertia, EPSILON);
 }
 
 // ----------------------------------------------------------------------------
 // COLLISION DETECTION (no broad phase – works correctly for all shapes)
 // ----------------------------------------------------------------------------
-// Normal ass collision system, nothing special
+// Circle, AABB, and convex-polygon narrow-phase tests.
 CollisionInfo detectCircleCircle(vec2 pa, float ra, vec2 pb, float rb, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    vec2 d = pb - pa;
-    float dsq = dot(d, d);
-    float rs = ra + rb;
-    if (dsq < rs*rs && dsq > EPSILON) {
-        float dist = sqrt(dsq);
-        info.hasCollision = true;
-        info.normal = d / dist;
-        info.penetration = rs - dist;
-        info.contactPoint = pa + d * (ra / rs);
-    }
-    return info;
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+vec2 d = pb-pa;
+float dsq = dot(d, d);
+float rs = ra+rb;
+if(dsq<rs*rs&&dsq>EPSILON) {
+float dist = sqrt(dsq);
+info.hasCollision = true;
+info.normal = d/dist;
+info.penetration = rs-dist;
+info.contactPoint = pa+d*(ra/rs);
+}
+return info;
 }
 CollisionInfo detectAABBAABB(vec2 pa, vec2 ha, float ra, vec2 pb, vec2 hb, float rb, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    vec2 axes[4];
-    axes[0] = vec2(cos(ra), sin(ra));
-    axes[1] = vec2(-sin(ra), cos(ra));
-    axes[2] = vec2(cos(rb), sin(rb));
-    axes[3] = vec2(-sin(rb), cos(rb));
-    vec2 d = pb - pa;
-    for (int i = 0; i < 4; ++i) {
-        vec2 axis = axes[i];
-        float projA_rad = abs(dot(axes[0], axis)) * ha.x + abs(dot(axes[1], axis)) * ha.y;
-        float projB_rad = abs(dot(axes[2], axis)) * hb.x + abs(dot(axes[3], axis)) * hb.y;
-        float projA_center = 0.0;
-        float projB_center = dot(d, axis);
-        float sep = abs(projB_center - projA_center) - (projA_rad + projB_rad);
-        if (sep > 1e-4) return info;
-        float overlap = -sep;
-        if (overlap < info.penetration) {
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(d, axis) < 0.0) info.normal = -axis;
-        }
-    }
-    info.hasCollision = true;
-    info.contactPoint = getSupportPoint(pa, ha, ra, info.normal);
-    return info;
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+info.penetration = 1e10;
+vec2 axes[4];
+axes[0] = vec2(cos(ra), sin(ra));
+axes[1] = vec2(-sin(ra), cos(ra));
+axes[2] = vec2(cos(rb), sin(rb));
+axes[3] = vec2(-sin(rb), cos(rb));
+vec2 d = pb-pa;
+for(int i = 0;
+i<4;
+++ i) {
+vec2 axis = axes[i];
+float projA_rad = abs(dot(axes[0], axis))*ha.x+abs(dot(axes[1], axis))*ha.y;
+float projB_rad = abs(dot(axes[2], axis))*hb.x+abs(dot(axes[3], axis))*hb.y;
+float projA_center = 0.0;
+float projB_center = dot(d, axis);
+float sep = abs(projB_center-projA_center)-(projA_rad+projB_rad);
+if(sep>1e-4) return info;
+float overlap = -sep;
+if(overlap<info.penetration) {
+info.penetration = overlap;
+info.normal = axis;
+if(dot(d, axis)<0.0) info.normal = -axis;
+}
+}
+info.hasCollision = true;
+info.contactPoint = getSupportPoint(pa, ha, ra, info.normal);
+return info;
 }
 vec2 projectPolygon(vec2 center, float radius, int sides, float rot, vec2 axis) {
-    float minP = 1e10, maxP = -1e10;
-    float step = 2.0 * PI / float(sides);
-    for (int i = 0; i < sides; ++i) {
-        float a = rot + float(i) * step;
-        vec2 v = center + radius * vec2(cos(a), sin(a));
-        float p = dot(v, axis);
-        minP = min(minP, p);
-        maxP = max(maxP, p);
-    }
-    return vec2(minP, maxP);
+sides = clamp(sides, 3, MAX_POLYGON_SIDES);
+float minP = 1e10, maxP = -1e10;
+float step = 2.0*PI/float(sides);
+for(int i = 0;
+i<sides;
+++ i) {
+float a = rot+float(i)*step;
+vec2 v = center+radius*vec2(cos(a), sin(a));
+float p = dot(v, axis);
+minP = min(minP, p);
+maxP = max(maxP, p);
+}
+return vec2(minP, maxP);
 }
 vec2 getPolygonNormal(int side, int total, float rot) {
-    float step = 2.0 * PI / float(total);
-    float a = rot + float(side) * step;
-    vec2 edge = vec2(cos(a + step), sin(a + step)) - vec2(cos(a), sin(a));
-    return normalize(vec2(-edge.y, edge.x));
+total = clamp(total, 3, MAX_POLYGON_SIDES);
+side = clamp(side, 0, total-1);
+float step = 2.0*PI/float(total);
+float a = rot+float(side)*step;
+vec2 edge = vec2(cos(a+step), sin(a+step))-vec2(cos(a), sin(a));
+return normalize(vec2(-edge.y, edge.x));
 }
 CollisionInfo detectPolygonPolygon(vec2 pa, float ra, int sa, float rta, vec2 pb, float rb, int sb, float rtb, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    int total = sa + sb;
-    for (int i = 0; i < total; ++i) {
-        vec2 axis = (i < sa) ? getPolygonNormal(i, sa, rta) : getPolygonNormal(i - sa, sb, rtb);
-        vec2 projA = projectPolygon(pa, ra, sa, rta, axis);
-        vec2 projB = projectPolygon(pb, rb, sb, rtb, axis);
-        if (projA.y < projB.x || projB.y < projA.x) return info;
-        float overlap = min(projA.y, projB.y) - max(projA.x, projB.x);
-        if (overlap < info.penetration) {
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pb - pa, axis) < 0.0) info.normal = -axis;
-        }
-    }
-    info.hasCollision = true;
-    return info;
+sa = clamp(sa, 3, MAX_POLYGON_SIDES);
+sb = clamp(sb, 3, MAX_POLYGON_SIDES);
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+info.penetration = 1e10;
+int total = sa+sb;
+for(int i = 0;
+i<total;
+++ i) {
+vec2 axis = (i<sa) ? getPolygonNormal(i, sa, rta) : getPolygonNormal(i-sa, sb, rtb);
+vec2 projA = projectPolygon(pa, ra, sa, rta, axis);
+vec2 projB = projectPolygon(pb, rb, sb, rtb, axis);
+if(projA.y<projB.x||projB.y<projA.x) return info;
+float overlap = min(projA.y, projB.y)-max(projA.x, projB.x);
+if(overlap<info.penetration) {
+info.penetration = overlap;
+info.normal = axis;
+if(dot(pb-pa, axis)<0.0) info.normal = -axis;
+}
+}
+info.hasCollision = true;
+info.contactPoint = (pa+pb)*0.5;
+return info;
 }
 CollisionInfo detectCircleAABB(vec2 cp, float cr, vec2 bp, vec2 he, float brot, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    vec2 local = worldToLocal(cp, bp, brot);
-    vec2 closest = clamp(local, -he, he);
-    vec2 d = local - closest;
-    float dsq = dot(d, d);
-    if (dsq < cr*cr) {
-        float dist = sqrt(dsq);
-        info.hasCollision = true;
-        if (dist > EPSILON) {
-            vec2 localNormal = -(d / dist);
-            info.normal = rotatePoint(localNormal, brot);
-            info.penetration = cr - dist;
-            info.contactPoint = cp - info.normal * (cr - info.penetration * 0.5);
-        } else {
-            vec2 toEdge = -local;
-            vec2 absToEdge = abs(toEdge);
-            vec2 edgeDist = he - absToEdge;
-            vec2 localNormal;
-            if (edgeDist.x < edgeDist.y) {
-                localNormal = vec2(sign(toEdge.x), 0.0);
-                info.penetration = cr + edgeDist.x;
-            } else {
-                localNormal = vec2(0.0, sign(toEdge.y));
-                info.penetration = cr + edgeDist.y;
-            }
-            info.normal = rotatePoint(localNormal, brot);
-            info.contactPoint = cp - info.normal * cr;
-        }
-    }
-    return info;
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+vec2 local = worldToLocal(cp, bp, brot);
+vec2 closest = clamp(local,-he, he);
+vec2 d = local-closest;
+float dsq = dot(d, d);
+if(dsq<cr*cr) {
+float dist = sqrt(dsq);
+info.hasCollision = true;
+if(dist>EPSILON) {
+vec2 localNormal = -(d/dist);
+info.normal = rotatePoint(localNormal, brot);
+info.penetration = cr-dist;
+info.contactPoint = cp-info.normal*(cr-info.penetration*0.5);
+} else {
+vec2 toEdge = -local;
+vec2 absToEdge = abs(toEdge);
+vec2 edgeDist = he-absToEdge;
+vec2 localNormal;
+if(edgeDist.x<edgeDist.y) {
+localNormal = vec2(sign(toEdge.x), 0.0);
+info.penetration = cr+edgeDist.x;
+} else {
+localNormal = vec2(0.0, sign(toEdge.y));
+info.penetration = cr+edgeDist.y;
+}
+info.normal = rotatePoint(localNormal, brot);
+info.contactPoint = cp-info.normal*cr;
+}
+}
+return info;
 }
 CollisionInfo detectCirclePolygon(vec2 cp, float cr, vec2 pp, float pr, int ps, float prot, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    float step = 2.0 * PI / float(ps);
-    for (int i = 0; i < ps; ++i) {
-        vec2 axis = getPolygonNormal(i, ps, prot);
-        float cproj = dot(cp, axis);
-        vec2 crange = vec2(cproj - cr, cproj + cr);
-        vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-        if (crange.y < prange.x || prange.y < crange.x) return info;
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
-        if (overlap < info.penetration) {
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
-        }
-    }
-    vec2 closest = pp;
-    float closestDsq = 1e10;
-    for (int i = 0; i < ps; ++i) {
-        float a = prot + float(i) * step;
-        vec2 v = pp + pr * vec2(cos(a), sin(a));
-        float dsq = dot(v - cp, v - cp);
-        if (dsq < closestDsq) { closestDsq = dsq; closest = v; }
-    }
-    vec2 axis = normalize(cp - closest);
-    float cproj = dot(cp, axis);
-    vec2 crange = vec2(cproj - cr, cproj + cr);
-    vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-    if (!(crange.y < prange.x || prange.y < crange.x)) {
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
-        if (overlap < info.penetration) {
-            info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
-        }
-        info.hasCollision = true;
-    }
-    if (info.hasCollision) info.contactPoint = cp - info.normal * cr;
-    return info;
+ps = clamp(ps, 3, MAX_POLYGON_SIDES);
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+info.penetration = 1e10;
+float step = 2.0*PI/float(ps);
+for(int i = 0;
+i<ps;
+++ i) {
+vec2 axis = getPolygonNormal(i, ps, prot);
+float cproj = dot(cp, axis);
+vec2 crange = vec2(cproj-cr, cproj+cr);
+vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
+if(crange.y<prange.x||prange.y<crange.x) return info;
+float overlap = min(crange.y, prange.y)-max(crange.x, prange.x);
+if(overlap<info.penetration) {
+info.penetration = overlap;
+info.normal = axis;
+if(dot(pp-cp, axis)<0.0) info.normal = -axis;
+}
+}
+vec2 closest = pp;
+float closestDsq = 1e10;
+for(int i = 0;
+i<ps;
+++ i) {
+float a = prot+float(i)*step;
+vec2 v = pp+pr*vec2(cos(a), sin(a));
+float dsq = dot(v-cp, v-cp);
+if(dsq<closestDsq) {
+closestDsq = dsq;
+closest = v;
+}
+}
+vec2 axisDelta = cp-closest;
+float axisLength = length(axisDelta);
+vec2 axis;
+if(axisLength>EPSILON) {
+axis = axisDelta/axisLength;
+} else {
+vec2 fallback = pp-cp;
+float fallbackLength = length(fallback);
+axis = (fallbackLength>EPSILON) ? (fallback/fallbackLength) : vec2(1.0, 0.0);
+}
+float cproj = dot(cp, axis);
+vec2 crange = vec2(cproj-cr, cproj+cr);
+vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
+if(! (crange.y<prange.x||prange.y<crange.x)) {
+float overlap = min(crange.y, prange.y)-max(crange.x, prange.x);
+if(overlap<info.penetration) {
+info.penetration = overlap;
+info.normal = axis;
+if(dot(pp-cp, axis)<0.0) info.normal = -axis;
+}
+info.hasCollision = true;
+}
+if(info.hasCollision) info.contactPoint = cp-info.normal*cr;
+return info;
 }
 CollisionInfo detectPolygonAABB(vec2 pp, float pr, int ps, float prot, vec2 bp, vec2 he, float brot, int ob) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    info.otherObjectID = ob;
-    info.penetration = 1e10;
-    vec2 verts[32];
-    float step = 2.0 * PI / float(ps);
-    for (int i = 0; i < ps && i < 32; ++i) {
-        float a = prot + float(i) * step;
-        verts[i] = pp + pr * vec2(cos(a), sin(a));
-    }
-    vec2 bax[2];
-    bax[0] = vec2(cos(brot), sin(brot));
-    bax[1] = vec2(-sin(brot), cos(brot));
-    vec2 bc[4] = vec2[](
-        vec2(-he.x, -he.y), vec2( he.x, -he.y),
-        vec2( he.x,  he.y), vec2(-he.x,  he.y)
-    );
-    vec2 bv[4];
-    for (int i = 0; i < 4; ++i) bv[i] = bp + bc[i].x * bax[0] + bc[i].y * bax[1];
-    vec2 axes[34];
-    int ac = 0;
-    for (int i = 0; i < ps; ++i) {
-        int n = (i + 1) % ps;
-        vec2 e = verts[n] - verts[i];
-        axes[ac++] = normalize(vec2(-e.y, e.x));
-    }
-    axes[ac++] = bax[0];
-    axes[ac++] = bax[1];
-    for (int i = 0; i < ac; ++i) {
-        vec2 axis = axes[i];
-        float pmin = dot(verts[0], axis), pmax = pmin;
-        for (int j = 1; j < ps; ++j) {
-            float p = dot(verts[j], axis);
-            pmin = min(pmin, p);
-            pmax = max(pmax, p);
-        }
-        float bmin = dot(bv[0], axis), bmax = bmin;
-        for (int j = 1; j < 4; ++j) {
-            float p = dot(bv[j], axis);
-            bmin = min(bmin, p);
-            bmax = max(bmax, p);
-        }
-        if (pmax < bmin - 1e-4 || bmax < pmin - 1e-4) return info;
-        float overlap = min(pmax, bmax) - max(pmin, bmin);
-        if (overlap < info.penetration) {
-            info.penetration = overlap;
-            info.normal = axis;
-            vec2 centerDiff = bp - pp;
-            if (dot(centerDiff, axis) < 0.0) info.normal = -axis;
-        }
-    }
-    info.hasCollision = true;
-    info.contactPoint = (pp + bp) * 0.5;
-    return info;
+ps = clamp(ps, 3, MAX_POLYGON_SIDES);
+CollisionInfo info;
+info.hasCollision = false;
+info.otherObjectID = ob;
+info.penetration = 1e10;
+vec2 verts[MAX_POLYGON_SIDES];
+float step = 2.0*PI/float(ps);
+for(int i = 0;
+i<ps;
+++ i) {
+float a = prot+float(i)*step;
+verts[i] = pp+pr*vec2(cos(a), sin(a));
+}
+vec2 bax[2];
+bax[0] = vec2(cos(brot), sin(brot));
+bax[1] = vec2(-sin(brot), cos(brot));
+vec2 bc[4] = vec2[](vec2(-he.x,-he.y), vec2(he.x,-he.y), vec2(he.x, he.y), vec2(-he.x, he.y));
+vec2 bv[4];
+for(int i = 0;
+i<4;
+++ i) bv[i] = bp+bc[i].x*bax[0]+bc[i].y*bax[1];
+vec2 axes[MAX_POLYGON_SIDES+2];
+int ac = 0;
+for(int i = 0;
+i<ps;
+++ i) {
+int n = (i+1)%ps;
+vec2 e = verts[n]-verts[i];
+axes[ac ++] = normalize(vec2(-e.y, e.x));
+}
+axes[ac ++] = bax[0];
+axes[ac ++] = bax[1];
+for(int i = 0;
+i<ac;
+++ i) {
+vec2 axis = axes[i];
+float pmin = dot(verts[0], axis), pmax = pmin;
+for(int j = 1;
+j<ps;
+++ j) {
+float p = dot(verts[j], axis);
+pmin = min(pmin, p);
+pmax = max(pmax, p);
+}
+float bmin = dot(bv[0], axis), bmax = bmin;
+for(int j = 1;
+j<4;
+++ j) {
+float p = dot(bv[j], axis);
+bmin = min(bmin, p);
+bmax = max(bmax, p);
+}
+if(pmax<bmin-1e-4||bmax<pmin-1e-4) return info;
+float overlap = min(pmax, bmax)-max(pmin, bmin);
+if(overlap<info.penetration) {
+info.penetration = overlap;
+info.normal = axis;
+vec2 centerDiff = bp-pp;
+if(dot(centerDiff, axis)<0.0) info.normal = -axis;
+}
+}
+info.hasCollision = true;
+info.contactPoint = (pp+bp)*0.5;
+return info;
 }
 CollisionInfo detectCollision(Object a, Object b, int ib) {
-    CollisionInfo info;
-    info.hasCollision = false;
-    CollisionProperties pa = collisionProps[gl_GlobalInvocationID.x];
-    CollisionProperties pb = collisionProps[ib];
-    if (pa.enabled == 0 || pb.enabled == 0) return info;
-    int sa = pa.shapeType, sb = pb.shapeType;
-    if (sa == COLLISION_NONE || sb == COLLISION_NONE) return info;
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_CIRCLE)
-        return detectCircleCircle(a.position, a.visualData.x, b.position, b.visualData.x, ib);
-    if (sa == COLLISION_AABB && sb == COLLISION_AABB) {
-        vec2 ha = a.visualData.xy * 0.5, hb = b.visualData.xy * 0.5;
-        return detectAABBAABB(a.position, ha, a.visualData.z, b.position, hb, b.visualData.z, ib);
-    }
-    if (sa == COLLISION_POLYGON && sb == COLLISION_POLYGON)
-        return detectPolygonPolygon(a.position, a.visualData.x, int(a.visualData.y), a.visualData.z,
-                                    b.position, b.visualData.x, int(b.visualData.y), b.visualData.z, ib);
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_AABB) {
-        vec2 hb = b.visualData.xy * 0.5;
-        return detectCircleAABB(a.position, a.visualData.x, b.position, hb, b.visualData.z, ib);
-    }
-    if (sa == COLLISION_AABB && sb == COLLISION_CIRCLE) {
-        vec2 ha = a.visualData.xy * 0.5;
-        CollisionInfo ci = detectCircleAABB(b.position, b.visualData.x, a.position, ha, a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }
-    if (sa == COLLISION_CIRCLE && sb == COLLISION_POLYGON)
-        return detectCirclePolygon(a.position, a.visualData.x, b.position, b.visualData.x, int(b.visualData.y), b.visualData.z, ib);
-    if (sa == COLLISION_POLYGON && sb == COLLISION_CIRCLE) {
-        CollisionInfo ci = detectCirclePolygon(b.position, b.visualData.x, a.position, a.visualData.x, int(a.visualData.y), a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }
-    if (sa == COLLISION_POLYGON && sb == COLLISION_AABB) {
-        vec2 hb = b.visualData.xy * 0.5;
-        return detectPolygonAABB(a.position, a.visualData.x, int(a.visualData.y), a.visualData.z,
-                                 b.position, hb, b.visualData.z, ib);
-    }
-    if (sa == COLLISION_AABB && sb == COLLISION_POLYGON) {
-        vec2 ha = a.visualData.xy * 0.5;
-        CollisionInfo ci = detectPolygonAABB(b.position, b.visualData.x, int(b.visualData.y), b.visualData.z,
-                                             a.position, ha, a.visualData.z, ib);
-        ci.normal = -ci.normal;
-        return ci;
-    }
-    return info;
+CollisionInfo info;
+info.hasCollision = false;
+CollisionProperties pa = collisionProps[int(gl_GlobalInvocationID.x)];
+CollisionProperties pb = collisionProps[ib];
+if(pa.enabled==0||pb.enabled==0) return info;
+int sa = pa.shapeType, sb = pb.shapeType;
+if(sa==COLLISION_NONE||sb==COLLISION_NONE) return info;
+
+    // Derive 2D rotation angles from the orientation quaternion.
+float angle_a = quat_extract_2d_angle(a.orientation);
+float angle_b = quat_extract_2d_angle(b.orientation);
+
+if(sa==COLLISION_CIRCLE&&sb==COLLISION_CIRCLE) return detectCircleCircle(a.position.xy, a.visualData.x, b.position.xy, b.visualData.x, ib);
+if(sa==COLLISION_AABB&&sb==COLLISION_AABB) {
+vec2 ha = a.visualData.xy*0.5, hb = b.visualData.xy*0.5;
+return detectAABBAABB(a.position.xy, ha, angle_a, b.position.xy, hb, angle_b, ib);
+}
+if(sa==COLLISION_POLYGON&&sb==COLLISION_POLYGON) return detectPolygonPolygon(a.position.xy, a.visualData.x, int(a.visualData.y), angle_a, b.position.xy, b.visualData.x, int(b.visualData.y), angle_b, ib);
+if(sa==COLLISION_CIRCLE&&sb==COLLISION_AABB) {
+vec2 hb = b.visualData.xy*0.5;
+return detectCircleAABB(a.position.xy, a.visualData.x, b.position.xy, hb, angle_b, ib);
+}
+if(sa==COLLISION_AABB&&sb==COLLISION_CIRCLE) {
+vec2 ha = a.visualData.xy*0.5;
+CollisionInfo ci = detectCircleAABB(b.position.xy, b.visualData.x, a.position.xy, ha, angle_a, ib);
+ci.normal = -ci.normal;
+return ci;
+}
+if(sa==COLLISION_CIRCLE&&sb==COLLISION_POLYGON) return detectCirclePolygon(a.position.xy, a.visualData.x, b.position.xy, b.visualData.x, int(b.visualData.y), angle_b, ib);
+if(sa==COLLISION_POLYGON&&sb==COLLISION_CIRCLE) {
+CollisionInfo ci = detectCirclePolygon(b.position.xy, b.visualData.x, a.position.xy, a.visualData.x, int(a.visualData.y), angle_a, ib);
+ci.normal = -ci.normal;
+return ci;
+}
+if(sa==COLLISION_POLYGON&&sb==COLLISION_AABB) {
+vec2 hb = b.visualData.xy*0.5;
+return detectPolygonAABB(a.position.xy, a.visualData.x, int(a.visualData.y), angle_a, b.position.xy, hb, angle_b, ib);
+}
+if(sa==COLLISION_AABB&&sb==COLLISION_POLYGON) {
+vec2 ha = a.visualData.xy*0.5;
+CollisionInfo ci = detectPolygonAABB(b.position.xy, b.visualData.x, int(b.visualData.y), angle_b, a.position.xy, ha, angle_a, ib);
+ci.normal = -ci.normal;
+return ci;
+}
+return info;
 }
 
 // ----------------------------------------------------------------------------
 // COLLISION RESPONSE (with torque)
 // ----------------------------------------------------------------------------
-void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, float ma, float ia,
-                                inout vec2 pb, inout vec2 vb, inout float wb, float mb, float ib,
-                                vec2 n, vec2 cp, float pen, float rest, float fric) {
-    const float posCorr = 0.8, slop = 0.001;
-    if (pen > slop) {
-        float tot = ma + mb;
-        float invTot = 1.0 / tot;
-        vec2 corr = (pen - slop) * posCorr * n;
-        pa -= corr * (mb * invTot);
-        pb += corr * (ma * invTot);
-    }
-    vec2 ra = cp - pa;
-    vec2 rb = cp - pb;
-    vec2 vac = va + vec2(-wa * ra.y, wa * ra.x);
-    vec2 vbc = vb + vec2(-wb * rb.y, wb * rb.x);
-    vec2 rel = vbc - vac;
-    float vn = dot(rel, n);
-    if (vn > 0.0) return;
-    float e = clamp(rest, 0.0, 1.0);
-    float num = -(1.0 + e) * vn;
-    float rap = dot(ra, n), rbp = dot(rb, n);
-    float den = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
-    if (abs(den) < EPSILON) return;
-    float j = num / den;
-    vec2 imp = j * n;
-    va -= imp / ma;
-    vb += imp / mb;
-    wa -= (ra.x * imp.y - ra.y * imp.x) / ia;
-    wb += (rb.x * imp.y - rb.y * imp.x) / ib;
-    if (fric > 0.0) {
-        vac = va + vec2(-wa * ra.y, wa * ra.x);
-        vbc = vb + vec2(-wb * rb.y, wb * rb.x);
-        rel = vbc - vac;
-        vec2 tan = rel - n * dot(rel, n);
-        float tl = length(tan);
-        if (tl > EPSILON) {
-            tan /= tl;
-            float vt = dot(rel, tan);
-            float jt = -vt * fric;
-            float dent = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
-            if (abs(dent) > EPSILON) {
-                jt /= dent;
-                float maxJt = abs(j) * fric;
-                jt = clamp(jt, -maxJt, maxJt);
-                vec2 fimp = jt * tan;
-                va -= fimp / ma;
-                vb += fimp / mb;
-                wa -= (ra.x * fimp.y - ra.y * fimp.x) / ia;
-                wb += (rb.x * fimp.y - rb.y * fimp.x) / ib;
-            }
-        }
-    }
+void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, float ma, float ia, inout vec2 pb, inout vec2 vb, inout float wb, float mb, float ib, vec2 n, vec2 cp, float pen, float rest, float fric) {
+const float posCorr = 0.8, slop = 0.001;
+if(pen>slop) {
+float tot = ma+mb;
+float invTot = 1.0/tot;
+vec2 corr = (pen-slop)*posCorr*n;
+pa -= corr*(mb*invTot);
+pb += corr*(ma*invTot);
+}
+vec2 ra = cp-pa;
+vec2 rb = cp-pb;
+vec2 vac = va+vec2(-wa*ra.y, wa*ra.x);
+vec2 vbc = vb+vec2(-wb*rb.y, wb*rb.x);
+vec2 rel = vbc-vac;
+float vn = dot(rel, n);
+if(vn>0.0) return;
+float e = clamp(rest, 0.0, 1.0);
+float num = -(1.0+e)*vn;
+float rap = dot(ra, n), rbp = dot(rb, n);
+float den = (1.0/ma)+(1.0/mb)+(rap*rap)/ia+(rbp*rbp)/ib;
+if(abs(den)<EPSILON) return;
+float j = num/den;
+vec2 imp = j*n;
+va -= imp/ma;
+vb += imp/mb;
+wa -= (ra.x*imp.y-ra.y*imp.x)/ia;
+wb += (rb.x*imp.y-rb.y*imp.x)/ib;
+if(fric>0.0) {
+vac = va+vec2(-wa*ra.y, wa*ra.x);
+vbc = vb+vec2(-wb*rb.y, wb*rb.x);
+rel = vbc-vac;
+vec2 tan = rel-n*dot(rel, n);
+float tl = length(tan);
+if(tl>EPSILON) {
+tan /= tl;
+float vt = dot(rel, tan);
+float jt = -vt*fric;
+float dent = (1.0/ma)+(1.0/mb)+(rap*rap)/ia+(rbp*rbp)/ib;
+if(abs(dent)>EPSILON) {
+jt /= dent;
+float maxJt = abs(j)*fric;
+jt = clamp(jt,-maxJt, maxJt);
+vec2 fimp = jt*tan;
+va -= fimp/ma;
+vb += fimp/mb;
+wa -= (ra.x*fimp.y-ra.y*fimp.x)/ia;
+wb += (rb.x*fimp.y-rb.y*fimp.x)/ib;
+}
+}
+}
 }
 
 // ----------------------------------------------------------------------------
 // CONTACT PERSISTENCE (warm starting)
 // ----------------------------------------------------------------------------
 int findPersistentContact(int a, int b, vec2 n) {
-    int base = a * MAX_CONTACTS_PER_OBJECT;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        ContactPoint c = contacts[ci];
-        if (c.frameCount > 0 && dot(c.normal, n) > 0.9) return ci;
-    }
-    return -1;
+int base = a*MAX_CONTACTS_PER_OBJECT;
+for(int i = 0;
+i<MAX_CONTACTS_PER_OBJECT;
+++ i) {
+int ci = base+i;
+if(ci>=contacts.length()) break;
+ContactPoint c = contacts[ci];
+if(c.frameCount>0&&dot(c.normal, n)>0.9) return ci;
+}
+return -1;
 }
 void updateContactPoint(int a, int b, vec2 n, vec2 pos, float pen) {
-    int base = a * MAX_CONTACTS_PER_OBJECT;
-    int oldest = base, oldestFrames = 9999;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        ContactPoint c = contacts[ci];
-        if (c.frameCount == 0 || dot(c.normal, n) > 0.9) {
-            contacts[ci].normal = n;
-            contacts[ci].position = pos;
-            contacts[ci].penetration = pen;
-            contacts[ci].frameCount = min(c.frameCount + 1, MAX_CONTACT_FRAMES);
-            return;
-        }
-        if (c.frameCount < oldestFrames) {
-            oldestFrames = c.frameCount;
-            oldest = ci;
-        }
-    }
-    if (oldest >= 0 && oldest < contacts.length()) {
-        contacts[oldest].normal = n;
-        contacts[oldest].position = pos;
-        contacts[oldest].penetration = pen;
-        contacts[oldest].frameCount = 1;
-        contacts[oldest].accumulatedNormalImpulse = 0.0;
-        contacts[oldest].accumulatedTangentImpulse = 0.0;
-    }
+int base = a*MAX_CONTACTS_PER_OBJECT;
+int oldest = base, oldestFrames = 9999;
+for(int i = 0;
+i<MAX_CONTACTS_PER_OBJECT;
+++ i) {
+int ci = base+i;
+if(ci>=contacts.length()) break;
+ContactPoint c = contacts[ci];
+if(c.frameCount==0||dot(c.normal, n)>0.9) {
+contacts[ci].normal = n;
+contacts[ci].position = pos;
+contacts[ci].penetration = pen;
+contacts[ci].frameCount = min(c.frameCount+1, MAX_CONTACT_FRAMES);
+return;
+}
+if(c.frameCount<oldestFrames) {
+oldestFrames = c.frameCount;
+oldest = ci;
+}
+}
+if(oldest>=0&&oldest<contacts.length()) {
+contacts[oldest].normal = n;
+contacts[oldest].position = pos;
+contacts[oldest].penetration = pen;
+contacts[oldest].frameCount = 1;
+contacts[oldest].accumulatedNormalImpulse = 0.0;
+contacts[oldest].accumulatedTangentImpulse = 0.0;
+}
 }
 void ageContacts(int idx) {
-    int base = idx * MAX_CONTACTS_PER_OBJECT;
-    for (int i = 0; i < MAX_CONTACTS_PER_OBJECT; ++i) {
-        int ci = base + i;
-        if (ci >= contacts.length()) break;
-        if (contacts[ci].frameCount > 0) {
-            contacts[ci].frameCount--;
-            if (contacts[ci].frameCount == 0) {
-                contacts[ci].accumulatedNormalImpulse = 0.0;
-                contacts[ci].accumulatedTangentImpulse = 0.0;
-            }
-        }
-    }
+int base = idx*MAX_CONTACTS_PER_OBJECT;
+for(int i = 0;
+i<MAX_CONTACTS_PER_OBJECT;
+++ i) {
+int ci = base+i;
+if(ci>=contacts.length()) break;
+if(contacts[ci].frameCount>0) {
+contacts[ci].frameCount --;
+if(contacts[ci].frameCount==0) {
+contacts[ci].accumulatedNormalImpulse = 0.0;
+contacts[ci].accumulatedTangentImpulse = 0.0;
+}
+}
+}
 }
 
 // ----------------------------------------------------------------------------
@@ -2036,145 +2142,155 @@ void ageContacts(int idx) {
 // ----------------------------------------------------------------------------
 //It all comes together here. This is where we calculate the new position, velocity, and color of each object based on the physics and equations defined above.
 void main() {
-    uint gid = gl_GlobalInvocationID.x;
-    if (int(gid) >= uNumObjects) return;
+uint gid = gl_GlobalInvocationID.x;
+if(int(gid)>=uNumObjects) return;
 
-    Object p = objectsIn[gid];
-    vec2 pos = p.position;
-    vec2 vel = p.velocity;
-    float mass = max(EPSILON, p.mass);
-    float charge = p.charge;
-    float theta = p.visualData.z;
-    float omega = p.visualData.w;
-    vec4 color = p.color;
-    int self = int(gid);
-    vec2 originalPos = pos;
+Object p = objectsIn[gid];
+int self = int(gid);
 
-    vec2 acc = vec2(0.0);
-    float angAcc = 0.0;
-    vec4 newColor = color;
+if(p.visualSkinType==-1) {
+objectsOut[self].position = p.position;
+objectsOut[self].velocity = p.velocity;
+objectsOut[self].orientation = p.orientation;
+objectsOut[self].spin = p.spin;
+objectsOut[self].visualData = p.visualData;
+objectsOut[self].collisionData = p.collisionData;
+objectsOut[self].color = p.color;
+objectsOut[self].mass = p.mass;
+objectsOut[self].charge = p.charge;
+objectsOut[self].visualSkinType = p.visualSkinType;
+objectsOut[self].collisionShapeType = p.collisionShapeType;
+objectsOut[self].equationID = p.equationID;
+objectsOut[self].scriptID = p.scriptID;
+objectsOut[self].meshID = p.meshID;
+objectsOut[self]._pad[0] = p._pad[0];
+objectsOut[self]._pad[1] = p._pad[1];
+objectsOut[self]._pad[2] = p._pad[2];
+objectsOut[self]._pad[3] = p._pad[3];
+objectsOut[self]._pad[4] = p._pad[4];
+return;
+}
 
-    if (uEquationMode == 0) {
-        int eq = p.equationID;
-        bool valid = (eq >= 0 && eq < MAX_EQUATION_COUNT) &&
-                     (mappings[eq].tokenCount_ax > 0 || mappings[eq].tokenCount_ay > 0 ||
-                      mappings[eq].tokenCount_angular > 0 || mappings[eq].tokenCount_r > 0 ||
-                      mappings[eq].tokenCount_g > 0 || mappings[eq].tokenCount_b > 0 ||
-                      mappings[eq].tokenCount_a > 0);
-        if (!valid) {
-            acc = calculateDefaultPhysics();
-        } else {
-            EquationMapping m = mappings[eq];
-            float ax = 0.0, ay = 0.0;
-            if (m.tokenCount_ax > 0) {
-                ax = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                          theta, omega, color, mass, charge, self,
-                                          0, m.tokenOffset_ax, m.tokenCount_ax, m.constantOffset_ax);
-            }
-            if (m.tokenCount_ay > 0) {
-                ay = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                          theta, omega, color, mass, charge, self,
-                                          1, m.tokenOffset_ay, m.tokenCount_ay, m.constantOffset_ay);
-            }
-            acc = sanitizeVec2(vec2(ax, ay));
-            if (m.tokenCount_angular > 0) {
-                angAcc = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                              theta, omega, color, mass, charge, self,
-                                              2, m.tokenOffset_angular, m.tokenCount_angular, m.constantOffset_angular);
-                angAcc = isInvalid(angAcc) ? 0.0 : angAcc;
-            }
-            if (m.tokenCount_r > 0)
-                newColor.r = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                                  theta, omega, color, mass, charge, self,
-                                                  3, m.tokenOffset_r, m.tokenCount_r, m.constantOffset_r);
-            if (m.tokenCount_g > 0)
-                newColor.g = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                                  theta, omega, color, mass, charge, self,
-                                                  4, m.tokenOffset_g, m.tokenCount_g, m.constantOffset_g);
-            if (m.tokenCount_b > 0)
-                newColor.b = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                                  theta, omega, color, mass, charge, self,
-                                                  5, m.tokenOffset_b, m.tokenCount_b, m.constantOffset_b);
-            if (m.tokenCount_a > 0)
-                newColor.a = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y,
-                                                  theta, omega, color, mass, charge, self,
-                                                  6, m.tokenOffset_a, m.tokenCount_a, m.constantOffset_a);
-            newColor = sanitizeVec4(newColor);
-        }
-    } else {
-        acc = calculateDefaultPhysics();
-    }
-    acc = sanitizeVec2(acc);
+vec2 pos = p.position.xy;
+vec2 vel = p.velocity.xy;
+float mass = max(EPSILON, p.mass);
+float charge = p.charge;
+float theta = quat_extract_2d_angle(p.orientation);
+float omega = p.spin.z;
+vec4 color = p.color;
+
+vec2 originalPos = pos;
+
+vec2 acc = vec2(0.0);
+float angAcc = 0.0;
+vec4 newColor = color;
+
+if(uEquationMode==0) {
+int eq = p.equationID;
+if(eq>=0&&eq<MAX_EQUATION_COUNT) {
+EquationMapping m = mappings[eq];
+float ax = 0.0;
+float ay = 0.0;
+    // One evaluator call site avoids duplicating the large interpreter in the
+    // shader compiler's inliner for each output channel.
+    #pragma unroll 1
+for(int component = 0;
+component<7;
+++ component) {
+int tokenOffset;
+int tokenCount;
+int constantOffset;
+getEquationComponent(m, component, tokenOffset, tokenCount, constantOffset);
+if(tokenCount<=0) continue;
+float value = evaluateRPNComponent(pos.x, pos.y, vel.x, vel.y, p.collisionData.x, p.collisionData.y, theta, omega, color, mass, charge, self, component, tokenOffset, tokenCount, constantOffset);
+if(component==0) ax = value;
+else if(component==1) ay = value;
+else if(component==2) angAcc = isInvalid(value) ? 0.0 : value;
+else newColor[component-3] = value;
+}
+acc = sanitizeVec2(vec2(ax, ay));
+newColor = sanitizeVec4(newColor);
+} else {
+acc = calculateDefaultPhysics();
+}
+} else {
+acc = calculateDefaultPhysics();
+}
+acc = sanitizeVec2(acc);
 
     // Symplectic Euler integration
-    vec2 newVel = vel + acc * uDt;
-    newVel = sanitizeVec2(newVel);
-    vec2 newPos = pos + newVel * uDt;
-    newPos = sanitizeVec2(newPos);
-    float newOmega = omega + angAcc * uDt;
-    float newTheta = theta + newOmega * uDt;
-    newTheta = mod(newTheta, 2.0 * PI);
-    if (newTheta < 0.0) newTheta += 2.0 * PI;
+vec2 newVel = vel+acc*uDt;
+newVel = sanitizeVec2(newVel);
+vec2 newPos = pos+newVel*uDt;
+newPos = sanitizeVec2(newPos);
+float newOmega = omega+angAcc*uDt;
+float newTheta = theta+newOmega*uDt;
+newTheta = mod(newTheta, 2.0*PI);
+if(newTheta<0.0) newTheta += 2.0*PI;
 
-    applyConstraints(newPos, newVel, self, originalPos);
+applyConstraints(newPos, newVel, self, originalPos);
 
     // Collision detection (narrow phase only – accurate for all shapes)
-    bool hadCollision = false;
-    for (int i = 0; i < uNumObjects; ++i) {
-        if (i == self) continue;
-        Object other = objectsIn[i];
-        CollisionProperties propA = collisionProps[self];
-        CollisionProperties propB = collisionProps[i];
-        if (propA.enabled == 0 || propB.enabled == 0) continue;
-        if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
+bool hadCollision = false;
+#pragma unroll 1
+for(int i = 0;
+i<uNumObjects;
+++ i) {
+if(i==self) continue;
+Object other = objectsIn[i];
+CollisionProperties propA = collisionProps[self];
+CollisionProperties propB = collisionProps[i];
+if(propA.enabled==0||propB.enabled==0) continue;
+if(propA.shapeType==COLLISION_NONE||propB.shapeType==COLLISION_NONE) continue;
+// Layer/mask filter (parity with shader.py's automatic collision path).
+if((propA.layer&propB.mask)==0u||(propB.layer&propA.mask)==0u) continue;
 
-        CollisionInfo col = detectCollision(p, other, i);
-        if (col.hasCollision) {
-            hadCollision = true;
-            float rest = min(propA.restitution, propB.restitution);
-            float fric = sqrt(propA.friction * propB.friction);
-            float mA = mass, mB = max(EPSILON, other.mass);
-            float wA = newOmega, wB = other.visualData.w;
-            float iA = getMomentOfInertia(mA, propA.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);
-            float iB = getMomentOfInertia(mB, propB.shapeType, other.visualData.x, other.visualData.y, other.visualData.x * 0.5);
-            vec2 tempPos = other.position;
-            vec2 tempVel = other.velocity;
-            float tempOmega = wB;
-            resolveCollisionWithTorque(newPos, newVel, newOmega, mA, iA,
-                                       tempPos, tempVel, tempOmega, mB, iB,
-                                       col.normal, col.contactPoint, col.penetration,
-                                       rest, fric);
-        }
-    }
-    if (hadCollision) {
-        newVel = sanitizeVec2(newVel);
-        newOmega = clamp(newOmega, -100.0, 100.0);
-    }
-    if (uEnableWarmStart == 1) ageContacts(self);
+CollisionInfo col = detectCollision(p, other, i);
+if(col.hasCollision) {
+hadCollision = true;
+float rest = min(propA.restitution, propB.restitution);
+float fric = sqrt(propA.friction*propB.friction);
+float mA = mass, mB = max(EPSILON, other.mass);
+float wA = newOmega, wB = other.spin.z;
+float iA = getMomentOfInertia(mA, propA.shapeType, p.visualData.x, p.visualData.y, p.visualData.x*0.5);
+float iB = getMomentOfInertia(mB, propB.shapeType, other.visualData.x, other.visualData.y, other.visualData.x*0.5);
+vec2 tempPos = other.position.xy;
+vec2 tempVel = other.velocity.xy;
+float tempOmega = wB;
+resolveCollisionWithTorque(newPos, newVel, newOmega, mA, iA, tempPos, tempVel, tempOmega, mB, iB, col.normal, col.contactPoint, col.penetration, rest, fric);
+}
+}
+if(hadCollision) {
+newVel = sanitizeVec2(newVel);
+newOmega = clamp(newOmega,-100.0, 100.0);
+}
+if(uEnableWarmStart==1) ageContacts(self);
 
-    newPos = sanitizeVec2(newPos);
-    newVel = sanitizeVec2(newVel);
-    float speed = length(newVel);
-    if (speed > 1000.0) newVel = normalize(newVel) * 1000.0;
+newPos = sanitizeVec2(newPos);
+newVel = sanitizeVec2(newVel);
+float speed = length(newVel);
+if(speed>1000.0) newVel = normalize(newVel)*1000.0;
 
-    // Write output to buffer
-    objectsOut[self].position = newPos;
-    objectsOut[self].velocity = newVel;
-    objectsOut[self].mass = mass;
-    objectsOut[self].charge = charge;
-    objectsOut[self].visualSkinType = p.visualSkinType;
-    objectsOut[self].collisionShapeType = p.collisionShapeType;
-    objectsOut[self].visualData.x = p.visualData.x;
-    objectsOut[self].visualData.y = p.visualData.y;
-    objectsOut[self].visualData.z = newTheta;
-    objectsOut[self].visualData.w = newOmega;
-    objectsOut[self].collisionData.x = acc.x;
-    objectsOut[self].collisionData.y = acc.y;
-    objectsOut[self].collisionData.z = p.collisionData.z;
-    objectsOut[self].collisionData.w = p.collisionData.w;
-    objectsOut[self].color = newColor;
-    objectsOut[self].equationID = p.equationID;
-    objectsOut[self]._pad1 = 0;
-    objectsOut[self]._padEnd[0] = 0;
-    objectsOut[self]._padEnd[1] = 0;
+    // Write output to buffer (wide Object struct)
+objectsOut[self].position = vec4(newPos, 0.0, 0.0);
+objectsOut[self].velocity = vec4(newVel, 0.0, 0.0);
+// Encode 2D rotation back into an Rz quaternion.
+objectsOut[self].orientation = quat_axis_angle(vec3(0.0, 0.0, 1.0), newTheta);
+// Preserve existing X/Y spin; write new Z spin.
+objectsOut[self].spin = vec4(p.spin.xy, newOmega, 0.0);
+objectsOut[self].mass = mass;
+objectsOut[self].charge = charge;
+objectsOut[self].visualSkinType = p.visualSkinType;
+objectsOut[self].collisionShapeType = p.collisionShapeType;
+// visualData is now shape/mesh data (radius/width/height/sides) — pass through.
+objectsOut[self].visualData = p.visualData;
+objectsOut[self].collisionData = vec4(acc, p.collisionData.z, p.collisionData.w);
+objectsOut[self].color = newColor;
+objectsOut[self].equationID = p.equationID;
+objectsOut[self].scriptID = p.scriptID;
+objectsOut[self].meshID = p.meshID;
+for(int k = 0;
+k<5;
+++ k) objectsOut[self]._pad[k] = p._pad[k];
+
 }

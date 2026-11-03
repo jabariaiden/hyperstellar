@@ -65,6 +65,8 @@ class NameChecker(ast.NodeVisitor):
         self.referenced: Set[str] = set()        # variables referenced
         self.called_functions: Set[str] = set()  # function names called
         self.user_functions: Set[str] = set()    # functions defined inside the script
+        self.user_function_arities: Dict[str, int] = {}
+        self.raymarch_sdf_names: Set[str] = set()
         self.imported_names: Set[str] = set()    # imported from hyperstellar.glsl
         self.param_names: Set[str] = set()       # function parameters
 
@@ -83,10 +85,14 @@ class NameChecker(ast.NodeVisitor):
         self._collect()
 
     def _get_builtin_vars(self) -> Set[str]:
-        """Return the set of built-in variable names for the current mode."""
-        common = {'num_objects', 'dt', 'time', 'idx', 'group_count', 'i', 'p'}
+        """Return built-in variables that are valid in the current mode."""
+        common = {
+            'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
+        }
+
         if self.mode == 'object':
             return common | {
+                'p',
                 # 2D user-facing aliases.
                 'x', 'y', 'vx', 'vy',
                 'mass', 'charge', 'theta', 'omega',
@@ -96,45 +102,55 @@ class NameChecker(ast.NodeVisitor):
                 'wx', 'wy', 'wz',
                 'angular_x', 'angular_y', 'angular_z',
             }
-        elif self.mode == 'paint':
-            return common | {'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
-                             'color', 't'}
-        elif self.mode == 'agent':
+        if self.mode == 'paint':
+            return common | {
+                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
+                'color', 't',
+            }
+        if self.mode == 'agent':
             return common | {'signal_object_idx', 'signal_payload'}
-        else:
-            return common
+        return common
 
     def _get_builtin_funcs(self) -> Set[str]:
-        """Return the set of built-in function names exposed to JIT scripts."""
-        return {
-            # Math
-            'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
-            'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
-            'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor', 'ceil',
-            'fract', 'sign', 'step', 'smoothstep', 'mix', 'clamp', 'mod',
-            'min', 'max', 'dot', 'cross', 'length', 'distance', 'normalize',
-            'reflect', 'refract', 'faceforward', 'transpose', 'inverse',
-            'determinant', 'outerProduct', 'matrixCompMult',
-            'radians', 'degrees', 'saturate', 'lerp', 'fbm', 'noise', 'rand',
-            # JIT-specific
-            'signal', 'scratchpad_read', 'scratchpad_write',
-            'apply_constraints', 'detect_collision', 'resolve_collision',
-            # Constraint DSL and query helpers.
-            'spring', 'distance', 'boundary', 'angle',
-            'get_constraint_count', 'get_constraint_type',
-            'get_constraint_target', 'get_constraint_param',
-            # Ray-tracing
+        """Return functions implemented by the current shader mode."""
+        common = {
+            # GLSL math.
+            'sqrt', 'inversesqrt', 'sin', 'cos', 'tan', 'asin', 'acos',
+            'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh',
+            'atanh', 'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor',
+            'ceil', 'frac', 'fract', 'sign', 'step', 'smoothstep', 'mix',
+            'clamp', 'mod', 'min', 'max', 'dot', 'cross', 'length',
+            'distance', 'normalize', 'reflect', 'refract', 'faceforward',
+            'transpose', 'inverse', 'determinant', 'outerProduct',
+            'matrixCompMult', 'radians', 'degrees', 'saturate', 'lerp',
+            'fbm', 'noise', 'rand', 'random',
+            # Shared JIT and utility helpers.
+            'scratchpad_read', 'diff', 'int', 'float', 'len', 'sum', 'range',
+            # Ray-tracing primitives are included in every wrapper.
             'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
-            'look_at', 'camera_ray', 'camera_ray_ndc', 'offset_ray_origin',
-            # Complex
+            'look_at', 'camera_ray_ndc', 'offset_ray_origin', 'raymarch',
+            # Complex-number helpers are included in every wrapper.
             'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
             'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
-            # Other
-            'int', 'float', 'len', 'sum', 'diff', 'range',
-            # Paint helpers
-            'sample_prev_r', 'sample_prev_g', 'sample_prev_b', 'sample_prev_a',
-            'avg_prev_r', 'avg_prev_g', 'avg_prev_b', 'avg_prev_a',
         }
+
+        if self.mode == 'object':
+            return common | {
+                'signal', 'detect_collision', 'resolve_collision',
+                'apply_constraints', 'spring', 'boundary', 'angle',
+                'get_constraint_count', 'get_constraint_type',
+                'get_constraint_target', 'get_constraint_param',
+            }
+        if self.mode == 'paint':
+            return common | {
+                'signal', 'camera_ray',
+                'sample_prev_r', 'sample_prev_g', 'sample_prev_b',
+                'sample_prev_a', 'avg_prev_r', 'avg_prev_g',
+                'avg_prev_b', 'avg_prev_a',
+            }
+        if self.mode == 'agent':
+            return common | {'scratchpad_write'}
+        return common
 
     def _collect(self) -> None:
         """Walk the AST to collect assignments, references, and function calls."""
@@ -163,8 +179,11 @@ class NameChecker(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        # Record user-defined function
+        # Record user-defined functions and their signatures. Raymarching uses
+        # a function name as its second argument, so its one-argument SDF
+        # contract can be checked after the complete AST has been collected.
         self.user_functions.add(node.name)
+        self.user_function_arities[node.name] = len(node.args.args)
         # Also collect its parameters
         for arg in node.args.args:
             self.param_names.add(arg.arg)
@@ -176,12 +195,20 @@ class NameChecker(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == 'hyperstellar.glsl':
             for alias in node.names:
-                self.imported_names.add(alias.name)
+                self.imported_names.add(alias.asname or alias.name)
         # No further traversal needed for imports
 
     def visit_Import(self, node: ast.Import) -> None:
         # Regular imports are ignored; we don't track modules.
         pass
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        # p[index] is translated directly to objectsIn[index] in paint/agent
+        # scripts; p itself is not a GLSL variable in those wrappers.
+        if isinstance(node.value, ast.Name) and node.value.id == 'p':
+            self.visit(node.slice)
+            return
+        self.generic_visit(node)
 
     def _add_target(self, target: ast.AST) -> None:
         """Recursively add names from assignment targets."""
@@ -199,16 +226,30 @@ class NameChecker(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        # Record the function name if it's a simple Name
-        if isinstance(node.func, ast.Name):
-            func_name = node.func.id
+        # Record the function name if it's a simple Name.
+        func_name = node.func.id if isinstance(node.func, ast.Name) else None
+        if func_name is not None:
             self.called_functions.add(func_name)
-            # Also record this as a function call context for the Name node
             self.name_nodes.append((func_name, node.lineno, node.col_offset, True))
-        
-        # Do NOT call self.generic_visit(node) here, because it marks the function
-        # name as a variable. Instead, manually visit only the arguments.
-        for arg in node.args:
+
+        # raymarch(ray, sdf, ...) takes an SDF function identifier as data,
+        # not as a variable or a direct function call at this AST position.
+        if func_name == 'raymarch':
+            if len(node.args) < 2 or not isinstance(node.args[1], ast.Name):
+                self.errors.append((
+                    "raymarch() requires a named one-argument SDF function as its second argument.",
+                    node.lineno, node.col_offset, None
+                ))
+                args_to_visit = node.args
+            else:
+                self.raymarch_sdf_names.add(node.args[1].id)
+                args_to_visit = list(node.args[:1]) + list(node.args[2:])
+        else:
+            args_to_visit = node.args
+
+        # Do not visit node.func: doing so would misclassify the callable as a
+        # variable. Visit only expression arguments and keyword values.
+        for arg in args_to_visit:
             self.visit(arg)
         for kw in node.keywords:
             self.visit(kw.value)
@@ -288,7 +329,20 @@ class NameChecker(ast.NodeVisitor):
                     (f"Undefined variable '{name}'", lineno, col, suggestion)
                 )
 
-        # 2. Check undefined functions
+        # 2. Validate SDF function references passed to raymarch().
+        for sdf_name in self.raymarch_sdf_names:
+            if sdf_name not in self.user_functions:
+                self.errors.append((
+                    f"raymarch() references undefined SDF function '{sdf_name}'.",
+                    None, None, None
+                ))
+            elif self.user_function_arities.get(sdf_name) != 1:
+                self.errors.append((
+                    f"SDF function '{sdf_name}' must accept exactly one parameter.",
+                    None, None, None
+                ))
+
+        # 3. Check undefined functions.
         for func_name in self.called_functions:
             if (func_name not in self.builtin_funcs and
                 func_name not in self.user_functions and
@@ -298,7 +352,7 @@ class NameChecker(ast.NodeVisitor):
                     (f"Undefined function '{func_name}'", None, None, suggestion)
                 )
 
-        # 3. Check unused variables (assigned but never referenced)
+        # 4. Check unused variables (assigned but never referenced).
         for var in self.assigned:
             if var not in self.referenced and var not in self.builtin_vars:
                 if var in self.param_names:
@@ -343,6 +397,9 @@ class GLSLGenerator(ast.NodeVisitor):
         self.return_expr: Optional[ast.AST] = None          # captured return expression
         self.param_names: List[str] = []                    # function parameter names
         self.imported_names: Set[str] = set()               # names imported from hyperstellar.glsl
+        self.root_function_name: Optional[str] = None
+        self.loop_vars: Set[str] = set()
+        self.in_sdf_function: bool = False
 
     def indent_str(self) -> str:
         return "    " * self.indent
@@ -368,6 +425,9 @@ class GLSLGenerator(ast.NodeVisitor):
         self.return_expr = None
         self.param_names = []
         self.imported_names.clear()
+        self.root_function_name = None
+        self.loop_vars.clear()
+        self.in_sdf_function = False
 
         # Get source and AST
         source = inspect.getsource(func)
@@ -375,6 +435,12 @@ class GLSLGenerator(ast.NodeVisitor):
         if not isinstance(tree.body[0], ast.FunctionDef):
             raise ValueError("Not a function definition")
         func_node = tree.body[0]
+        self.root_function_name = func_node.name
+        self.loop_vars = {
+            node.target.id
+            for node in ast.walk(func_node)
+            if isinstance(node, ast.For) and isinstance(node.target, ast.Name)
+        }
 
         # ---- LINTER STAGE ----
         # Pass self.globals to the linter so it knows about module-level constants like CAM
@@ -408,28 +474,29 @@ class GLSLGenerator(ast.NodeVisitor):
         # Check for return statement and capture its expression
         self._scan_for_return(func_node)
 
-        # Predefined variables depend on mode
+        # Predefined variables must agree with NameChecker and the selected
+        # shader wrapper; otherwise generated locals can shadow wrapper state.
+        common_predefined = {
+            'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
+        }
         if self.mode == 'paint':
-            predefined = {'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
-                          't', 'color', 'idx', 'num_objects', 'dt', 'time',
-                          'group_count', 'i'}
+            predefined = common_predefined | {
+                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
+                't', 'color',
+            }
         elif self.mode == 'agent':
-            predefined = {'signal_object_idx', 'signal_payload', 'num_objects', 'dt',
-                          'time', 'idx', 'group_count', 'i'}
+            predefined = common_predefined | {
+                'signal_object_idx', 'signal_payload',
+            }
         else:
-            predefined = {
-                'x', 'y', 'vx', 'vy',
-                'mass', 'charge', 'theta', 'omega',
-                'color', 'pos', 'vel',
-                'num_objects', 'dt', 'time', 'idx', 'group_count', 'i',
-                'ax', 'ay', 'angular',
-                # 3D state variables declared by main() in the object shader.
-                'z', 'vz', 'az',
-                'wx', 'wy', 'wz',
+            predefined = common_predefined | {
+                'p', 'x', 'y', 'vx', 'vy', 'z', 'vz',
+                'mass', 'charge', 'theta', 'omega', 'color', 'pos', 'vel',
+                'ax', 'ay', 'az', 'angular', 'wx', 'wy', 'wz',
                 'angular_x', 'angular_y', 'angular_z',
             }
         
-        self.assigned_vars = collector.vars - predefined
+        self.assigned_vars = collector.vars - predefined - self.loop_vars
         if self.mode == 'paint':
             self.assigned_vars.add('color')
         if self.has_return:
@@ -493,9 +560,30 @@ class GLSLGenerator(ast.NodeVisitor):
             'pos': 'pos', 'vel': 'vel',
         }
 
+        exposed = {
+            'object': {
+                'x', 'y', 'vx', 'vy', 'z', 'vz', 'wx', 'wy', 'wz',
+                'mass', 'charge', 'theta', 'omega', 'ax', 'ay', 'az',
+                'angular', 'angular_x', 'angular_y', 'angular_z',
+                'color', 'pos', 'vel', 'p', 'idx', 'num_objects',
+                'group_count', 'dt', 'time', 'i',
+            },
+            'paint': {
+                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
+                'color', 't', 'idx', 'num_objects', 'group_count',
+                'dt', 'time', 'i',
+            },
+            'agent': {
+                'signal_object_idx', 'signal_payload', 'idx',
+                'num_objects', 'group_count', 'dt', 'time', 'i',
+            },
+        }.get(self.mode, set())
+
         lines = []
         for pname in self.param_names:
-            if pname in mapping:
+            if pname in exposed:
+                continue
+            if pname in mapping and self.mode == 'object':
                 expr = mapping[pname]
                 if pname == 'color':
                     typ = 'vec4'
@@ -503,7 +591,12 @@ class GLSLGenerator(ast.NodeVisitor):
                     typ = 'vec2'
                 else:
                     typ = 'float'
-                lines.append(f"    {typ} {pname} = {expr};")
+                if pname in self.assigned_vars:
+                    lines.append(f"    {pname} = {expr};")
+                else:
+                    lines.append(f"    {typ} {pname} = {expr};")
+            elif pname in self.assigned_vars:
+                lines.append(f"    {pname} = 0.0;")
             else:
                 lines.append(f"    // WARNING: parameter '{pname}' is not a known property; defaulting to 0.0")
                 lines.append(f"    float {pname} = 0.0;")
@@ -551,27 +644,45 @@ class GLSLGenerator(ast.NodeVisitor):
     # Helper: generate SDF and raymarch definitions
     # ------------------------------------------------------------------------
     def _generate_sdf_defs(self) -> str:
+        """Generate SDF functions and their specialized raymarch wrappers."""
         sdf_defs = ""
         for name, (sdf_node, params) in self.sdf_functions.items():
             param_name = params[0]
-            temp_gen = GLSLGenerator(debug=self.debug, mode='object')
+            temp_gen = GLSLGenerator(debug=self.debug, mode=self.mode)
+            temp_gen.globals = self.globals
+            temp_gen.imported_names = self.imported_names.copy()
             temp_gen.var_types = self.var_types.copy()
             temp_gen.complex_vars = self.complex_vars.copy()
             temp_gen.var_types[param_name] = 'vec3'
-            if len(sdf_node.body) == 1 and isinstance(sdf_node.body[0], ast.Return):
-                ret_expr = temp_gen._expr_to_glsl(sdf_node.body[0].value)
-                sdf_defs += f"float {name}(vec3 {param_name}) {{ return {ret_expr}; }}\n"
-            else:
-                temp_gen.lines = []
-                temp_gen.indent = 0
-                for stmt in sdf_node.body:
-                    temp_gen.visit(stmt)
-                body_lines = "\n".join(temp_gen.lines)
-                sdf_defs += f"float {name}(vec3 {param_name}) {{\n{body_lines}\n}}\n"
+            temp_gen.in_sdf_function = True
+            temp_gen.root_function_name = sdf_node.name
+            temp_gen.loop_vars = {
+                node.target.id
+                for node in ast.walk(sdf_node)
+                if isinstance(node, ast.For) and isinstance(node.target, ast.Name)
+            }
 
-        # Generate specialized raymarch functions
+            # Translate the body first so assignment types are known before
+            # declarations are emitted at the top of the generated function.
+            temp_gen.lines = []
+            temp_gen.indent = 0
+            for stmt in sdf_node.body:
+                temp_gen.visit(stmt)
+
+            local_collector = AssignCollector()
+            local_collector.visit(sdf_node)
+            local_names = sorted(local_collector.vars - temp_gen.loop_vars - {param_name})
+            local_decls = [
+                f"    {temp_gen.var_types.get(var, 'float')} {var};"
+                for var in local_names
+            ]
+            body_lines = "\n".join(local_decls + temp_gen.lines)
+            sdf_defs += f"float {name}(vec3 {param_name}) {{\n{body_lines}\n}}\n"
+
+        # Generate specialized raymarch functions. Hit and Ray are declared
+        # by the common ray-tracing header in every shader mode.
         raymarch_defs = ""
-        for sdf_name in self.sdf_functions.keys():
+        for sdf_name in self.sdf_functions:
             func_name = f"raymarch_{sdf_name}"
             raymarch_defs += f"""
 Hit {func_name}(Ray r, float t_min, float t_max, int steps, float eps) {{
@@ -765,16 +876,26 @@ float fbm(vec2 p, int octaves) {
     # AST Visitors
     # ------------------------------------------------------------------------
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if node.name != self.root_function_name:
+            return
         for stmt in node.body:
             self.visit(stmt)
 
     def visit_Pass(self, node: ast.Pass) -> None:
         pass
 
+    def visit_Return(self, node: ast.Return) -> None:
+        if self.in_sdf_function:
+            if node.value is None:
+                raise SyntaxError("SDF functions must return a distance value")
+            self.lines.append(
+                self.indent_str() + f"return {self._expr_to_glsl(node.value)};"
+            )
+
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == 'hyperstellar.glsl':
             for alias in node.names:
-                self.imported_names.add(alias.name)
+                self.imported_names.add(alias.asname or alias.name)
 
     def visit_Import(self, node: ast.Import) -> None:
         pass
@@ -865,17 +986,22 @@ float fbm(vec2 p, int octaves) {
                 ])
                 self.user_handles_collisions = True
                 return
-            if func_name == 'spring':
-                self._handle_spring(node.value)
+            if func_name in ('spring', 'boundary', 'angle'):
+                if self.mode != 'object':
+                    raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
+                if func_name == 'spring':
+                    self._handle_spring(node.value)
+                elif func_name == 'boundary':
+                    self._handle_boundary(node.value)
+                else:
+                    self._handle_angle(node.value)
                 return
-            if func_name == 'distance':
+            if func_name == 'distance' and any(
+                kw.arg in ('target', 'length') for kw in node.value.keywords
+            ):
+                if self.mode != 'object':
+                    raise SyntaxError("distance constraint syntax is only available in 'object' scripts.")
                 self._handle_distance(node.value)
-                return
-            if func_name == 'boundary':
-                self._handle_boundary(node.value)
-                return
-            if func_name == 'angle':
-                self._handle_angle(node.value)
                 return
         self.generic_visit(node)
 
@@ -1199,6 +1325,8 @@ float fbm(vec2 p, int octaves) {
         if isinstance(node, ast.Constant):
             return isinstance(node.value, complex)
         if isinstance(node, ast.Name):
+            if node.id in self.loop_vars:
+                return False
             return node.id in self.complex_vars
         if isinstance(node, ast.Call):
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
@@ -1219,6 +1347,8 @@ float fbm(vec2 p, int octaves) {
         if isinstance(node, ast.Name):
             if node.id in self.imported_names:
                 return None
+            if node.id == 'i' and node.id not in self.loop_vars:
+                return 'vec2'
             return self.var_types.get(node.id)
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
@@ -1317,7 +1447,7 @@ float fbm(vec2 p, int octaves) {
                         return arg_type
                 return "float"
             if func_name in ('distance', 'length', 'dot', 'determinant', 'fbm', 'random', 'rand',
-                             'real', 'imag', 'arg', 'sum', 'len'):
+                             'real', 'imag', 'arg', 'sum', 'len', 'atan2'):
                 return "float"
             if func_name in ('cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp',
                              'cPow', 'cSin', 'cCos', 'cTan', 'conj'):
@@ -1537,10 +1667,10 @@ float fbm(vec2 p, int octaves) {
                 return subst[name]
             if name in self.imported_names:
                 return name
-            if name == 'i':
+            if name == 'i' and name not in self.loop_vars:
                 self.complex_vars.add(name)
                 self.var_types[name] = "vec2"
-                return 'i'
+                return '_imaginary_unit'
             if name == 'num_objects':
                 return 'uNumObjects'
             if name == 'dt':
@@ -1548,27 +1678,30 @@ float fbm(vec2 p, int octaves) {
             if name == 'time':
                 return 'uTime'
             if name == 'idx':
-                return 'objectIndex' if self.mode != 'agent' else 'int(gl_GlobalInvocationID.x)'
+                if self.mode == 'paint':
+                    return '(coord.y * uTexWidth + coord.x)'
+                if self.mode == 'agent':
+                    return 'int(gl_GlobalInvocationID.x)'
+                return 'objectIndex'
             if name == 'group_count':
+                if self.mode == 'paint':
+                    return '(uTexWidth * uTexHeight)'
+                if self.mode == 'agent':
+                    return 'uSignalCount'
                 return 'uGroupCount'
             if self.mode == 'agent' and name in ('signal_object_idx', 'signal_payload'):
                 return name
-            if name in ('x', 'y', 'vx', 'vy', 'mass', 'charge', 'theta', 'omega',
-                        'color', 'pos', 'vel'):
-                return name
+            if self.mode == 'object':
+                if name in (
+                    'x', 'y', 'z', 'vx', 'vy', 'vz', 'wx', 'wy', 'wz',
+                    'mass', 'charge', 'theta', 'omega', 'az', 'ax', 'ay',
+                    'angular', 'angular_x', 'angular_y', 'angular_z',
+                    'color', 'pos', 'vel', 'p',
+                ):
+                    return name
             if self.mode == 'paint':
-                if name == 'px':
-                    return 'px'
-                if name == 'py':
-                    return 'py'
-                if name == 'prev_r':
-                    return 'prev_r'
-                if name == 'prev_g':
-                    return 'prev_g'
-                if name == 'prev_b':
-                    return 'prev_b'
-                if name == 'prev_a':
-                    return 'prev_a'
+                if name in ('px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a', 'color'):
+                    return name
                 if name == 't':
                     return 'uTime'
             if name in self.globals and isinstance(self.globals[name], (int, float)):
@@ -1684,10 +1817,11 @@ float fbm(vec2 p, int octaves) {
                     return f"look_at({args[0]}, {args[1]}, {args[2]})"
                 raise SyntaxError("look_at(eye, target, up)")
             if func_name == 'camera_ray':
+                if self.mode != 'paint':
+                    raise SyntaxError("camera_ray() is only available in 'paint' scripts; use camera_ray_ndc() in other modes.")
                 if len(args) == 4:
                     return f"camera_ray({', '.join(args)})"
-                else:
-                    raise SyntaxError("camera_ray(eye, target, up, fov)")
+                raise SyntaxError("camera_ray(eye, target, up, fov)")
             if func_name == 'camera_ray_ndc':
                 if len(args) == 7:
                     return f"camera_ray_ndc({', '.join(args)})"
@@ -1735,22 +1869,30 @@ float fbm(vec2 p, int octaves) {
             if func_name == 'rand' and len(args) == 0:
                 offset = self.rand_call_counter
                 self.rand_call_counter += 1
-                return f"rand(vec2(uTime, float(objectIndex) + {offset}.0))"
+                if self.mode == 'paint':
+                    seed = (
+                        f"vec2(uTime + float(gl_GlobalInvocationID.x), "
+                        f"float(gl_GlobalInvocationID.y) + {offset}.0)"
+                    )
+                else:
+                    seed = f"vec2(uTime, float(gl_GlobalInvocationID.x) + {offset}.0)"
+                return f"rand({seed})"
 
             # ---- len ----
             if func_name == 'len':
                 if len(args) != 1:
                     raise SyntaxError("len() takes exactly one argument")
                 arg = node.args[0]
-                if isinstance(arg, ast.Name) and arg.id in self.var_types:
-                    typ = self.var_types[arg.id]
-                    if typ.startswith('vec'):
-                        return f"{arg.id}.length()"
-                    elif typ.startswith('mat'):
-                        size = int(typ[3])
-                        return str(size * size)
+                typ = self._infer_expr_type(arg)
+                if typ and typ.startswith('vec'):
+                    return str(int(typ[3]))
+                if typ and typ.startswith('mat'):
+                    size = int(typ[3])
+                    return str(size * size)
                 if isinstance(arg, ast.List):
                     return str(len(arg.elts))
+                if typ == 'float[]':
+                    return f"({args[0]}.length())"
                 return "float(-1.0)"
 
             # ---- sum ----
@@ -1822,20 +1964,36 @@ float fbm(vec2 p, int octaves) {
             # ---- Paint helper functions ----
             if self.mode == 'paint':
                 if func_name == 'sample_prev_r':
+                    if len(args) != 1:
+                        raise SyntaxError("sample_prev_r(radius) takes exactly one argument")
                     return f"sample_prev_r(vec2(px, py), {args[0]})"
                 if func_name == 'sample_prev_g':
+                    if len(args) != 1:
+                        raise SyntaxError("sample_prev_g(radius) takes exactly one argument")
                     return f"sample_prev_g(vec2(px, py), {args[0]})"
                 if func_name == 'sample_prev_b':
+                    if len(args) != 1:
+                        raise SyntaxError("sample_prev_b(radius) takes exactly one argument")
                     return f"sample_prev_b(vec2(px, py), {args[0]})"
                 if func_name == 'sample_prev_a':
+                    if len(args) != 1:
+                        raise SyntaxError("sample_prev_a(radius) takes exactly one argument")
                     return f"sample_prev_a(vec2(px, py), {args[0]})"
                 if func_name == 'avg_prev_r':
+                    if args:
+                        raise SyntaxError("avg_prev_r() takes no arguments")
                     return "avg_prev_r()"
                 if func_name == 'avg_prev_g':
+                    if args:
+                        raise SyntaxError("avg_prev_g() takes no arguments")
                     return "avg_prev_g()"
                 if func_name == 'avg_prev_b':
+                    if args:
+                        raise SyntaxError("avg_prev_b() takes no arguments")
                     return "avg_prev_b()"
                 if func_name == 'avg_prev_a':
+                    if args:
+                        raise SyntaxError("avg_prev_a() takes no arguments")
                     return "avg_prev_a()"
 
             # ---- Complex functions ----
@@ -1886,9 +2044,9 @@ float fbm(vec2 p, int octaves) {
         'sqrt': 'sqrt', 'inversesqrt': 'inversesqrt',
         'log': 'log', 'log2': 'log2', 'exp': 'exp', 'exp2': 'exp2',
         'abs': 'abs', 'floor': 'floor', 'ceil': 'ceil',
-        'frac': 'frac', 'fract': 'fract', 'sign': 'sign', 'step': 'step',
+        'frac': 'fract', 'fract': 'fract', 'sign': 'sign', 'step': 'step',
         'min': 'min', 'max': 'max', 'clamp': 'clamp',
-        'mod': 'mod', 'atan2': 'atan2',
+        'mod': 'mod', 'atan2': 'atan',
         'dot': 'dot', 'cross': 'cross', 'length': 'length', 'distance': 'distance',
         'normalize': 'normalize', 'reflect': 'reflect', 'refract': 'refract', 'faceforward': 'faceforward',
         'mix': 'mix', 'smoothstep': 'smoothstep',
@@ -2014,8 +2172,20 @@ class AssignCollector(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_For(self, node: ast.For) -> None:
-        self._collect_target(node.target)
-        self.generic_visit(node)
+        # The generator declares the induction variable in the for statement.
+        # Collect only the iterable and body assignments here.
+        self.visit(node.iter)
+        for stmt in node.body:
+            self.visit(stmt)
+        for stmt in node.orelse:
+            self.visit(stmt)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if not self._is_root:
+            return
+        self._is_root = False
+        for stmt in node.body:
+            self.visit(stmt)
 
 
 # -----------------------------------------------------------------------------
@@ -2025,6 +2195,9 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
     """
     Decorator that compiles a Python function into a GPU compute shader.
     """
+    if mode not in {'object', 'paint', 'agent'}:
+        raise ValueError("mode must be 'object', 'paint', or 'agent'")
+
     def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)
         shader_source = generator.generate(func)

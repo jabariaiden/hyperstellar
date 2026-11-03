@@ -45,3 +45,6 @@ git-*/
 _deps_linux/
 _build_linux/
 _build_windows/
+
+# version control
+hyperstellar/src/hyperstellar/_version.py

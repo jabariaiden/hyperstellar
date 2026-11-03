@@ -432,10 +432,20 @@ PYBIND11_MODULE(stellar, m)
             target_object (int): ID of target object to maintain distance with
             rest_length (float): Desired distance between objects
         )pbdoc")
-        .def(py::init<int, float>(),
-             py::arg("target_object") = 0,
-             py::arg("rest_length") = 5.0f,
-             "Create distance constraint")
+        .def(py::init([](py::object target, float length) {
+            int idx = -1;
+            if (py::isinstance<py::int_>(target)) {
+                idx = py::cast<int>(target);
+            } else if (py::isinstance<ObjectHandle>(target)) {
+                idx = py::cast<ObjectHandle>(target).slot;
+            } else {
+                throw py::type_error("target_object must be an int or ObjectHandle");
+            }
+            DistanceConstraint c;
+            c.target_object = idx;
+            c.rest_length = length;
+            return c;
+        }), py::arg("target_object") = 0, py::arg("rest_length") = 5.0f, "Create distance constraint")
         .def_readwrite("target_object", &DistanceConstraint::target_object, "Target object ID")
         .def_readwrite("rest_length", &DistanceConstraint::rest_length, "Desired distance")
         .def("__repr__", [](const DistanceConstraint &c)
@@ -1237,9 +1247,37 @@ PYBIND11_MODULE(stellar, m)
             return py::bytes((const char*)jpeg_data.data(), jpeg_data.size()); }, py::arg("quality") = 85, "Get the full rendered frame as JPEG.")
 
         // Constraints
-        .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint, py::arg("object_index"), py::arg("constraint"), "Add distance constraint between objects")
+        .def("add_distance_constraint", [](SimulationWrapper &self, py::object obj, const DistanceConstraint &constraint) {
+            int index = -1;
+            if (py::isinstance<py::int_>(obj)) {
+                index = py::cast<int>(obj);
+            } else if (py::isinstance<ObjectHandle>(obj)) {
+                ObjectHandle handle = py::cast<ObjectHandle>(obj);
+                if (!self.is_handle_valid(handle)) {
+                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+                }
+                index = self.get_slot_index(handle);
+            } else {
+                throw py::type_error("add_distance_constraint() expects an int index or an ObjectHandle");
+            }
+            self.add_distance_constraint(index, constraint);
+        }, py::arg("obj"), py::arg("constraint"), "Add distance constraint between objects")
 
-        .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint, py::arg("object_index"), py::arg("constraint"), "Add boundary constraint to object")
+        .def("add_boundary_constraint", [](SimulationWrapper &self, py::object obj, const BoundaryConstraint &constraint) {
+            int index = -1;
+            if (py::isinstance<py::int_>(obj)) {
+                index = py::cast<int>(obj);
+            } else if (py::isinstance<ObjectHandle>(obj)) {
+                ObjectHandle handle = py::cast<ObjectHandle>(obj);
+                if (!self.is_handle_valid(handle)) {
+                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+                }
+                index = self.get_slot_index(handle);
+            } else {
+                throw py::type_error("add_boundary_constraint() expects an int index or an ObjectHandle");
+            }
+            self.add_boundary_constraint(index, constraint);
+        }, py::arg("obj"), py::arg("constraint"), "Add boundary constraint to object")
 
         .def("clear_constraints", &SimulationWrapper::clear_constraints, py::arg("object_index"), "Clear all constraints from object")
 
@@ -1311,92 +1349,52 @@ PYBIND11_MODULE(stellar, m)
             }
             self.set_collision_properties(self.get_slot_index(handle), restitution, friction); }, py::arg("handle"), py::arg("restitution"), py::arg("friction"), "Set collision physical properties for an object by stable handle.")
 
-        // unified collision setter
-        .def("set_collision", [](SimulationWrapper &self, int index, const py::kwargs &kwargs)
+        // Unified collision setter for integer indices and stable handles.
+        .def("set_collision", [](SimulationWrapper &self, py::object obj, const py::kwargs &kwargs)
              {
-            // Optional: set enabled
+            int index = -1;
+            if (py::isinstance<py::int_>(obj)) {
+                index = py::cast<int>(obj);
+            } else if (py::isinstance<ObjectHandle>(obj)) {
+                ObjectHandle handle = py::cast<ObjectHandle>(obj);
+                if (!self.is_handle_valid(handle)) {
+                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+                }
+                index = self.get_slot_index(handle);
+            } else {
+                throw py::type_error("set_collision() expects an int index or an ObjectHandle");
+            }
+
             if (kwargs.contains("enabled")) {
                 bool enabled = py::cast<bool>(kwargs["enabled"]);
                 self.set_collision_enabled(index, enabled);
             }
-            // Optional: set shape
             if (kwargs.contains("shape")) {
                 PyCollisionShape shape = py::cast<PyCollisionShape>(kwargs["shape"]);
                 self.set_collision_shape(index, shape);
             }
-            // Optional: set restitution and friction
             if (kwargs.contains("restitution") && kwargs.contains("friction")) {
                 float restitution = py::cast<float>(kwargs["restitution"]);
                 float friction = py::cast<float>(kwargs["friction"]);
                 self.set_collision_properties(index, restitution, friction);
             } else if (kwargs.contains("restitution")) {
-                // If only restitution given, keep current friction
                 float restitution = py::cast<float>(kwargs["restitution"]);
                 CollisionConfig config = self.get_collision_config(index);
                 self.set_collision_properties(index, restitution, config.friction);
             } else if (kwargs.contains("friction")) {
-                // If only friction given, keep current restitution
                 float friction = py::cast<float>(kwargs["friction"]);
                 CollisionConfig config = self.get_collision_config(index);
                 self.set_collision_properties(index, config.restitution, friction);
-            } }, py::arg("index"), R"pbdoc(
+            } }, py::arg("obj"), R"pbdoc(
             Set collision properties for an object in a single call.
 
             Args:
-                index (int): Object ID (raw index, or ObjectHandle.slot)
+                obj (int or ObjectHandle): Object ID or handle
                 enabled (bool, optional): Enable/disable collisions
                 shape (CollisionShape, optional): Collision shape type
                 restitution (float, optional): Bounciness (0.0-1.0)
                 friction (float, optional): Friction (0.0-1.0)
-
-            Example:
-                >>> sim.set_collision(0, shape=CollisionShape.CIRCLE, restitution=0.9, friction=0.1)
-                >>> sim.set_collision(1, enabled=False)
-        )")
-
-        .def("set_collision", [](SimulationWrapper &self, const ObjectHandle &handle, const py::kwargs &kwargs)
-             {
-            if (!self.is_handle_valid(handle)) {
-                throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-            }
-            int index = self.get_slot_index(handle);
-            if (kwargs.contains("enabled")) {
-                bool enabled = py::cast<bool>(kwargs["enabled"]);
-                self.set_collision_enabled(index, enabled);
-            }
-            if (kwargs.contains("shape")) {
-                PyCollisionShape shape = py::cast<PyCollisionShape>(kwargs["shape"]);
-                self.set_collision_shape(index, shape);
-            }
-            if (kwargs.contains("restitution") && kwargs.contains("friction")) {
-                float restitution = py::cast<float>(kwargs["restitution"]);
-                float friction = py::cast<float>(kwargs["friction"]);
-                self.set_collision_properties(index, restitution, friction);
-            } else if (kwargs.contains("restitution")) {
-                float restitution = py::cast<float>(kwargs["restitution"]);
-                CollisionConfig config = self.get_collision_config(index);
-                self.set_collision_properties(index, restitution, config.friction);
-            } else if (kwargs.contains("friction")) {
-                float friction = py::cast<float>(kwargs["friction"]);
-                CollisionConfig config = self.get_collision_config(index);
-                self.set_collision_properties(index, config.restitution, friction);
-            } }, py::arg("handle"), "Set collision properties for an object by stable handle.")
-
-        .def("get_collision_config", &SimulationWrapper::get_collision_config,
-             py::arg("index"),
-             R"pbdoc(
-             Get collision configuration for an object.
-
-             Args:
-                 index (int): Object ID (raw index, or ObjectHandle.slot)
-
-             Returns:
-                 CollisionConfig: Current collision settings
-
-             Example:
-                 >>> config = sim.get_collision_config(0)
-                 >>> print(f"Restitution: {config.restitution}")
-             )pbdoc")
+            )pbdoc")
 
         .def("get_collision_config", [](SimulationWrapper &self, const ObjectHandle &handle)
              {

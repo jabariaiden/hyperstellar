@@ -119,13 +119,6 @@ _COLLISION_3D = """
 // the 2D solver uses: only `pa`, `va`, `wa` end up applied to the calling
 // object; the B-side values are treated as read-only inputs.
 // ----------------------------------------------------------------------------
-struct CollisionInfo3D {
-    bool  hasCollision;
-    vec3  normal;        // unit, A -> B
-    float penetration;
-    vec3  contactPoint;
-};
-
 CollisionInfo3D noHit3D() {
     CollisionInfo3D c;
     c.hasCollision = false; c.normal = vec3(0.0, 0.0, 1.0);
@@ -401,7 +394,6 @@ def _wrap_object_shader(body: str, header: str, sdf_defs: str,
     shader = f"""#version 430 core
 {header}
 {_QUAT_HELPERS}
-{sdf_defs}
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 // ----------------------------------------------------------------------------
@@ -464,6 +456,15 @@ struct CollisionInfo {{
     float penetration;
     int otherObjectID;
     vec2 contactPoint;
+}};
+
+// Define the 3D collision result before its function prototypes. GLSL requires
+// a structure type to be declared before it is used as a return type.
+struct CollisionInfo3D {{
+    bool hasCollision;
+    vec3 normal;
+    float penetration;
+    vec3 contactPoint;
 }};
 
 // ----------------------------------------------------------------------------
@@ -600,6 +601,7 @@ float stepFunc(float x) {{ return (x >= 0.0) ? 1.0 : 0.0; }}
 // ----------------------------------------------------------------------------
 // COMPLEX NUMBERS
 // ----------------------------------------------------------------------------
+const vec2 _imaginary_unit = vec2(0.0, 1.0);
 vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
 vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
 vec2 cMul(vec2 a, vec2 b) {{
@@ -662,6 +664,10 @@ float getMomentOfInertia(float mass, int shapeType, float w, float h, float r) {
 // 2D vs 3D selection mirrors the automatic path in main(): both shapes 3D ->
 // 3D detector; both 2D -> 2D detector; a mixed 2D/3D pair never collides.
 // ----------------------------------------------------------------------------
+// Forward declarations to satisfy _dc_inline before the full definitions
+CollisionInfo3D detectCollision3D(Object a, Object b, int sa, int sb);
+CollisionInfo detectCollision(Object a, Object b, int ib, int self);
+
 bool _dc_inline(int other, int selfIdx, vec2 pos, float z, vec4 q, Object p) {{
     if (other < 0 || other >= uNumObjects || other == selfIdx) return false;
     Object _o = objectsIn[other];
@@ -1031,6 +1037,10 @@ void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, fl
 
 {_COLLISION_3D}
 
+// SDF functions and their generated raymarch wrappers are emitted after the
+// common math and ray-tracing types they may reference.
+{sdf_defs}
+
 // ----------------------------------------------------------------------------
 // USER-FACING COLLISION CALLS (intentionally not defined here)
 //
@@ -1380,8 +1390,7 @@ void main() {{
 # -----------------------------------------------------------------------------
 # Paint mode wrapper
 #
-# Paint scripts only READ the Object SSBO, so the only change required here is
-# updating the struct definition to the wide layout. Field access via
+# Paint scripts only READ the Object SSBO. Field access via
 # `o.position.x`, `o.position.y`, `o.velocity.x`, `o.velocity.y` continues to
 # work because those are still the first two components of the vec4s.
 # -----------------------------------------------------------------------------
@@ -1398,16 +1407,15 @@ def _wrap_paint_shader(body: str, header: str, sdf_defs: str,
     decls = []
     for v in sorted(assigned_vars):
         if v == 'color':
-            typ = 'vec4'
-        else:
-            typ = var_types.get(v, "float")
+            decls.append("    vec4 color = prev;")
+            continue
+        typ = var_types.get(v, "float")
         decls.append(f"    {typ} {v};")
     decls_str = "\n".join(decls)
 
     shader = f"""#version 430 core
 {header}
 {_QUAT_HELPERS}
-{sdf_defs}
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 uniform sampler2D uPrevFrame;
@@ -1502,7 +1510,7 @@ bool isInvalid(float v) {{ return isinf(v) || isnan(v); }}
 float signFunc(float x) {{ return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }}
 float stepFunc(float x) {{ return (x >= 0.0) ? 1.0 : 0.0; }}
 
-const vec2 i = vec2(0.0, 1.0);
+const vec2 _imaginary_unit = vec2(0.0, 1.0);
 vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
 vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
 vec2 cMul(vec2 a, vec2 b) {{
@@ -1596,6 +1604,10 @@ float avg_prev_r() {{ return avgPrevFrame(0); }}
 float avg_prev_g() {{ return avgPrevFrame(1); }}
 float avg_prev_b() {{ return avgPrevFrame(2); }}
 float avg_prev_a() {{ return avgPrevFrame(3); }}
+
+// SDF functions and their generated raymarch wrappers are emitted after the
+// common math, object-query, and paint-sampling helpers they may reference.
+{sdf_defs}
 
 // Hash map for per-object properties:
 //    1-2   position x/y          3-4   velocity x/y
@@ -1728,7 +1740,6 @@ def _wrap_agent_shader(body: str, header: str, sdf_defs: str,
     shader = f"""#version 430 core
 {header}
 {_QUAT_HELPERS}
-{sdf_defs}
 layout(local_size_x = 64) in;
 
 // ----------------------------------------------------------------------------
@@ -1757,6 +1768,82 @@ struct Object {{
 }};
 layout(std430, binding = 0) readonly buffer ObjectsIn {{ Object objectsIn[]; }};
 
+
+// ----------------------------------------------------------------------------
+// COMMON MATHEMATICAL HELPERS
+// ----------------------------------------------------------------------------
+const float EPSILON = 1e-6;
+const float SAFE_MIN_VALUE = 1e-6;
+const float SAFE_MAX_EXP = 50.0;
+const vec2 _imaginary_unit = vec2(0.0, 1.0);
+
+float safeDivide(float n, float d) {{
+    return (abs(d) < EPSILON) ? 0.0 : n / d;
+}}
+float safePow(float base, float exponent) {{
+    if (base < 0.0) {{
+        float intPart;
+        if (abs(modf(exponent, intPart)) < EPSILON) {{
+            float result = pow(-base, exponent);
+            if (int(intPart) % 2 == 1) result = -result;
+            return result;
+        }}
+    }}
+    return pow(max(0.0, base), exponent);
+}}
+float safeLog(float value) {{ return log(max(SAFE_MIN_VALUE, value)); }}
+float safeExp(float value) {{ return exp(clamp(value, -SAFE_MAX_EXP, SAFE_MAX_EXP)); }}
+bool isInvalid(float value) {{ return isinf(value) || isnan(value); }}
+vec2 sanitizeVec2(vec2 value) {{
+    if (isInvalid(value.x)) value.x = 0.0;
+    if (isInvalid(value.y)) value.y = 0.0;
+    return value;
+}}
+vec4 sanitizeVec4(vec4 value) {{
+    for (int component = 0; component < 4; ++component)
+        if (isInvalid(value[component])) value[component] = 0.0;
+    return value;
+}}
+float signFunc(float value) {{
+    return (value > 0.0) ? 1.0 : ((value < 0.0) ? -1.0 : 0.0);
+}}
+float stepFunc(float value) {{ return (value >= 0.0) ? 1.0 : 0.0; }}
+
+// Complex values are represented as vec2(real, imaginary).
+vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
+vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
+vec2 cMul(vec2 a, vec2 b) {{
+    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+}}
+vec2 cDiv(vec2 a, vec2 b) {{
+    float denominator = b.x*b.x + b.y*b.y;
+    if (abs(denominator) < EPSILON) return vec2(0.0);
+    return vec2((a.x*b.x + a.y*b.y)/denominator,
+                (a.y*b.x - a.x*b.y)/denominator);
+}}
+vec2 cLog(vec2 z) {{
+    return vec2(safeLog(length(z)), atan(z.y, z.x));
+}}
+vec2 cExp(vec2 z) {{
+    float magnitude = safeExp(z.x);
+    return vec2(magnitude*cos(z.y), magnitude*sin(z.y));
+}}
+vec2 cPow(vec2 base, vec2 exponent) {{
+    if (length(base) < EPSILON) return vec2(0.0);
+    return cExp(cMul(exponent, cLog(base)));
+}}
+vec2 cSin(vec2 z) {{
+    return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y));
+}}
+vec2 cCos(vec2 z) {{
+    return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y));
+}}
+vec2 cTan(vec2 z) {{ return cDiv(cSin(z), cCos(z)); }}
+float real(vec2 z) {{ return z.x; }}
+float imag(vec2 z) {{ return z.y; }}
+vec2 conj(vec2 z) {{ return vec2(z.x, -z.y); }}
+float arg(vec2 z) {{ return atan(z.y, z.x); }}
+
 // ----------------------------------------------------------------------------
 // SCRATCHPAD (read/write)
 // ----------------------------------------------------------------------------
@@ -1780,8 +1867,14 @@ layout(std430, binding = 11) readonly buffer SignalQueue {{
 }};
 
 uniform int uNumObjects;
+uniform float uTime;
+uniform float uDt;
 uniform int uAgentID;
 uniform int uSignalCount;
+
+// SDF functions and their generated raymarch wrappers are emitted after the
+// common ray-tracing and mathematical helper definitions.
+{sdf_defs}
 
 // ----------------------------------------------------------------------------
 // MAIN
