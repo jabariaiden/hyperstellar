@@ -1827,7 +1827,7 @@ if(dist>EPSILON) {
 vec2 localNormal = -(d/dist);
 info.normal = rotatePoint(localNormal, brot);
 info.penetration = cr-dist;
-info.contactPoint = cp-info.normal*(cr-info.penetration*0.5);
+info.contactPoint = cp+info.normal*(cr-info.penetration*0.5);
 } else {
 vec2 toEdge = -local;
 vec2 absToEdge = abs(toEdge);
@@ -1841,7 +1841,7 @@ localNormal = vec2(0.0, sign(toEdge.y));
 info.penetration = cr+edgeDist.y;
 }
 info.normal = rotatePoint(localNormal, brot);
-info.contactPoint = cp-info.normal*cr;
+info.contactPoint = cp+info.normal*cr;
 }
 }
 return info;
@@ -1903,7 +1903,7 @@ if(dot(pp-cp, axis)<0.0) info.normal = -axis;
 }
 info.hasCollision = true;
 }
-if(info.hasCollision) info.contactPoint = cp-info.normal*cr;
+if(info.hasCollision) info.contactPoint = cp+info.normal*cr;
 return info;
 }
 CollisionInfo detectPolygonAABB(vec2 pp, float pr, int ps, float prot, vec2 bp, vec2 he, float brot, int ob) {
@@ -2041,8 +2041,9 @@ float vn = dot(rel, n);
 if(vn>0.0) return;
 float e = clamp(rest, 0.0, 1.0);
 float num = -(1.0+e)*vn;
-float rap = dot(ra, n), rbp = dot(rb, n);
-float den = (1.0/ma)+(1.0/mb)+(rap*rap)/ia+(rbp*rbp)/ib;
+float raCrossN = ra.x*n.y-ra.y*n.x;
+float rbCrossN = rb.x*n.y-rb.y*n.x;
+float den = (1.0/ma)+(1.0/mb)+(raCrossN*raCrossN)/ia+(rbCrossN*rbCrossN)/ib;
 if(abs(den)<EPSILON) return;
 float j = num/den;
 vec2 imp = j*n;
@@ -2060,7 +2061,9 @@ if(tl>EPSILON) {
 tan /= tl;
 float vt = dot(rel, tan);
 float jt = -vt*fric;
-float dent = (1.0/ma)+(1.0/mb)+(rap*rap)/ia+(rbp*rbp)/ib;
+float raCrossT = ra.x*tan.y-ra.y*tan.x;
+float rbCrossT = rb.x*tan.y-rb.y*tan.x;
+float dent = (1.0/ma)+(1.0/mb)+(raCrossT*raCrossT)/ia+(rbCrossT*rbCrossT)/ib;
 if(abs(dent)>EPSILON) {
 jt /= dent;
 float maxJt = abs(j)*fric;

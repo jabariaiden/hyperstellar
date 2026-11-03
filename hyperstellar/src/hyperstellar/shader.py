@@ -687,7 +687,11 @@ bool _dc_inline(int other, int selfIdx, vec2 pos, float z, vec4 q, Object p) {{
     
     // Mixed 2D/3D pairs report no hit, matching the auto path.
     if (_pa.shapeType >= COLLISION_SPHERE || _pb.shapeType >= COLLISION_SPHERE) return false;
-    return detectCollision(p, _o, other, selfIdx).hasCollision;
+    
+    Object _me2D = p;
+    _me2D.position = vec4(pos, z, 0.0);
+    _me2D.orientation = q;
+    return detectCollision(_me2D, _o, other, selfIdx).hasCollision;
 }}
 // ----------------------------------------------------------------------------
 // 2D COLLISION DETECTION
@@ -801,67 +805,115 @@ CollisionInfo detectCircleAABB(vec2 cp, float cr, vec2 bp, vec2 he, float brot, 
             vec2 localNormal = -(d / dist);
             info.normal = rotatePoint(localNormal, brot);
             info.penetration = cr - dist;
-            info.contactPoint = cp - info.normal * (cr - info.penetration * 0.5);
+            info.contactPoint = cp + info.normal * (cr - info.penetration * 0.5);
         }} else {{
             vec2 toEdge = -local;
             vec2 absToEdge = abs(toEdge);
             vec2 edgeDist = he - absToEdge;
             vec2 localNormal;
+
             if (edgeDist.x < edgeDist.y) {{
-                localNormal = vec2(sign(toEdge.x), 0.0);
+                localNormal = vec2(
+                    (toEdge.x >= 0.0) ? 1.0 : -1.0,
+                    0.0
+                );
                 info.penetration = cr + edgeDist.x;
             }} else {{
-                localNormal = vec2(0.0, sign(toEdge.y));
+                localNormal = vec2(
+                    0.0,
+                    (toEdge.y >= 0.0) ? 1.0 : -1.0
+                );
                 info.penetration = cr + edgeDist.y;
             }}
+
             info.normal = rotatePoint(localNormal, brot);
-            info.contactPoint = cp - info.normal * cr;
+            info.contactPoint = cp + info.normal * cr;
         }}
     }}
     return info;
 }}
+CollisionInfo detectCirclePolygon(
+    vec2 cp, float cr,
+    vec2 pp, float pr,
+    int ps, float prot, int ob
+) {{
+    ps = clamp(ps, 3, 32);
 
-CollisionInfo detectCirclePolygon(vec2 cp, float cr, vec2 pp, float pr, int ps, float prot, int ob) {{
     CollisionInfo info;
     info.hasCollision = false;
     info.otherObjectID = ob;
     info.penetration = 1e10;
+    info.normal = vec2(1.0, 0.0);
+
     float step = 2.0 * PI / float(ps);
+
+    // Test the polygon face normals.
     for (int i = 0; i < ps; ++i) {{
         vec2 axis = getPolygonNormal(i, ps, prot);
+
         float cproj = dot(cp, axis);
         vec2 crange = vec2(cproj - cr, cproj + cr);
         vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-        if (crange.y < prange.x || prange.y < crange.x) return info;
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
+
+        if (crange.y < prange.x || prange.y < crange.x)
+            return info;
+
+        float overlap =
+            min(crange.y, prange.y) - max(crange.x, prange.x);
+
         if (overlap < info.penetration) {{
             info.penetration = overlap;
             info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
+
+            if (dot(pp - cp, axis) < 0.0)
+                info.normal = -axis;
         }}
     }}
+
+    // Find the polygon vertex closest to the circle centre.
     vec2 closest = pp;
     float closestDsq = 1e10;
+
     for (int i = 0; i < ps; ++i) {{
         float a = prot + float(i) * step;
-        vec2 v = pp + pr * vec2(cos(a), sin(a));
-        float dsq = dot(v - cp, v - cp);
-        if (dsq < closestDsq) {{ closestDsq = dsq; closest = v; }}
+        vec2 vertex = pp + pr * vec2(cos(a), sin(a));
+        float dsq = dot(vertex - cp, vertex - cp);
+
+        if (dsq < closestDsq) {{
+            closestDsq = dsq;
+            closest = vertex;
+        }}
     }}
-    vec2 axis = normalize(cp - closest);
-    float cproj = dot(cp, axis);
-    vec2 crange = vec2(cproj - cr, cproj + cr);
-    vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
-    if (!(crange.y < prange.x || prange.y < crange.x)) {{
-        float overlap = min(crange.y, prange.y) - max(crange.x, prange.x);
+
+    // Test the vertex axis when it is well-defined.
+    vec2 axisDelta = cp - closest;
+    float axisLength = length(axisDelta);
+
+    if (axisLength > EPSILON) {{
+        vec2 vertexAxis = axisDelta / axisLength;
+
+        float cproj = dot(cp, vertexAxis);
+        vec2 crange = vec2(cproj - cr, cproj + cr);
+        vec2 prange = projectPolygon(pp, pr, ps, prot, vertexAxis);
+
+        if (crange.y < prange.x || prange.y < crange.x)
+            return info;
+
+        float overlap =
+            min(crange.y, prange.y) - max(crange.x, prange.x);
+
         if (overlap < info.penetration) {{
             info.penetration = overlap;
-            info.normal = axis;
-            if (dot(pp - cp, axis) < 0.0) info.normal = -axis;
+            info.normal = vertexAxis;
+
+            if (dot(pp - cp, vertexAxis) < 0.0)
+                info.normal = -vertexAxis;
         }}
-        info.hasCollision = true;
     }}
-    if (info.hasCollision) info.contactPoint = cp - info.normal * cr;
+
+    info.hasCollision = true;
+    info.contactPoint = cp + info.normal * cr;
+
     return info;
 }}
 
@@ -1001,8 +1053,12 @@ void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, fl
     if (vn > 0.0) return;
     float e = clamp(rest, 0.0, 1.0);
     float num = -(1.0 + e) * vn;
-    float rap = dot(ra, n), rbp = dot(rb, n);
-    float den = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
+    float raCrossN = ra.x * n.y - ra.y * n.x;
+    float rbCrossN = rb.x * n.y - rb.y * n.x;
+
+    float den = (1.0 / ma) + (1.0 / mb)
+          + (raCrossN * raCrossN) / ia
+          + (rbCrossN * rbCrossN) / ib;
     if (abs(den) < EPSILON) return;
     float j = num / den;
     vec2 imp = j * n;
@@ -1020,14 +1076,24 @@ void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, fl
             tan /= tl;
             float vt = dot(rel, tan);
             float jt = -vt * fric;
-            float dent = (1.0/ma) + (1.0/mb) + (rap*rap)/ia + (rbp*rbp)/ib;
+            float raCrossT = ra.x * tan.y - ra.y * tan.x;
+            float rbCrossT = rb.x * tan.y - rb.y * tan.x;
+
+            float dent = (1.0 / ma) + (1.0 / mb)
+                    + (raCrossT * raCrossT) / ia
+                    + (rbCrossT * rbCrossT) / ib;
+                    
             if (abs(dent) > EPSILON) {{
                 jt /= dent;
+
                 float maxJt = abs(j) * fric;
                 jt = clamp(jt, -maxJt, maxJt);
+
                 vec2 fimp = jt * tan;
+
                 va -= fimp / ma;
                 vb += fimp / mb;
+
                 wa -= (ra.x * fimp.y - ra.y * fimp.x) / ia;
                 wb += (rb.x * fimp.y - rb.y * fimp.x) / ib;
             }}
@@ -1308,15 +1374,32 @@ void main() {{
         }}
 
         // ---- 2D shapes (unchanged) ----
-        CollisionInfo _col = detectCollision(p, _other, i, _self);
+        Object _me2D = p;
+        _me2D.position = vec4(pos, z, 0.0);
+        _me2D.orientation = quat_axis_angle(
+            vec3(0.0, 0.0, 1.0), theta
+        );
+        CollisionInfo _col = detectCollision(_me2D, _other, i, _self);
+
         if (_col.hasCollision) {{
             _hadCollision = true;
             float rest = min(propA.restitution, propB.restitution);
             float fric = sqrt(propA.friction * propB.friction);
             float mA = mass, mB = max(EPSILON, _other.mass);
             float wA = omega, wB = _other.spin.z;
-            float iA = getMomentOfInertia(mA, propA.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);
-            float iB = getMomentOfInertia(mB, propB.shapeType, _other.visualData.x, _other.visualData.y, _other.visualData.x * 0.5);
+            float iA = getMomentOfInertia(
+                mA, propA.shapeType,
+                p.visualData.x,
+                p.visualData.y,
+                p.visualData.x
+            );
+
+            float iB = getMomentOfInertia(
+                mB, propB.shapeType,
+                _other.visualData.x,
+                _other.visualData.y,
+                _other.visualData.x
+            );
             vec2 tempPos = _other.position.xy;
             vec2 tempVel = _other.velocity.xy;
             float tempOmega = wB;
@@ -1896,4 +1979,4 @@ void main() {{
 {body}
 }}
 """
-    return shader
+    return shader 
