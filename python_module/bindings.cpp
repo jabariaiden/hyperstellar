@@ -8,6 +8,7 @@
 #include "simulation_wrapper.h"
 #include "../include/mesh.h"
 #include <array>
+#include <tuple>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -19,6 +20,28 @@
 #include <sstream>
 
 namespace py = pybind11;
+
+namespace stellar_binding
+{
+    inline int object_index(SimulationWrapper &self, py::handle value,
+                            const char *argument_name)
+    {
+        if (py::isinstance<py::int_>(value))
+            return py::cast<int>(value);
+
+        if (py::isinstance<ObjectHandle>(value))
+        {
+            const ObjectHandle handle = py::cast<ObjectHandle>(value);
+            if (!self.is_handle_valid(handle))
+                throw std::runtime_error(std::string(argument_name) +
+                    " is an invalid ObjectHandle (object was removed or its slot was reused)");
+            return self.get_slot_index(handle);
+        }
+
+        throw py::type_error(std::string(argument_name) +
+            " must be an integer index or ObjectHandle");
+    }
+}
 
 // =========================================================================
 // PRE-STEP: glm type casters
@@ -432,20 +455,10 @@ PYBIND11_MODULE(stellar, m)
             target_object (int): ID of target object to maintain distance with
             rest_length (float): Desired distance between objects
         )pbdoc")
-        .def(py::init([](py::object target, float length) {
-            int idx = -1;
-            if (py::isinstance<py::int_>(target)) {
-                idx = py::cast<int>(target);
-            } else if (py::isinstance<ObjectHandle>(target)) {
-                idx = py::cast<ObjectHandle>(target).slot;
-            } else {
-                throw py::type_error("target_object must be an int or ObjectHandle");
-            }
-            DistanceConstraint c;
-            c.target_object = idx;
-            c.rest_length = length;
-            return c;
-        }), py::arg("target_object") = 0, py::arg("rest_length") = 5.0f, "Create distance constraint")
+        .def(py::init<int, float>(),
+             py::arg("target_object") = 0,
+             py::arg("rest_length") = 5.0f,
+             "Create distance constraint")
         .def_readwrite("target_object", &DistanceConstraint::target_object, "Target object ID")
         .def_readwrite("rest_length", &DistanceConstraint::rest_length, "Desired distance")
         .def("__repr__", [](const DistanceConstraint &c)
@@ -654,100 +667,178 @@ PYBIND11_MODULE(stellar, m)
         .def("get_speed", &SimulationWrapper::get_speed,
              "Get current speed multiplier.")
 
-        // Object management - returns ObjectHandle for stability
-        .def("add_object", &SimulationWrapper::add_object,
+        // Object creation: argument names select the 2D or 3D overload.
+        .def("add_object", [](SimulationWrapper &self,
+                              float x, float y,
+                              float vx, float vy,
+                              float mass, float charge,
+                              float rotation, float angular_velocity,
+                              PySkinType skin, float size, float width, float height,
+                              float r, float g, float b, float a, int polygon_sides)
+             {
+                 return self.add_object(x, y, vx, vy, mass, charge,
+                                        rotation, angular_velocity, skin,
+                                        size, width, height, r, g, b, a,
+                                        polygon_sides);
+             },
              py::arg("x") = 0.0f, py::arg("y") = 0.0f,
              py::arg("vx") = 0.0f, py::arg("vy") = 0.0f,
              py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
              py::arg("rotation") = 0.0f, py::arg("angular_velocity") = 0.0f,
              py::arg("skin") = PySkinType::PY_SKIN_CIRCLE,
-             py::arg("size") = 0.3f,
-             py::arg("width") = 0.5f, py::arg("height") = 0.3f,
+             py::arg("size") = 0.3f, py::arg("width") = 0.5f, py::arg("height") = 0.3f,
              py::arg("r") = 1.0f, py::arg("g") = 1.0f,
              py::arg("b") = 1.0f, py::arg("a") = 1.0f,
              py::arg("polygon_sides") = 6,
              R"pbdoc(
-             Add an object with full property control.
+             Add a flat 2D object on the XY plane.
 
-             Returns an ObjectHandle that remains stable across object removals.
-
-             Args:
-                 x,y (float): Initial position
-                 vx,vy (float): Initial velocity
-                 mass (float): Object mass. Default: 1.0
-                 charge (float): Electric charge. Default: 0.0
-                 rotation (float): Initial rotation in radians. Default: 0.0
-                 angular_velocity (float): Angular velocity in rad/s. Default: 0.0
-                 skin (SkinType): Visual type. Default: CIRCLE
-                 size (float): General size. Default: 0.3
-                 width,height (float): Dimensions for rectangles. Default: 0.5, 0.3
-                 r,g,b,a (float): Color (0.0-1.0). Default: white (1,1,1,1)
-                 polygon_sides (int): Polygon sides. Default: 6
+             Use ``skin`` to choose a built-in 2D shape. ``rotation`` and
+             ``angular_velocity`` describe rotation about the Z axis.
 
              Returns:
-                 ObjectHandle: Stable handle for future reference
-
-             Example:
-                 >>> handle = sim.add_object(x=10, y=5, mass=50, skin=SkinType.CIRCLE)
+                 ObjectHandle: Stable handle for the new object.
              )pbdoc")
-
-        // =====================================================================
-        // ITEM 3: 3D object methods
-        // =====================================================================
-        .def("add_object_3d", &SimulationWrapper::add_object_3d,
+        .def("add_object", [](SimulationWrapper &self,
+                              float x, float y, float z,
+                              float vx, float vy, float vz,
+                              float mass, float charge, int mesh_id,
+                              glm::vec4 orientation, glm::vec3 spin,
+                              float r, float g, float b, float a)
+             {
+                 if (mesh_id < 0)
+                     throw std::invalid_argument(
+                         "3D add_object requires a valid mesh_id= handle");
+                 return self.add_object_3d(
+                     x, y, z, vx, vy, vz, mass, charge, mesh_id,
+                     orientation, spin, r, g, b, a, PyCollisionShape::SPHERE);
+             },
              py::arg("x") = 0.0f, py::arg("y") = 0.0f, py::arg("z") = 0.0f,
              py::arg("vx") = 0.0f, py::arg("vy") = 0.0f, py::arg("vz") = 0.0f,
              py::arg("mass") = 1.0f, py::arg("charge") = 0.0f,
-             py::kw_only(), py::arg("mesh_id"),
+             py::arg("mesh_id") = -1,
              py::arg("orientation") = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
              py::arg("spin") = glm::vec3(0.0f, 0.0f, 0.0f),
              py::arg("r") = 1.0f, py::arg("g") = 1.0f,
              py::arg("b") = 1.0f, py::arg("a") = 1.0f,
-             py::arg("shape") = PyCollisionShape::SPHERE,
              R"pbdoc(
-             Add a 3D object driven by an instanced mesh.
+             Add a 3D object using a registered mesh.
 
-             Args:
-                 x, y, z (float): Initial position
-                 vx, vy, vz (float): Initial velocity
-                 mass (float): Mass
-                 charge (float): Electric charge
-                 mesh_id (int): Handle returned by register_sphere / register_cube / ...
-                 orientation (tuple[float,float,float,float]): Unit quaternion (x, y, z, w).
-                     Defaults to identity.
-                 spin (tuple[float,float,float]): Angular velocity vector (rad/s).
-                 r, g, b, a (float): Color (0-1)
-                 shape (CollisionShape): SPHERE (default), BOX, or NONE.
+             Pass ``z`` and ``mesh_id`` by keyword to select this overload.
+             ``orientation`` is a quaternion in (x, y, z, w) order, and
+             ``spin`` is an angular-velocity vector. The default collision
+             shape is SPHERE.
 
              Returns:
-                 ObjectHandle: Stable handle to the new object
-
-             Example:
-                 >>> mesh = register_sphere(radius=1.0)
-                 >>> h = sim.add_object_3d(0, 0, 5, mesh_id=mesh, mass=2.0,
-                 ...                       shape=CollisionShape.SPHERE)
+                 ObjectHandle: Stable handle for the new object.
              )pbdoc")
 
-        .def("set_mesh_3d", &SimulationWrapper::set_mesh_3d,
+        // Unified accessors for mesh-backed 3D objects.
+        .def("set_mesh", [](SimulationWrapper &self, int index, int mesh_id)
+             { self.set_mesh_3d(index, mesh_id); },
              py::arg("index"), py::arg("mesh_id"),
-             "Swap the mesh of an existing 3D object. Pass -1 to hide.")
-        .def("get_mesh_3d", &SimulationWrapper::get_mesh_3d, py::arg("index"))
+             "Swap the mesh assigned to an object. Pass -1 to hide it.")
+        .def("get_mesh", [](const SimulationWrapper &self, int index)
+             { return self.get_mesh_3d(index); }, py::arg("index"))
+        .def("set_mesh", [](SimulationWrapper &self, const ObjectHandle &handle, int mesh_id)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.set_mesh_3d(self.get_slot_index(handle), mesh_id);
+             }, py::arg("handle"), py::arg("mesh_id"))
+        .def("get_mesh", [](const SimulationWrapper &self, const ObjectHandle &handle)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 return self.get_mesh_3d(self.get_slot_index(handle));
+             }, py::arg("handle"))
 
-        .def("set_position_3d", &SimulationWrapper::set_position_3d,
-             py::arg("index"), py::arg("x"), py::arg("y"), py::arg("z"))
-        .def("get_position_3d", &SimulationWrapper::get_position_3d, py::arg("index"))
+        .def("set_position", [](SimulationWrapper &self, int index,
+                                float x, float y, float z)
+             { self.set_position_3d(index, x, y, z); },
+             py::arg("index"), py::arg("x"), py::arg("y"), py::arg("z") = 0.0f)
+        .def("get_position", [](const SimulationWrapper &self, int index)
+             {
+                 glm::vec3 p = self.get_position_3d(index);
+                 return std::make_tuple(p.x, p.y, p.z);
+             }, py::arg("index"))
+        .def("set_position", [](SimulationWrapper &self, const ObjectHandle &handle,
+                                float x, float y, float z)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.set_position_3d(self.get_slot_index(handle), x, y, z);
+             }, py::arg("handle"), py::arg("x"), py::arg("y"), py::arg("z") = 0.0f)
+        .def("get_position", [](const SimulationWrapper &self, const ObjectHandle &handle)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 glm::vec3 p = self.get_position_3d(self.get_slot_index(handle));
+                 return std::make_tuple(p.x, p.y, p.z);
+             }, py::arg("handle"))
 
-        .def("set_velocity_3d", &SimulationWrapper::set_velocity_3d,
-             py::arg("index"), py::arg("vx"), py::arg("vy"), py::arg("vz"))
-        .def("get_velocity_3d", &SimulationWrapper::get_velocity_3d, py::arg("index"))
+        .def("set_velocity", [](SimulationWrapper &self, int index,
+                                float vx, float vy, float vz)
+             { self.set_velocity_3d(index, vx, vy, vz); },
+             py::arg("index"), py::arg("vx"), py::arg("vy"), py::arg("vz") = 0.0f)
+        .def("get_velocity", [](const SimulationWrapper &self, int index)
+             {
+                 glm::vec3 v = self.get_velocity_3d(index);
+                 return std::make_tuple(v.x, v.y, v.z);
+             }, py::arg("index"))
+        .def("set_velocity", [](SimulationWrapper &self, const ObjectHandle &handle,
+                                float vx, float vy, float vz)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.set_velocity_3d(self.get_slot_index(handle), vx, vy, vz);
+             }, py::arg("handle"), py::arg("vx"), py::arg("vy"), py::arg("vz") = 0.0f)
+        .def("get_velocity", [](const SimulationWrapper &self, const ObjectHandle &handle)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 glm::vec3 v = self.get_velocity_3d(self.get_slot_index(handle));
+                 return std::make_tuple(v.x, v.y, v.z);
+             }, py::arg("handle"))
 
-        .def("set_orientation_3d", &SimulationWrapper::set_orientation_3d,
-             py::arg("index"), py::arg("qx"), py::arg("qy"), py::arg("qz"), py::arg("qw"))
-        .def("get_orientation_3d", &SimulationWrapper::get_orientation_3d, py::arg("index"))
+        .def("set_orientation", [](SimulationWrapper &self, int index,
+                                   float qx, float qy, float qz, float qw)
+             { self.set_orientation_3d(index, qx, qy, qz, qw); },
+             py::arg("index"), py::arg("qx"), py::arg("qy"),
+             py::arg("qz"), py::arg("qw") = 1.0f)
+        .def("get_orientation", [](const SimulationWrapper &self, int index)
+             {
+                 glm::vec4 q = self.get_orientation_3d(index);
+                 return std::make_tuple(q.x, q.y, q.z, q.w);
+             }, py::arg("index"))
+        .def("set_orientation", [](SimulationWrapper &self, const ObjectHandle &handle,
+                                   float qx, float qy, float qz, float qw)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.set_orientation_3d(self.get_slot_index(handle), qx, qy, qz, qw);
+             }, py::arg("handle"), py::arg("qx"), py::arg("qy"), py::arg("qz"), py::arg("qw") = 1.0f)
+        .def("get_orientation", [](const SimulationWrapper &self, const ObjectHandle &handle)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 glm::vec4 q = self.get_orientation_3d(self.get_slot_index(handle));
+                 return std::make_tuple(q.x, q.y, q.z, q.w);
+             }, py::arg("handle"))
 
-        .def("set_spin_3d", &SimulationWrapper::set_spin_3d,
-             py::arg("index"), py::arg("sx"), py::arg("sy"), py::arg("sz"))
-        .def("get_spin_3d", &SimulationWrapper::get_spin_3d, py::arg("index"))
+        .def("set_spin", [](SimulationWrapper &self, int index,
+                            float sx, float sy, float sz)
+             { self.set_spin_3d(index, sx, sy, sz); },
+             py::arg("index"), py::arg("sx"), py::arg("sy"), py::arg("sz") = 0.0f)
+        .def("get_spin", [](const SimulationWrapper &self, int index)
+             {
+                 glm::vec3 s = self.get_spin_3d(index);
+                 return std::make_tuple(s.x, s.y, s.z);
+             }, py::arg("index"))
+        .def("set_spin", [](SimulationWrapper &self, const ObjectHandle &handle,
+                            float sx, float sy, float sz)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.set_spin_3d(self.get_slot_index(handle), sx, sy, sz);
+             }, py::arg("handle"), py::arg("sx"), py::arg("sy"), py::arg("sz") = 0.0f)
+        .def("get_spin", [](const SimulationWrapper &self, const ObjectHandle &handle)
+             {
+                 if (!self.is_handle_valid(handle)) throw std::runtime_error("Invalid ObjectHandle");
+                 glm::vec3 v = self.get_spin_3d(self.get_slot_index(handle));
+                 return std::make_tuple(v.x, v.y, v.z);
+             }, py::arg("handle"))
 
         // Raw index add (kept for backward compatibility)
         .def("add_object_raw", &SimulationWrapper::add_object_raw,
@@ -790,135 +881,200 @@ PYBIND11_MODULE(stellar, m)
                     polygon_sides (int): Number of sides for polygons (0 = keep existing)
                 )pbdoc")
 
+        .def("update_object", [](SimulationWrapper &self, const ObjectHandle &handle,
+                                  float x, float y, float vx, float vy,
+                                  float mass, float charge, float rotation,
+                                  float angular_velocity, float size,
+                                  float width, float height,
+                                  float r, float g, float b, float a,
+                                  int polygon_sides)
+             {
+                 if (!self.is_handle_valid(handle))
+                     throw std::runtime_error("Invalid ObjectHandle");
+                 self.update_object(self.get_slot_index(handle), x, y, vx, vy,
+                                    mass, charge, rotation, angular_velocity,
+                                    size, width, height, r, g, b, a, polygon_sides);
+             }, py::arg("handle"), py::arg("x"), py::arg("y"),
+                py::arg("vx"), py::arg("vy"), py::arg("mass"), py::arg("charge"),
+                py::arg("rotation"), py::arg("angular_velocity"), py::arg("size"),
+                py::arg("width"), py::arg("height"), py::arg("r"), py::arg("g"),
+                py::arg("b"), py::arg("a"), py::arg("polygon_sides") = 0,
+             "Update all 2D object properties using a stable ObjectHandle.")
+
         // ---------------------------------------------------------------------
         // ITEM 6: kwargs update_object (int-index) — 3D-safe
         // ---------------------------------------------------------------------
         .def("update_object", [](SimulationWrapper &self, int index, const py::kwargs &kwargs)
              {
-            // Fetch current state
-            ObjectState state = self.get_object(index);
+                 ObjectState state = self.get_object(index);
+                 py::dict kw = kwargs;
+                 bool is_3d = (state.skin_type == -1);
 
-            py::dict kw = kwargs;
+                 auto get_f = [&](const char *k, float d)
+                 {
+                     return kw.contains(k) ? py::cast<float>(kw[k]) : d;
+                 };
+                 auto get_i = [&](const char *k, int d)
+                 {
+                     return kw.contains(k) ? py::cast<int>(kw[k]) : d;
+                 };
 
-            auto get_f = [&](const char *k, float d) {
-                return kw.contains(k) ? py::cast<float>(kw[k]) : d; };
-            auto get_i = [&](const char *k, int d) {
-                return kw.contains(k) ? py::cast<int>(kw[k]) : d; };
+                 if (is_3d)
+                 {
+                     if (kw.contains("x") || kw.contains("y") || kw.contains("z"))
+                         self.set_position_3d(index,
+                             get_f("x", state.x), get_f("y", state.y),
+                             get_f("z", state.z));
 
-            // --- 2D field update (existing) ---
-            float x    = get_f("x",    state.x);
-            float y    = get_f("y",    state.y);
-            float vx   = get_f("vx",   state.vx);
-            float vy   = get_f("vy",   state.vy);
-            float mass = get_f("mass", state.mass);
-            float charge = get_f("charge", state.charge);
-            float size   = get_f("size",   state.radius);
-            float width  = get_f("width",  state.width);
-            float height = get_f("height", state.height);
-            float r = get_f("r", state.r), g = get_f("g", state.g);
-            float b = get_f("b", state.b), a = get_f("a", state.a);
-            int   sides = get_i("polygon_sides", state.polygon_sides);
+                     if (kw.contains("vx") || kw.contains("vy") || kw.contains("vz"))
+                         self.set_velocity_3d(index,
+                             get_f("vx", state.vx), get_f("vy", state.vy),
+                             get_f("vz", state.vz));
 
-            // --- rotation/angular velocity: only override if user asked ---
-            bool touched_rot = kw.contains("rotation");
-            bool touched_ang = kw.contains("angular_velocity");
-            float rotation = touched_rot ? py::cast<float>(kw["rotation"]) : state.rotation;
-            float ang_vel  = touched_ang ? py::cast<float>(kw["angular_velocity"]) : state.angular_velocity;
+                     float qx = get_f("qx", state.qx);
+                     float qy = get_f("qy", state.qy);
+                     float qz = get_f("qz", state.qz);
+                     float qw = get_f("qw", state.qw);
+                     if (kw.contains("orientation"))
+                     {
+                         auto t = py::cast<std::array<float, 4>>(kw["orientation"]);
+                         qx = t[0]; qy = t[1]; qz = t[2]; qw = t[3];
+                     }
+                     if (kw.contains("qx") || kw.contains("qy") ||
+                         kw.contains("qz") || kw.contains("qw") ||
+                         kw.contains("orientation"))
+                         self.set_orientation_3d(index, qx, qy, qz, qw);
 
-            bool is_3d = (state.skin_type == -1);
+                     float sx = get_f("spin_x", state.spin_x);
+                     float sy = get_f("spin_y", state.spin_y);
+                     float sz = get_f("spin_z", state.spin_z);
+                     if (kw.contains("spin"))
+                     {
+                         auto t = py::cast<std::array<float, 3>>(kw["spin"]);
+                         sx = t[0]; sy = t[1]; sz = t[2];
+                     }
+                     if (kw.contains("spin_x") || kw.contains("spin_y") ||
+                         kw.contains("spin_z") || kw.contains("spin"))
+                         self.set_spin_3d(index, sx, sy, sz);
 
-            if (is_3d) {
-                // For 3D objects, do NOT call the positional update_object —
-                // it would flatten the quaternion. Update only what the user
-                // explicitly asked for.
-                if (kw.contains("x") || kw.contains("y") ||
-                    kw.contains("vx") || kw.contains("vy") ||
-                    kw.contains("mass") || kw.contains("charge")) {
-                    self.set_position_3d(index, x, y, state.z);
-                    self.set_velocity_3d(index, vx, vy, state.vz);
-                    // mass/charge: no 3D setter exists yet
-                }
-                if (touched_rot || touched_ang) {
-                    throw py::type_error(
-                        "update_object(rotation=..., angular_velocity=...) is 2D-only; "
-                        "use set_orientation_3d() / set_spin_3d() for 3D objects");
-                }
-                return;
-            }
+                     if (kw.contains("mesh_id"))
+                         self.set_mesh_3d(index, py::cast<int>(kw["mesh_id"]));
 
-            // --- existing 2D path ---
-            self.update_object(index, x, y, vx, vy, mass, charge,
-                               rotation, ang_vel, size, width, height,
-                               r, g, b, a, sides); }, py::arg("index"), R"pbdoc(
-            Update only specified properties. Properties not provided keep their current values.
+                     return;
+                 }
 
-            Example:
-                >>> sim.update_object(handle, x=1.0, r=0.5)  # only change x and red component
-                >>> sim.update_object(handle, size=0.8)      # change radius of a circle
-            )pbdoc")
+                 float x = get_f("x", state.x);
+                 float y = get_f("y", state.y);
+                 float vx = get_f("vx", state.vx);
+                 float vy = get_f("vy", state.vy);
+                 float mass = get_f("mass", state.mass);
+                 float charge = get_f("charge", state.charge);
+                 float size = get_f("size", state.radius);
+                 float width = get_f("width", state.width);
+                 float height = get_f("height", state.height);
+                 float r = get_f("r", state.r), g = get_f("g", state.g);
+                 float b = get_f("b", state.b), a = get_f("a", state.a);
+                 int sides = get_i("polygon_sides", state.polygon_sides);
+                 float rotation = get_f("rotation", state.rotation);
+                 float ang_vel = get_f("angular_velocity", state.angular_velocity);
 
-        // ---------------------------------------------------------------------
-        // ITEM 6: kwargs update_object (ObjectHandle) — 3D-safe
-        // ---------------------------------------------------------------------
-        .def("update_object", [](SimulationWrapper &self, const ObjectHandle &handle, const py::kwargs &kwargs)
+                 self.update_object(index, x, y, vx, vy, mass, charge,
+                                    rotation, ang_vel, size, width, height,
+                                    r, g, b, a, sides);
+             }, py::arg("index"), R"pbdoc(
+             Update only the properties supplied as keyword arguments.
+             For 3D objects, use x/y/z, vx/vy/vz, orientation=(qx, qy, qz, qw),
+             spin=(sx, sy, sz), or mesh_id. For 2D objects, use the usual
+             position, velocity, shape, color, and rotation properties.
+             )pbdoc")
+
+        .def("update_object", [](SimulationWrapper &self, const ObjectHandle &handle,
+                                 const py::kwargs &kwargs)
              {
-            if (!self.is_handle_valid(handle)) {
-                throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-            }
-            int index = self.get_slot_index(handle);
+                 if (!self.is_handle_valid(handle))
+                     throw std::runtime_error(
+                         "ObjectHandle is invalid (object was removed)");
 
-            ObjectState state = self.get_object(index);
-            py::dict kw = kwargs;
+                 int index = self.get_slot_index(handle);
+                 ObjectState state = self.get_object(index);
+                 py::dict kw = kwargs;
+                 bool is_3d = (state.skin_type == -1);
 
-            auto get_f = [&](const char *k, float d) {
-                return kw.contains(k) ? py::cast<float>(kw[k]) : d; };
-            auto get_i = [&](const char *k, int d) {
-                return kw.contains(k) ? py::cast<int>(kw[k]) : d; };
+                 auto get_f = [&](const char *k, float d)
+                 {
+                     return kw.contains(k) ? py::cast<float>(kw[k]) : d;
+                 };
+                 auto get_i = [&](const char *k, int d)
+                 {
+                     return kw.contains(k) ? py::cast<int>(kw[k]) : d;
+                 };
 
-            float x    = get_f("x",    state.x);
-            float y    = get_f("y",    state.y);
-            float vx   = get_f("vx",   state.vx);
-            float vy   = get_f("vy",   state.vy);
-            float mass = get_f("mass", state.mass);
-            float charge = get_f("charge", state.charge);
-            float size   = get_f("size",   state.radius);
-            float width  = get_f("width",  state.width);
-            float height = get_f("height", state.height);
-            float r = get_f("r", state.r), g = get_f("g", state.g);
-            float b = get_f("b", state.b), a = get_f("a", state.a);
-            int   sides = get_i("polygon_sides", state.polygon_sides);
+                 if (is_3d)
+                 {
+                     if (kw.contains("x") || kw.contains("y") || kw.contains("z"))
+                         self.set_position_3d(index,
+                             get_f("x", state.x), get_f("y", state.y),
+                             get_f("z", state.z));
 
-            bool touched_rot = kw.contains("rotation");
-            bool touched_ang = kw.contains("angular_velocity");
-            float rotation = touched_rot ? py::cast<float>(kw["rotation"]) : state.rotation;
-            float ang_vel  = touched_ang ? py::cast<float>(kw["angular_velocity"]) : state.angular_velocity;
+                     if (kw.contains("vx") || kw.contains("vy") || kw.contains("vz"))
+                         self.set_velocity_3d(index,
+                             get_f("vx", state.vx), get_f("vy", state.vy),
+                             get_f("vz", state.vz));
 
-            bool is_3d = (state.skin_type == -1);
+                     float qx = get_f("qx", state.qx);
+                     float qy = get_f("qy", state.qy);
+                     float qz = get_f("qz", state.qz);
+                     float qw = get_f("qw", state.qw);
+                     if (kw.contains("orientation"))
+                     {
+                         auto t = py::cast<std::array<float, 4>>(kw["orientation"]);
+                         qx = t[0]; qy = t[1]; qz = t[2]; qw = t[3];
+                     }
+                     if (kw.contains("qx") || kw.contains("qy") ||
+                         kw.contains("qz") || kw.contains("qw") ||
+                         kw.contains("orientation"))
+                         self.set_orientation_3d(index, qx, qy, qz, qw);
 
-            if (is_3d) {
-                if (kw.contains("x") || kw.contains("y") ||
-                    kw.contains("vx") || kw.contains("vy") ||
-                    kw.contains("mass") || kw.contains("charge")) {
-                    self.set_position_3d(index, x, y, state.z);
-                    self.set_velocity_3d(index, vx, vy, state.vz);
-                }
-                if (touched_rot || touched_ang) {
-                    throw py::type_error(
-                        "update_object(rotation=..., angular_velocity=...) is 2D-only; "
-                        "use set_orientation_3d() / set_spin_3d() for 3D objects");
-                }
-                return;
-            }
+                     float sx = get_f("spin_x", state.spin_x);
+                     float sy = get_f("spin_y", state.spin_y);
+                     float sz = get_f("spin_z", state.spin_z);
+                     if (kw.contains("spin"))
+                     {
+                         auto t = py::cast<std::array<float, 3>>(kw["spin"]);
+                         sx = t[0]; sy = t[1]; sz = t[2];
+                     }
+                     if (kw.contains("spin_x") || kw.contains("spin_y") ||
+                         kw.contains("spin_z") || kw.contains("spin"))
+                         self.set_spin_3d(index, sx, sy, sz);
 
-            self.update_object(index, x, y, vx, vy, mass, charge,
-                               rotation, ang_vel, size, width, height,
-                               r, g, b, a, sides); }, py::arg("handle"), R"pbdoc(
-            Update an object by stable handle.
+                     if (kw.contains("mesh_id"))
+                         self.set_mesh_3d(index, py::cast<int>(kw["mesh_id"]));
 
-            Example:
-                >>> handle = sim.add_object(x=0, y=0)
-                >>> sim.update_object(handle, x=1.0, r=0.5)
-            )pbdoc")
+                     return;
+                 }
+
+                 float x = get_f("x", state.x);
+                 float y = get_f("y", state.y);
+                 float vx = get_f("vx", state.vx);
+                 float vy = get_f("vy", state.vy);
+                 float mass = get_f("mass", state.mass);
+                 float charge = get_f("charge", state.charge);
+                 float size = get_f("size", state.radius);
+                 float width = get_f("width", state.width);
+                 float height = get_f("height", state.height);
+                 float r = get_f("r", state.r), g = get_f("g", state.g);
+                 float b = get_f("b", state.b), a = get_f("a", state.a);
+                 int sides = get_i("polygon_sides", state.polygon_sides);
+                 float rotation = get_f("rotation", state.rotation);
+                 float ang_vel = get_f("angular_velocity", state.angular_velocity);
+
+                 self.update_object(index, x, y, vx, vy, mass, charge,
+                                    rotation, ang_vel, size, width, height,
+                                    r, g, b, a, sides);
+             }, py::arg("handle"), R"pbdoc(
+             Update an object by stable handle, changing only the supplied properties.
+             The accepted properties depend on whether the object is 2D or 3D.
+             )pbdoc")
 
         // Remove object by handle
         .def("remove_object", &SimulationWrapper::remove_object_handle, py::arg("handle"), "Remove an object by stable ObjectHandle")
@@ -1002,6 +1158,18 @@ PYBIND11_MODULE(stellar, m)
         .def("get_rotation", &SimulationWrapper::get_rotation, py::arg("index"), "Get rotation angle in radians")
 
         .def("get_angular_velocity", &SimulationWrapper::get_angular_velocity, py::arg("index"), "Get angular velocity in rad/s")
+        .def("set_rotation", [](SimulationWrapper &self, const ObjectHandle &h, float v)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); self.set_rotation(self.get_slot_index(h), v); }, py::arg("handle"), py::arg("rotation"))
+        .def("set_angular_velocity", [](SimulationWrapper &self, const ObjectHandle &h, float v)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); self.set_angular_velocity(self.get_slot_index(h), v); }, py::arg("handle"), py::arg("angular_velocity"))
+        .def("set_dimensions", [](SimulationWrapper &self, const ObjectHandle &h, float w, float v)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); self.set_dimensions(self.get_slot_index(h), w, v); }, py::arg("handle"), py::arg("width"), py::arg("height"))
+        .def("set_radius", [](SimulationWrapper &self, const ObjectHandle &h, float v)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); self.set_radius(self.get_slot_index(h), v); }, py::arg("handle"), py::arg("radius"))
+        .def("get_rotation", [](SimulationWrapper &self, const ObjectHandle &h)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); return self.get_rotation(self.get_slot_index(h)); }, py::arg("handle"))
+        .def("get_angular_velocity", [](SimulationWrapper &self, const ObjectHandle &h)
+             { if (!self.is_handle_valid(h)) throw std::runtime_error("Invalid ObjectHandle"); return self.get_angular_velocity(self.get_slot_index(h)); }, py::arg("handle"))
 
         // Batch operations
         .def("batch_get", &SimulationWrapper::batch_get, py::arg("indices"),
@@ -1247,39 +1415,46 @@ PYBIND11_MODULE(stellar, m)
             return py::bytes((const char*)jpeg_data.data(), jpeg_data.size()); }, py::arg("quality") = 85, "Get the full rendered frame as JPEG.")
 
         // Constraints
-        .def("add_distance_constraint", [](SimulationWrapper &self, py::object obj, const DistanceConstraint &constraint) {
-            int index = -1;
-            if (py::isinstance<py::int_>(obj)) {
-                index = py::cast<int>(obj);
-            } else if (py::isinstance<ObjectHandle>(obj)) {
-                ObjectHandle handle = py::cast<ObjectHandle>(obj);
-                if (!self.is_handle_valid(handle)) {
-                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-                }
-                index = self.get_slot_index(handle);
-            } else {
-                throw py::type_error("add_distance_constraint() expects an int index or an ObjectHandle");
-            }
-            self.add_distance_constraint(index, constraint);
-        }, py::arg("obj"), py::arg("constraint"), "Add distance constraint between objects")
+        .def("add_distance_constraint", &SimulationWrapper::add_distance_constraint,
+             py::arg("object_index"), py::arg("constraint"),
+             "Add a distance constraint using raw indices.")
+        .def("add_distance_constraint", [](SimulationWrapper &self, const ObjectHandle &object,
+                                            const DistanceConstraint &constraint)
+             {
+                 if (!self.is_handle_valid(object)) throw std::runtime_error("Invalid constrained-object handle");
+                 self.add_distance_constraint(self.get_slot_index(object), constraint);
+             }, py::arg("object"), py::arg("constraint"),
+             "Add a distance constraint to an object addressed by ObjectHandle; target_object remains a raw index.")
+        .def("add_distance_constraint", [](SimulationWrapper &self, py::object object,
+                                            py::object target, float rest_length)
+             {
+                 const int object_index = stellar_binding::object_index(self, object, "object");
+                 const int target_index = stellar_binding::object_index(self, target, "target");
+                 DistanceConstraint c;
+                 c.target_object = target_index;
+                 c.rest_length = rest_length;
+                 self.add_distance_constraint(object_index, c);
+             }, py::arg("object"), py::arg("target"), py::arg("rest_length"),
+             "Add a distance constraint between raw indices and/or stable ObjectHandles.")
 
-        .def("add_boundary_constraint", [](SimulationWrapper &self, py::object obj, const BoundaryConstraint &constraint) {
-            int index = -1;
-            if (py::isinstance<py::int_>(obj)) {
-                index = py::cast<int>(obj);
-            } else if (py::isinstance<ObjectHandle>(obj)) {
-                ObjectHandle handle = py::cast<ObjectHandle>(obj);
-                if (!self.is_handle_valid(handle)) {
-                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-                }
-                index = self.get_slot_index(handle);
-            } else {
-                throw py::type_error("add_boundary_constraint() expects an int index or an ObjectHandle");
-            }
-            self.add_boundary_constraint(index, constraint);
-        }, py::arg("obj"), py::arg("constraint"), "Add boundary constraint to object")
+        .def("add_boundary_constraint", &SimulationWrapper::add_boundary_constraint,
+             py::arg("object_index"), py::arg("constraint"),
+             "Add a boundary constraint using a raw index.")
+        .def("add_boundary_constraint", [](SimulationWrapper &self, const ObjectHandle &object,
+                                            const BoundaryConstraint &constraint)
+             {
+                 if (!self.is_handle_valid(object)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.add_boundary_constraint(self.get_slot_index(object), constraint);
+             }, py::arg("object"), py::arg("constraint"),
+             "Add a boundary constraint to an object addressed by ObjectHandle.")
 
-        .def("clear_constraints", &SimulationWrapper::clear_constraints, py::arg("object_index"), "Clear all constraints from object")
+        .def("clear_constraints", &SimulationWrapper::clear_constraints,
+             py::arg("object_index"), "Clear constraints using a raw index.")
+        .def("clear_constraints", [](SimulationWrapper &self, const ObjectHandle &object)
+             {
+                 if (!self.is_handle_valid(object)) throw std::runtime_error("Invalid ObjectHandle");
+                 self.clear_constraints(self.get_slot_index(object));
+             }, py::arg("object"), "Clear constraints from an object addressed by ObjectHandle.")
 
         .def("clear_all_constraints", &SimulationWrapper::clear_all_constraints, "Clear all constraints from all objects")
 
@@ -1349,52 +1524,54 @@ PYBIND11_MODULE(stellar, m)
             }
             self.set_collision_properties(self.get_slot_index(handle), restitution, friction); }, py::arg("handle"), py::arg("restitution"), py::arg("friction"), "Set collision physical properties for an object by stable handle.")
 
-        // Unified collision setter for integer indices and stable handles.
-        .def("set_collision", [](SimulationWrapper &self, py::object obj, const py::kwargs &kwargs)
+        // unified collision setter
+        .def("set_collision", [](SimulationWrapper &self, py::object object, const py::kwargs &kwargs)
              {
-            int index = -1;
-            if (py::isinstance<py::int_>(obj)) {
-                index = py::cast<int>(obj);
-            } else if (py::isinstance<ObjectHandle>(obj)) {
-                ObjectHandle handle = py::cast<ObjectHandle>(obj);
-                if (!self.is_handle_valid(handle)) {
-                    throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-                }
-                index = self.get_slot_index(handle);
-            } else {
-                throw py::type_error("set_collision() expects an int index or an ObjectHandle");
-            }
+                 const int index = stellar_binding::object_index(self, object, "object");
 
-            if (kwargs.contains("enabled")) {
-                bool enabled = py::cast<bool>(kwargs["enabled"]);
-                self.set_collision_enabled(index, enabled);
-            }
-            if (kwargs.contains("shape")) {
-                PyCollisionShape shape = py::cast<PyCollisionShape>(kwargs["shape"]);
-                self.set_collision_shape(index, shape);
-            }
-            if (kwargs.contains("restitution") && kwargs.contains("friction")) {
-                float restitution = py::cast<float>(kwargs["restitution"]);
-                float friction = py::cast<float>(kwargs["friction"]);
-                self.set_collision_properties(index, restitution, friction);
-            } else if (kwargs.contains("restitution")) {
-                float restitution = py::cast<float>(kwargs["restitution"]);
-                CollisionConfig config = self.get_collision_config(index);
-                self.set_collision_properties(index, restitution, config.friction);
-            } else if (kwargs.contains("friction")) {
-                float friction = py::cast<float>(kwargs["friction"]);
-                CollisionConfig config = self.get_collision_config(index);
-                self.set_collision_properties(index, config.restitution, friction);
-            } }, py::arg("obj"), R"pbdoc(
-            Set collision properties for an object in a single call.
+                 // Reject unknown options before changing any state.
+                 for (auto item : kwargs)
+                 {
+                     const std::string key = py::cast<std::string>(item.first);
+                     if (key != "enabled" && key != "shape" &&
+                         key != "restitution" && key != "friction")
+                         throw py::type_error("set_collision() got an unexpected keyword argument: '" + key + "'");
+                 }
 
-            Args:
-                obj (int or ObjectHandle): Object ID or handle
-                enabled (bool, optional): Enable/disable collisions
-                shape (CollisionShape, optional): Collision shape type
-                restitution (float, optional): Bounciness (0.0-1.0)
-                friction (float, optional): Friction (0.0-1.0)
-            )pbdoc")
+                 if (kwargs.contains("enabled"))
+                     self.set_collision_enabled(index, py::cast<bool>(kwargs["enabled"]));
+                 if (kwargs.contains("shape"))
+                     self.set_collision_shape(index, py::cast<PyCollisionShape>(kwargs["shape"]));
+
+                 const bool has_restitution = kwargs.contains("restitution");
+                 const bool has_friction = kwargs.contains("friction");
+                 if (has_restitution || has_friction)
+                 {
+                     const CollisionConfig current = self.get_collision_config(index);
+                     const float restitution = has_restitution
+                         ? py::cast<float>(kwargs["restitution"]) : current.restitution;
+                     const float friction = has_friction
+                         ? py::cast<float>(kwargs["friction"]) : current.friction;
+                     self.set_collision_properties(index, restitution, friction);
+                 }
+             }, py::arg("object"),
+             "Set collision enabled state, shape, restitution, and/or friction for an index or ObjectHandle.")
+
+        .def("get_collision_config", &SimulationWrapper::get_collision_config,
+             py::arg("index"),
+             R"pbdoc(
+             Get collision configuration for an object.
+
+             Args:
+                 index (int): Object ID (raw index, or ObjectHandle.slot)
+
+             Returns:
+                 CollisionConfig: Current collision settings
+
+             Example:
+                 >>> config = sim.get_collision_config(0)
+                 >>> print(f"Restitution: {config.restitution}")
+             )pbdoc")
 
         .def("get_collision_config", [](SimulationWrapper &self, const ObjectHandle &handle)
              {

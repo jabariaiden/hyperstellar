@@ -1,6 +1,6 @@
 ﻿# Type stubs for hyperstellar package
 import typing
-from typing import Any, List, Dict, Optional, Union, Callable, ClassVar, Tuple, overload
+from typing import Any, List, Dict, Optional, Union, Callable, ClassVar, Tuple, Iterator, overload
 
 # ============================================================================
 # ENUMS
@@ -200,7 +200,6 @@ class ObjectConfig:
         r,g,b,a (float): Color
         polygon_sides (int): Polygon sides
         equation (str): Physics equation string
-        constraints (List[ConstraintConfig]): List of constraints
     """
     x: float
     y: float
@@ -220,7 +219,6 @@ class ObjectConfig:
     a: float
     polygon_sides: int
     equation: str
-    constraints: List["ConstraintConfig"]
 
     def __init__(self) -> None: ...
     def __repr__(self) -> str: ...
@@ -396,6 +394,11 @@ class Simulation:
             >>> sim = Simulation(width=1920, height=1080, title="My Simulation", enable_grid=True)
         """
         ...
+
+    def __enter__(self) -> "Simulation": ...
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[ObjectState]: ...
 
     # ========================================================================
     # WINDOW MANAGEMENT
@@ -601,28 +604,75 @@ class Simulation:
     # mean existing 2D call sites keep working.
     # ========================================================================
 
-    def set_mesh(self, index: int, mesh_id: int) -> None:
+    @overload
+    def set_mesh(self, index: int, mesh_id: int) -> None: ...
+    @overload
+    def set_mesh(self, handle: ObjectHandle, mesh_id: int) -> None: ...
+
+    def set_mesh(self, index: int | ObjectHandle, mesh_id: int) -> None:
         """Swap the mesh assigned to an object. Pass -1 to hide it."""
         ...
 
+    @overload
     def get_mesh(self, index: int) -> int: ...
+    @overload
+    def get_mesh(self, handle: ObjectHandle) -> int: ...
 
+    @overload
     def set_position(self, index: int, x: float, y: float, z: float = 0.0) -> None: ...
+    @overload
+    def set_position(self, handle: ObjectHandle, x: float, y: float, z: float = 0.0) -> None: ...
+    @overload
     def get_position(self, index: int) -> Tuple[float, float, float]: ...
+    @overload
+    def get_position(self, handle: ObjectHandle) -> Tuple[float, float, float]: ...
 
+    @overload
     def set_velocity(self, index: int, vx: float, vy: float, vz: float = 0.0) -> None: ...
+    @overload
+    def set_velocity(self, handle: ObjectHandle, vx: float, vy: float, vz: float = 0.0) -> None: ...
+    @overload
     def get_velocity(self, index: int) -> Tuple[float, float, float]: ...
+    @overload
+    def get_velocity(self, handle: ObjectHandle) -> Tuple[float, float, float]: ...
 
+    @overload
     def set_orientation(self, index: int, qx: float, qy: float, qz: float, qw: float = 1.0) -> None: ...
+    @overload
+    def set_orientation(self, handle: ObjectHandle, qx: float, qy: float, qz: float, qw: float = 1.0) -> None: ...
+    @overload
     def get_orientation(self, index: int) -> Tuple[float, float, float, float]: ...
+    @overload
+    def get_orientation(self, handle: ObjectHandle) -> Tuple[float, float, float, float]: ...
 
+    @overload
     def set_spin(self, index: int, sx: float, sy: float, sz: float = 0.0) -> None: ...
+    @overload
+    def set_spin(self, handle: ObjectHandle, sx: float, sy: float, sz: float = 0.0) -> None: ...
+    @overload
     def get_spin(self, index: int) -> Tuple[float, float, float]: ...
+    @overload
+    def get_spin(self, handle: ObjectHandle) -> Tuple[float, float, float]: ...
 
     # ========================================================================
     # UPDATE
     # ========================================================================
 
+    @overload
+    def update_object(
+        self,
+        handle: ObjectHandle,
+        x: float, y: float,
+        vx: float, vy: float,
+        mass: float, charge: float,
+        rotation: float, angular_velocity: float,
+        size: float,
+        width: float, height: float,
+        r: float, g: float, b: float, a: float,
+        polygon_sides: int = 0
+    ) -> None: ...
+
+    @overload
     def update_object(
         self,
         index: int,
@@ -836,27 +886,27 @@ class Simulation:
     # CONVENIENCE METHODS
     # ========================================================================
 
-    def set_rotation(self, index: int, rotation: float) -> None:
+    def set_rotation(self, index: int | ObjectHandle, rotation: float) -> None:
         """Set rotation angle in radians."""
         ...
 
-    def set_angular_velocity(self, index: int, angular_velocity: float) -> None:
+    def set_angular_velocity(self, index: int | ObjectHandle, angular_velocity: float) -> None:
         """Set angular velocity in rad/s."""
         ...
 
-    def set_dimensions(self, index: int, width: float, height: float) -> None:
+    def set_dimensions(self, index: int | ObjectHandle, width: float, height: float) -> None:
         """Set width and height for rectangle objects."""
         ...
 
-    def set_radius(self, index: int, radius: float) -> None:
+    def set_radius(self, index: int | ObjectHandle, radius: float) -> None:
         """Set radius for circle/polygon objects."""
         ...
 
-    def get_rotation(self, index: int) -> float:
+    def get_rotation(self, index: int | ObjectHandle) -> float:
         """Get rotation angle in radians."""
         ...
 
-    def get_angular_velocity(self, index: int) -> float:
+    def get_angular_velocity(self, index: int | ObjectHandle) -> float:
         """Get angular velocity in rad/s."""
         ...
 
@@ -942,15 +992,25 @@ class Simulation:
     # CONSTRAINTS
     # ========================================================================
 
-    def add_distance_constraint(self, object_index: int, constraint: DistanceConstraint) -> None:
-        """Add distance constraint between objects."""
+    @overload
+    def add_distance_constraint(self, object_index: int | ObjectHandle, constraint: DistanceConstraint) -> None: ...
+    @overload
+    def add_distance_constraint(self, object_index: int | ObjectHandle, target: int | ObjectHandle, rest_length: float) -> None: ...
+
+    def add_distance_constraint(
+        self,
+        object_index: int | ObjectHandle,
+        constraint_or_target: DistanceConstraint | int | ObjectHandle,
+        rest_length: Optional[float] = None
+    ) -> None:
+        """Add a distance constraint. The three-argument form accepts either indices or stable handles."""
         ...
 
-    def add_boundary_constraint(self, object_index: int, constraint: BoundaryConstraint) -> None:
+    def add_boundary_constraint(self, object_index: int | ObjectHandle, constraint: BoundaryConstraint) -> None:
         """Add boundary constraint to object."""
         ...
 
-    def clear_constraints(self, object_index: int) -> None:
+    def clear_constraints(self, object_index: int | ObjectHandle) -> None:
         """Clear all constraints from object."""
         ...
 
@@ -1048,7 +1108,7 @@ class Simulation:
         friction: Optional[float] = None
     ) -> None: ...
 
-    def set_collision(self, index: int, **kwargs) -> None:
+    def set_collision(self, index: int | ObjectHandle, **kwargs) -> None:
         """
         Set collision properties for an object in a single call.
 
