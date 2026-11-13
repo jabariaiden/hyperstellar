@@ -26,6 +26,21 @@ class ConstraintType:
     DISTANCE: int   # Distance constraint between objects
     BOUNDARY: int   # Boundary/box constraint
 
+
+class MaterialType:
+    """Shading model stored on a registered mesh.
+
+    A material is created independently, then assigned to a mesh. Every
+    object that uses that mesh shares the same material; materials are not
+    selected per object.
+
+    SOLID_COLOR uses an RGBA surface colour. EMISSIVE uses an RGB emission
+    colour multiplied by its intensity and does not rely on the directional
+    light for its emitted contribution.
+    """
+    SOLID_COLOR: int
+    EMISSIVE: int
+
 # ============================================================================
 # DATA CLASSES
 # ============================================================================
@@ -50,7 +65,7 @@ class ObjectState:
         height (float): Height for rectangles
         radius (float): Radius for circles/polygons
         polygon_sides (int): Number of sides for polygons
-        skin_type (SkinType): Visual type (-1 for 3D mesh objects)
+        skin_type (int): Visual type code (-1 for 3D mesh-backed objects)
         mesh_id (int): Mesh handle (-1 = no mesh)
         r,g,b,a (float): Color components (0.0-1.0)
     """
@@ -75,7 +90,7 @@ class ObjectState:
     height: float
     radius: float
     polygon_sides: int
-    skin_type: SkinType
+    skin_type: int
     mesh_id: int
     r: float
     g: float
@@ -103,7 +118,7 @@ class CollisionConfig:
     def __repr__(self) -> str: ...
 
 class ObjectHandle:
-    """A stable handle to an object that remains valid across removals.
+    """A stable reference to one object, safe to keep across removals.
 
     Instead of a raw integer index that can silently repoint when objects
     are removed, a handle contains a slot and a generation counter. If the
@@ -190,7 +205,10 @@ class KeyboardMonitor:
         ...
 
 class ObjectConfig:
-    """Configuration for creating objects in batch mode.
+    """Configuration for one object in a ``BatchConfig`` run.
+
+    This is the batch-run object format, separate from the dictionary format
+    accepted by ``Simulation.add_objects``.
 
     Attributes:
         x,y,vx,vy,mass,charge,rotation,angular_velocity: Same as ObjectState
@@ -227,14 +245,14 @@ class ConstraintConfig:
     """Constraint configuration for batch mode.
 
     Attributes:
-        type (ConstraintType): Constraint type (DISTANCE or BOUNDARY)
+        type (int): Constraint type code (0 = DISTANCE, 1 = BOUNDARY)
         target (int): Target object ID
         param1 (float): Distance: rest_length, Boundary: min_x, Angle: min_angle
         param2 (float): Boundary: max_x, Angle: max_angle
         param3 (float): Boundary: min_y
         param4 (float): Boundary: max_y
     """
-    type: ConstraintType
+    type: int
     target: int
     param1: float
     param2: float
@@ -244,7 +262,7 @@ class ConstraintConfig:
     def __init__(self) -> None: ...
 
 class BatchConfig:
-    """Configuration for batch simulations.
+    """One complete simulation job for ``Simulation.run_batch``.
 
     Attributes:
         objects (list[ObjectConfig]): List of object configurations
@@ -260,7 +278,12 @@ class BatchConfig:
     def __init__(self) -> None: ...
 
 class BatchGetData:
-    """Batch get data structure."""
+    """Snapshot of one object's exposed properties returned by ``batch_get``.
+
+    The record mirrors the ordinary object-state fields and includes the 3D
+    pose/mesh fields. Values are copied into the result; editing the returned
+    record does not update the simulation. Use ``batch_update`` to write data.
+    """
     x: float
     y: float
     z: float
@@ -292,7 +315,13 @@ class BatchGetData:
     def __init__(self) -> None: ...
 
 class BatchUpdateData:
-    """Batch update data structure."""
+    """Input record for one object in ``batch_update``.
+
+    Set ``index`` to the object's raw slot index and populate the fields to
+    apply. This structure is intended for grouped updates where preparing a
+    list of records is more convenient than calling ``update_object`` once
+    per object.
+    """
     index: int
     x: float
     y: float
@@ -344,23 +373,193 @@ class BoundaryConstraint:
     def __repr__(self) -> str: ...
 
 # ============================================================================
-# MESH REGISTRATION (module-level)
+# MESHES AND MATERIALS (module-level API)
 #
-# Returns integer handles used by add_object / set_mesh. Meshes are
-# reference-counted: each successful Register* call adds a reference, and
-# destroy_mesh releases one. Identical primitives share one VBO/IBO.
+# Meshes describe geometry and are referenced by objects. Materials are
+# assigned to meshes, so changing a mesh's material affects every object
+# using that mesh. Identical primitive registrations reuse cached geometry
+# and increment its registration reference count. A material_id of -1 leaves
+# the mesh on the legacy per-object-colour path.
 # ============================================================================
 
-def register_circle(radius: float, segs: int = 32) -> int: ...
-def register_square(width: float, height: float) -> int: ...
-def register_polygon(radius: float, sides: int = 6) -> int: ...
-def register_sphere(radius: float, segs: int = 32, rings: int = 16) -> int: ...
-def register_cube(size_x: float, size_y: float, size_z: float) -> int: ...
-def register_cylinder(radius: float, height: float, segs: int = 32) -> int: ...
-def register_capsule(radius: float, height: float, segs: int = 32, cap_rings: int = 8) -> int: ...
-def destroy_mesh(mesh_id: int) -> None: ...
-def mesh_count() -> int: ...
-def mesh_ids() -> List[int]: ...
+def register_circle(radius: float, segs: int = 32, material_id: int = -1) -> int:
+    """Register a flat, circular mesh and return its mesh ID.
+
+    Args:
+        radius: Circle radius in local mesh units.
+        segs: Number of perimeter segments. More segments make the outline
+            smoother at the cost of additional geometry.
+        material_id: Existing material ID to assign immediately, or -1 to
+            leave the mesh without a material.
+
+    The returned ID can be passed to ``Simulation.add_object(mesh_id=...)``.
+    """
+    ...
+
+
+def register_square(width: float, height: float, material_id: int = -1) -> int:
+    """Register a rectangular 2D mesh.
+
+    ``width`` and ``height`` define the mesh's local dimensions. ``material_id``
+    assigns a shared mesh material at registration time; use -1 for the
+    per-object colour path.
+    """
+    ...
+
+
+def register_polygon(radius: float, sides: int = 6, material_id: int = -1) -> int:
+    """Register a regular 2D polygon mesh.
+
+    ``sides`` controls the polygon's edge count; values of 3 or more produce
+    a valid regular polygon. The optional material is shared by all objects
+    that reference the returned mesh ID.
+    """
+    ...
+
+
+def register_sphere(radius: float, segs: int = 32, rings: int = 16, material_id: int = -1) -> int:
+    """Register a UV sphere mesh for 3D objects.
+
+    ``segs`` controls longitudinal tessellation and ``rings`` controls
+    latitudinal tessellation. Increase them when a smoother silhouette is
+    important. An optional material can be attached at registration.
+    """
+    ...
+
+
+def register_cube(size_x: float, size_y: float, size_z: float, material_id: int = -1) -> int:
+    """Register a box-shaped 3D mesh with independent side lengths."""
+    ...
+
+
+def register_cylinder(radius: float, height: float, segs: int = 32, material_id: int = -1) -> int:
+    """Register a cylinder aligned to the mesh's local axis.
+
+    ``radius`` and ``height`` set its dimensions; ``segs`` controls the
+    roundness of its circular cross-section.
+    """
+    ...
+
+
+def register_capsule(radius: float, height: float, segs: int = 32, cap_rings: int = 8, material_id: int = -1) -> int:
+    """Register a capsule mesh with a cylindrical middle and rounded ends.
+
+    ``height`` is the cylindrical section's length as defined by the mesh
+    generator; ``cap_rings`` controls tessellation of the rounded caps.
+    """
+    ...
+
+
+def destroy_mesh(mesh_id: int) -> None:
+    """Release a mesh registration reference.
+
+    Do not destroy a mesh while objects or other code still need to use it.
+    Mesh IDs are registry handles, not vertex-buffer indices.
+    """
+    ...
+
+
+def mesh_count() -> int:
+    """Return the mesh registry's slot-table size.
+
+    This count can include slots freed by ``destroy_mesh`` and not yet reused.
+    Use ``mesh_ids`` to retrieve only live mesh IDs.
+    """
+    ...
+
+
+def mesh_ids() -> List[int]:
+    """Return the IDs of all currently live registered meshes."""
+    ...
+
+
+def create_material(
+    type: MaterialType,
+    color: Union[List[float], Tuple[float, float, float], Tuple[float, float, float, float]],
+    intensity: float = 1.0,
+) -> int:
+    """Create a material and return its registry ID.
+
+    The colour format depends on ``type``:
+
+    * ``SOLID_COLOR`` requires ``(r, g, b, a)``. Alpha controls opacity.
+    * ``EMISSIVE`` requires ``(r, g, b)``. ``intensity`` scales emitted light.
+
+    Materials are independent of meshes until assigned. You can assign one
+    during mesh registration or later with ``set_mesh_material``.
+
+    Example:
+        >>> paint = create_material(MaterialType.SOLID_COLOR, (0.2, 0.6, 1.0, 1.0))
+        >>> glow = create_material(MaterialType.EMISSIVE, (1.0, 0.25, 0.05), intensity=4.0)
+        >>> sphere = register_sphere(1.0, material_id=glow)
+    """
+    ...
+
+
+def update_material(
+    material_id: int,
+    type: MaterialType,
+    color: Union[List[float], Tuple[float, float, float], Tuple[float, float, float, float]],
+    intensity: float = 1.0,
+) -> bool:
+    """Replace the definition of an existing material.
+
+    All meshes assigned that material see the updated definition. The colour
+    must follow the same format as ``create_material``. Returns ``False`` if
+    ``material_id`` does not identify a live material.
+    """
+    ...
+
+
+def destroy_material(material_id: int) -> bool:
+    """Destroy a material and clear its assignment from meshes that use it.
+
+    Returns ``False`` if the ID is invalid. Objects using those meshes remain;
+    the mesh simply no longer has that material assigned.
+    """
+    ...
+
+
+def is_valid_material(material_id: int) -> bool:
+    """Return whether ``material_id`` currently refers to a live material."""
+    ...
+
+
+def material_count() -> int:
+    """Return the number of material slots allocated by the registry.
+
+    This count includes slots that have been destroyed; use
+    ``is_valid_material`` to test an individual ID.
+    """
+    ...
+
+
+def get_material(material_id: int) -> Dict[str, Union[MaterialType, Tuple[float, float, float, float], float]]:
+    """Read a material's stored definition.
+
+    Returns a dictionary with ``type``, ``color`` (stored as RGBA), and
+    ``intensity``. For emissive materials the alpha component is unused.
+    Raises ``ValueError`` when the ID is invalid.
+    """
+    ...
+
+
+def set_mesh_material(mesh_id: int, material_id: int) -> bool:
+    """Assign a material to an existing mesh.
+
+    Every object referencing this mesh uses the assigned material. Pass
+    ``material_id=-1`` to remove the material and return the mesh to the
+    legacy per-object-colour path. Returns ``False`` if either ID is invalid.
+    """
+    ...
+
+
+def get_mesh_material(mesh_id: int) -> int:
+    """Return the material ID assigned to a mesh, or -1 when it has none.
+
+    Raises ``ValueError`` if ``mesh_id`` is not a live mesh.
+    """
+    ...
 
 # ============================================================================
 # MAIN SIMULATION CLASS
@@ -369,8 +568,15 @@ def mesh_ids() -> List[int]: ...
 class Simulation:
     """Main physics simulation class.
 
-    Provides real-time physics simulation with GPU acceleration.
-    Can run in headless mode (no window) or with OpenGL visualization.
+    Runs the physics world and owns its simulation, camera, input, and render
+    state. It can run headlessly for compute/batch workflows or with an OpenGL
+    window for interactive visualization.
+
+    Create 2D objects with the built-in ``SkinType`` shapes, or create 3D
+    objects from registered meshes. A 3D object's mesh supplies its geometry;
+    the mesh's material is shared by all objects that reference that mesh.
+    Object-creation methods return stable ``ObjectHandle`` values so references
+    remain safe when other objects are removed.
     """
 
     def __init__(self,
@@ -410,26 +616,43 @@ class Simulation:
 
     def paint(self, arg: Union[str, int]) -> None:
         """
-        Unified paint method.
+        Set the paint pass from either an equation or a registered paint script.
 
-        If arg is a string, it's treated as a DSL equation.
-        If arg is an int, it's treated as a JIT script ID (from register_script).
+        A string is parsed as a paint equation; an integer selects a script ID
+        returned by ``register_script``. Use the equation route for compact
+        colour fields and the script route when the paint effect needs general
+        Python-like JIT logic.
 
-        DSL equation variables: px, py, t, p[id].x etc.
-        Assign color.r, color.g, color.b.
+        The paint equation context exposes pixel coordinates ``px`` and ``py``
+        and simulation time ``t``. Assign the output through ``color.r``,
+        ``color.g``, ``color.b`` and, where supported, ``color.a``.
         """
         ...
 
     def set_paint_resolution(self, width: int, height: int) -> None:
-        """Set internal resolution for paint shader (default = window size)."""
+        """Set the paint target's pixel dimensions.
+
+        This controls the resolution of the paint image independently of the
+        window size. Larger targets retain more detail but require more GPU
+        memory and paint work.
+        """
         ...
 
     def get_paint_image(self, quality: int = 85) -> bytes:
-        """Get the paint framebuffer as JPEG bytes."""
+        """Return the paint layer as JPEG-encoded bytes.
+
+        ``quality`` controls JPEG compression quality. This returns the paint
+        output itself, not the complete scene with meshes and the grid.
+        """
         ...
 
     def get_full_frame(self, quality: int = 85) -> bytes:
-        """Get the full rendered frame as JPEG."""
+        """Render and return a complete frame as JPEG-encoded bytes.
+
+        Unlike ``get_paint_image``, this includes the rendered scene. The
+        returned value is raw JPEG data; write it to a ``.jpg`` file or decode
+        it with an image library.
+        """
         ...
 
     def process_input(self) -> None:
@@ -460,6 +683,46 @@ class Simulation:
         Returns:
             bool: True if grid is enabled, False otherwise
         """
+        ...
+
+    # ========================================================================
+    # DIRECTIONAL LIGHT
+    # ========================================================================
+
+    def set_light_direction(
+        self,
+        direction: Union[List[float], Tuple[float, float, float]],
+    ) -> None:
+        """Set the direction used by the scene's directional light.
+
+        Supply a non-zero vector ``(x, y, z)`` pointing from the light. The
+        engine normalizes it, so the vector's magnitude does not control
+        brightness. This is a direction, not a world-space light position.
+
+        The default direction is the engine's existing ``(-0.4, -0.7, -0.6)``
+        direction. Changing it affects the directional diffuse and specular
+        shading of mesh materials; emissive materials remain self-illuminated.
+
+        Example:
+            >>> sim.set_light_direction((-1.0, -0.5, -0.25))
+        """
+        ...
+
+    def get_light_direction(self) -> List[float]:
+        """Return the current normalized directional-light vector as ``[x, y, z]``."""
+        ...
+
+    def set_directional_light_enabled(self, enabled: bool) -> None:
+        """Enable or disable directional diffuse and specular shading.
+
+        Disabling this light does not remove the material system, ambient
+        contribution, or emissive lighting. It only turns off the fixed
+        directional-light contribution.
+        """
+        ...
+
+    def get_directional_light_enabled(self) -> bool:
+        """Return whether the directional-light contribution is enabled."""
         ...
 
     # ========================================================================
@@ -515,10 +778,16 @@ class Simulation:
         polygon_sides: int = 6
     ) -> ObjectHandle:
         """
-        Add a flat 2D object on the XY plane.
+        Add a built-in 2D visual shape on the XY plane.
 
-        Use ``skin`` to choose a built-in 2D shape. ``rotation`` and
-        ``angular_velocity`` describe rotation about the Z axis.
+        ``skin`` selects one of the existing built-in shapes: ``CIRCLE``,
+        ``RECTANGLE`` or ``POLYGON``. ``size`` controls circle/polygon size;
+        ``width`` and ``height`` define rectangles. ``rotation`` and
+        ``angular_velocity`` rotate the shape around the Z axis. The RGBA
+        values are the object's colour on the 2D skin path.
+
+        Use the 3D overload with ``mesh_id`` when the object should reference
+        registered mesh geometry instead.
 
         Returns:
             ObjectHandle: Stable handle for the new object.
@@ -545,19 +814,18 @@ class Simulation:
         a: float = 1.0
     ) -> ObjectHandle:
         """
-        Add a 3D object using a registered mesh.
+        Add a 3D object that references a registered mesh.
 
-        Pass ``z`` and ``mesh_id`` by keyword to select this overload.
-        ``orientation`` is a quaternion in (x, y, z, w) order, and
-        ``spin`` is an angular-velocity vector.
+        Pass ``z`` and ``mesh_id`` to select this overload. ``orientation`` is
+        a quaternion in ``(x, y, z, w)`` order, while ``spin`` is the angular
+        velocity vector in radians per second. Position and velocity use the
+        simulation's world coordinates.
 
-        ``mesh_id`` defaults to -1, which raises ``ValueError``; you must
-        supply a real mesh handle from ``register_sphere`` / ``register_cube``
-        / etc. for this overload to succeed.
-
-        The collision shape defaults to ``SPHERE``. Use
-        ``set_collision_shape(handle, CollisionShape.BOX)`` after creation
-        to switch to box collision.
+        ``mesh_id`` must identify a live mesh created with a ``register_*``
+        function. The object inherits that mesh's material; material selection
+        belongs to the mesh, not to the individual object. The collision shape
+        starts as ``SPHERE``; change it with ``set_collision_shape`` when a
+        different supported collision volume is needed.
 
         Returns:
             ObjectHandle: Stable handle for the new object.
@@ -595,6 +863,64 @@ class Simulation:
         """
         ...
 
+    @overload
+    def add_objects(
+        self,
+        objects: List[Dict[str, Any]],
+        mesh_id: int,
+    ) -> List[ObjectHandle]:
+        """Create many 3D objects that all reference the same registered mesh.
+
+        Each dictionary supplies per-object state. Supported keys are ``x``,
+        ``y``, ``z``, ``vx``, ``vy``, ``vz``, ``mass``, ``charge``,
+        ``orientation`` (a four-value quaternion) and ``spin`` (a three-value
+        angular-velocity vector). Omitted values use the same defaults as
+        single 3D object creation.
+
+        All created objects share ``mesh_id`` and therefore share its material.
+        The returned handles follow the same order as the input dictionaries.
+
+        Example:
+            >>> mesh = register_sphere(0.5, material_id=glow)
+            >>> handles = sim.add_objects(
+            ...     [{"x": -1.0}, {"x": 0.0}, {"x": 1.0, "z": 2.0}],
+            ...     mesh_id=mesh,
+            ... )
+        """
+        ...
+
+    @overload
+    def add_objects(
+        self,
+        objects: List[Dict[str, Any]],
+        skin: SkinType,
+        colors: List[Tuple[float, float, float, float]],
+        size: float = 0.3,
+        width: float = 0.5,
+        height: float = 0.3,
+        polygon_sides: int = 6,
+    ) -> List[ObjectHandle]:
+        """Create many 2D objects using one built-in skin type.
+
+        ``colors`` must contain exactly one RGBA tuple per object. Each object
+        dictionary may override its own ``x``, ``y``, ``vx``, ``vy``, ``mass``,
+        ``charge``, ``rotation``, ``angular_velocity``, ``size``, ``width``,
+        ``height`` or ``polygon_sides``. The top-level shape dimensions provide
+        defaults for dictionaries that omit them.
+
+        Returns handles in the same order as ``objects``. Unlike the 3D batch
+        overload, this route uses the 2D skin and per-object colour system.
+
+        Example:
+            >>> handles = sim.add_objects(
+            ...     [{"x": 0.0}, {"x": 1.0, "rotation": 0.4}],
+            ...     skin=SkinType.CIRCLE,
+            ...     colors=[(1, 0.2, 0.2, 1), (0.2, 0.6, 1, 1)],
+            ...     size=0.25,
+            ... )
+        """
+        ...
+
     # ========================================================================
     # MESH / 3D-STATE ACCESSORS
     #
@@ -610,7 +936,13 @@ class Simulation:
     def set_mesh(self, handle: ObjectHandle, mesh_id: int) -> None: ...
 
     def set_mesh(self, index: int | ObjectHandle, mesh_id: int) -> None:
-        """Swap the mesh assigned to an object. Pass -1 to hide it."""
+        """Change the registered mesh referenced by an object.
+
+        The object adopts the new mesh's geometry and material. Pass ``-1``
+        to remove its mesh association and hide it from the mesh renderer.
+        This changes the object's mesh reference; it does not edit a material.
+        Use the module-level ``set_mesh_material`` to change a mesh's material.
+        """
         ...
 
     @overload
@@ -1007,15 +1339,20 @@ class Simulation:
         ...
 
     def add_boundary_constraint(self, object_index: int | ObjectHandle, constraint: BoundaryConstraint) -> None:
-        """Add boundary constraint to object."""
+        """Constrain an object's position to a rectangular world-space region.
+
+        The supplied ``BoundaryConstraint`` defines the minimum and maximum
+        X/Y coordinates. Use ``clear_constraints`` to remove this and any
+        other constraints attached to the object.
+        """
         ...
 
     def clear_constraints(self, object_index: int | ObjectHandle) -> None:
-        """Clear all constraints from object."""
+        """Remove every constraint currently attached to this object."""
         ...
 
     def clear_all_constraints(self) -> None:
-        """Clear all constraints from all objects."""
+        """Remove all constraints from the simulation without removing objects."""
         ...
 
     # ========================================================================
@@ -1209,7 +1546,12 @@ class Simulation:
 
     def set_collision_parameters(self, enable_warm_start: bool, max_contact_iterations: int) -> None:
         """
-        Set global collision parameters (warm start and iteration count).
+        Tune the global iterative contact solver.
+
+        Warm starting reuses contact impulses from the previous step as an
+        initial estimate, which can improve stability for resting contacts.
+        More contact iterations can improve convergence in difficult stacks
+        and dense interactions, at the cost of additional compute time.
 
         Args:
             enable_warm_start (bool): Enable warm starting for contacts
@@ -1387,9 +1729,11 @@ class Simulation:
     # ========================================================================
 
     def default_input(self) -> None:
-        """
-        Default WASD + Q/E zoom + ESC close camera controls.
-        Call this in your loop for standard behavior.
+        """Apply the engine's built-in keyboard camera/window controls.
+
+        Call once per frame after ``process_input``. WASD moves the camera,
+        Q/E adjusts zoom, and Escape requests window closure. This is optional:
+        applications can read ``sim.keyboard`` and implement their own controls.
         """
         ...
 
@@ -1415,7 +1759,10 @@ class Simulation:
 
     def screen_to_world(self, screen_x: float, screen_y: float) -> Tuple[float, float]:
         """
-        Convert screen pixel coordinates to world coordinates.
+        Convert a screen-space pixel position into the current camera's world plane.
+
+        This is useful for placing or selecting objects at the location of a
+        mouse click. Screen coordinates are measured from the top-left corner.
 
         Args:
             screen_x (float): X coordinate in pixels (from left)
@@ -1432,7 +1779,10 @@ class Simulation:
 
     def world_to_screen(self, world_x: float, world_y: float) -> Tuple[float, float]:
         """
-        Convert world coordinates to screen pixel coordinates.
+        Project a world-space XY position into screen pixel coordinates.
+
+        The result uses the current camera and viewport, with the origin at
+        the top-left of the screen.
 
         Args:
             world_x (float): X coordinate in world space
@@ -1615,10 +1965,12 @@ class Simulation:
 
     def script(self, mode: str = "object", debug: bool = False) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """
-        Decorator that compiles a Python function into a GPU compute shader
-        and registers it with this simulation.
+        Decorator that compiles a supported Python-style function into a JIT
+        program and registers it with this simulation.
 
-        Modes: "object", "paint", "agent".
+        ``mode="object"`` runs the function for objects, ``mode="paint"``
+        targets the paint pass, and ``mode="agent"`` registers an agent
+        program. ``debug=True`` enables the decorator's debugging path.
         """
         ...
 

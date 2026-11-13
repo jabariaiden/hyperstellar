@@ -142,24 +142,10 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.s
 
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: CMakeFiles/stellar.dir/flags.make
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp
-
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp > CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i
-
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s
-
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o: CMakeFiles/stellar.dir/flags.make
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.i: cmake_force
@@ -170,24 +156,10 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.c
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
 
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o: CMakeFiles/stellar.dir/flags.make
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp
-
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp > CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i
-
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s
-
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o: CMakeFiles/stellar.dir/flags.make
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.i: cmake_force
@@ -201,7 +173,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o: CMakeFiles/stellar.dir/flags.make
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.i: cmake_force
@@ -211,6 +183,34 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cp
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.s
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o: CMakeFiles/stellar.dir/flags.make
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp > CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: CMakeFiles/stellar.dir/flags.make
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o: CMakeFiles/stellar.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/jaybird/Aidens_stuff/hyperstellar-public/_build_linux/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o -MF CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o.d -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp > CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s
 
 CMakeFiles/stellar.dir/bindings.cpp.o: CMakeFiles/stellar.dir/flags.make
 CMakeFiles/stellar.dir/bindings.cpp.o: /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/bindings.cpp
@@ -373,11 +373,11 @@ stellar_OBJECTS = \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o" \
-"CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o" \
-"CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o" \
+"CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o" \
+"CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o" \
 "CMakeFiles/stellar.dir/bindings.cpp.o" \
 "CMakeFiles/stellar.dir/simulation_wrapper.cpp.o" \
 "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o" \
@@ -398,11 +398,11 @@ stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o
-stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
-stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o
+stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o
+stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
 stellar.so: CMakeFiles/stellar.dir/bindings.cpp.o
 stellar.so: CMakeFiles/stellar.dir/simulation_wrapper.cpp.o
 stellar.so: CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o

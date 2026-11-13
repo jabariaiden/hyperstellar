@@ -6,11 +6,13 @@ in vec3 vWorldPos[];
 in vec3 vNormal[];
 in vec4 vColor[];
 in vec2 vUV[];
+flat in int vObjectSlot[];
 
 out vec3 fWorldPos;
 out vec3 fNormal;
 out vec4 fColor;
 out vec2 fUV;
+flat out int fObjectSlot;
 
 // Forwards triangle vertices, all geometry is generated CPU-side
 void main() {
@@ -19,6 +21,7 @@ void main() {
         fNormal   = vNormal[i];
         fColor    = vColor[i];
         fUV       = vUV[i];
+        fObjectSlot = vObjectSlot[i];
         gl_Position = gl_in[i].gl_Position;
         EmitVertex();
     }

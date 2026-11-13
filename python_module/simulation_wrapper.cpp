@@ -22,6 +22,7 @@
 #include <functional> // for std::function
 #include <vector>
 #include <atomic>
+#include <cmath>
 
 // ----------------------------------------------------------------------------
 // OBJECT HANDLE IMPLEMENTATION
@@ -381,9 +382,6 @@ bool SimulationWrapper::init_headless()
         return false;
     }
 
-    glFlush();
-    glFinish();
-
     // Clear any OpenGL errors
     while (glGetError() != GL_NO_ERROR)
         ;
@@ -423,6 +421,18 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
         g_simulationViewportSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
         glViewport(0, 0, width, height);
     }
+}
+
+void camera_scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+    if (yoffset == 0.0)
+        return;
+
+    const float zoomAmount =
+        static_cast<float>(yoffset) *
+        g_camera3d.ApparentHalfHeight() * 0.12f;
+
+    g_camera3d.Dolly(zoomAmount);
 }
 
 void SimulationWrapper::set_paint_resolution(int width, int height)
@@ -469,6 +479,7 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
     glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
     glfwSetWindowUserPointer(static_cast<GLFWwindow *>(m_window), this);
     glfwSetFramebufferSizeCallback(static_cast<GLFWwindow *>(m_window), framebuffer_size_callback);
+    glfwSetScrollCallback(static_cast<GLFWwindow *>(m_window), camera_scroll_callback);
     glfwSwapInterval(1); // Enable vsync
 
     // Show and focus window
@@ -485,9 +496,6 @@ bool SimulationWrapper::init_windowed(int width, int height, const std::string &
         std::cerr << "Failed to initialize GLAD" << std::endl;
         return false;
     }
-
-    glFlush();
-    glFinish();
 
     // Clear any OpenGL errors
     while (glGetError() != GL_NO_ERROR)
@@ -585,35 +593,108 @@ void SimulationWrapper::default_input()
 {
     if (m_headless || !m_window)
         return;
+
     process_input();
-    GLFWwindow *glfwWindow = static_cast<GLFWwindow *>(m_window);
-    glfwMakeContextCurrent(glfwWindow);
 
-    const float dt = 0.016f;
-    const float orbitStep = 0.02f;
+    GLFWwindow *window = static_cast<GLFWwindow *>(m_window);
+    glfwMakeContextCurrent(window);
 
-    // WASD orbits g_camera3d around its target.
-    float dyaw = 0.0f, dpitch = 0.0f;
-    if (is_key_pressed(GLFW_KEY_A))
-        dyaw -= orbitStep;
-    if (is_key_pressed(GLFW_KEY_D))
-        dyaw += orbitStep;
-    if (is_key_pressed(GLFW_KEY_W))
-        dpitch += orbitStep;
-    if (is_key_pressed(GLFW_KEY_S))
-        dpitch -= orbitStep;
-    if (dyaw != 0.0f || dpitch != 0.0f)
-        g_camera3d.Orbit(dyaw, dpitch);
+    // Calculate frame time.
+    static double lastInputTime = -1.0;
+    const double now = glfwGetTime();
 
-    // Q/E dollies the eye along the view direction.
-    float dollyStep = g_camera3d.ApparentHalfHeight() * 0.5f * dt * 30.0f;
-    if (is_key_pressed(GLFW_KEY_Q))
-        g_camera3d.Dolly(-dollyStep);
-    if (is_key_pressed(GLFW_KEY_E))
-        g_camera3d.Dolly(+dollyStep);
+    float dt = 1.0f / 60.0f;
+    if (lastInputTime >= 0.0)
+        dt = std::clamp(static_cast<float>(now - lastInputTime), 0.0f, 0.05f);
+
+    lastInputTime = now;
+
+    // WASD and arrow keys move along the camera's local plane.
+    float horizontal = 0.0f;
+    float vertical = 0.0f;
+
+    if (is_key_pressed(GLFW_KEY_A) || is_key_pressed(GLFW_KEY_LEFT))
+        horizontal -= 1.0f;
+
+    if (is_key_pressed(GLFW_KEY_D) || is_key_pressed(GLFW_KEY_RIGHT))
+        horizontal += 1.0f;
+
+    if (is_key_pressed(GLFW_KEY_W) || is_key_pressed(GLFW_KEY_UP))
+        vertical += 1.0f;
+
+    if (is_key_pressed(GLFW_KEY_S) || is_key_pressed(GLFW_KEY_DOWN))
+        vertical -= 1.0f;
+
+    glm::vec2 movement(horizontal, vertical);
+
+    if (glm::length(movement) > 1.0f)
+        movement = glm::normalize(movement);
+
+    const float panSpeed = g_camera3d.ApparentHalfHeight();
+
+    if (glm::length(movement) > 0.0f)
+    {
+        g_camera3d.Pan(
+            movement.x * panSpeed * dt,
+            movement.y * panSpeed * dt);
+    }
+
+    // Left mouse drag rotates the viewing direction without moving the eye.
+    static GLFWwindow *trackedWindow = nullptr;
+    static double previousMouseX = 0.0;
+    static double previousMouseY = 0.0;
+    static bool wasDragging = false;
+
+    if (trackedWindow != window)
+    {
+        trackedWindow = window;
+        wasDragging = false;
+    }
+
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+
+    const bool dragging =
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+
+    if (dragging && wasDragging)
+    {
+        const float dx = static_cast<float>(mouseX - previousMouseX);
+        const float dy = static_cast<float>(mouseY - previousMouseY);
+
+        glm::vec3 forward = g_camera3d.target - g_camera3d.eye;
+        const float distance = glm::length(forward);
+
+        if (distance > 1e-6f)
+        {
+            forward /= distance;
+
+            float yaw = std::atan2(forward.x, -forward.z);
+            float pitch = std::asin(std::clamp(forward.y, -1.0f, 1.0f));
+
+            constexpr float sensitivity = 0.0035f;
+
+            yaw += dx * sensitivity;
+            pitch -= dy * sensitivity;
+
+            const float pitchLimit = glm::radians(89.0f);
+            pitch = std::clamp(pitch, -pitchLimit, pitchLimit);
+
+            glm::vec3 direction(
+                std::sin(yaw) * std::cos(pitch),
+                std::sin(pitch),
+                -std::cos(yaw) * std::cos(pitch));
+
+            g_camera3d.target = g_camera3d.eye + direction * distance;
+        }
+    }
+
+    previousMouseX = mouseX;
+    previousMouseY = mouseY;
+    wasDragging = dragging;
 
     if (is_key_just_pressed(GLFW_KEY_ESCAPE))
-        glfwSetWindowShouldClose(glfwWindow, GLFW_TRUE);
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
 std::pair<float, float> SimulationWrapper::get_mouse_position() const
@@ -827,127 +908,74 @@ void SimulationWrapper::update(float dt)
         while (glGetError() != GL_NO_ERROR)
             ;
 
-        GLuint computeProgram = Objects::GetComputeProgram();
-        if (computeProgram && Objects::IsComputeShaderReady())
-        {
-            glUseProgram(computeProgram);
-
-            // Fetch uniform locations
-            GLint dtLoc = glGetUniformLocation(computeProgram, "uDt");
-            GLint timeLoc = glGetUniformLocation(computeProgram, "uTime");
-            GLint kLoc = glGetUniformLocation(computeProgram, "k");
-            GLint bLoc = glGetUniformLocation(computeProgram, "b");
-            GLint gLoc = glGetUniformLocation(computeProgram, "g");
-            GLint gravityDirLoc = glGetUniformLocation(computeProgram, "uGravityDir");
-            GLint restitutionLoc = glGetUniformLocation(computeProgram, "uRestitution");
-            GLint couplingLoc = glGetUniformLocation(computeProgram, "uCoupling");
-            GLint externalForceLoc = glGetUniformLocation(computeProgram, "uExternalForce");
-            GLint driveFreqLoc = glGetUniformLocation(computeProgram, "uDriveFreq");
-            GLint driveAmpLoc = glGetUniformLocation(computeProgram, "uDriveAmp");
-            GLint equationModeLoc = glGetUniformLocation(computeProgram, "uEquationMode");
-            GLint numObjectsLoc = glGetUniformLocation(computeProgram, "uNumObjects");
-
-            //  Get collision parameter uniforms
-            GLint enableWarmStartLoc = glGetUniformLocation(computeProgram, "uEnableWarmStart");
-            GLint maxContactIterationsLoc = glGetUniformLocation(computeProgram, "uMaxContactIterations");
-
-            // Apply Uniforms
-            if (dtLoc != -1)
-                glUniform1f(dtLoc, FIXED_STEP);
-            if (timeLoc != -1)
-                glUniform1f(timeLoc, m_simulationTime);
-            if (kLoc != -1)
-                glUniform1f(kLoc, m_stiffness);
-            if (bLoc != -1)
-                glUniform1f(bLoc, m_damping);
-            if (gLoc != -1)
-                glUniform1f(gLoc, m_gravity);
-            if (gravityDirLoc != -1)
-                glUniform2f(gravityDirLoc, 0.0f, -1.0f);
-            if (restitutionLoc != -1)
-                glUniform1f(restitutionLoc, 0.7f);
-            if (couplingLoc != -1)
-                glUniform1f(couplingLoc, 1.0f);
-            if (externalForceLoc != -1)
-                glUniform2f(externalForceLoc, 0.0f, 0.0f);
-            if (driveFreqLoc != -1)
-                glUniform1f(driveFreqLoc, 1.0f);
-            if (driveAmpLoc != -1)
-                glUniform1f(driveAmpLoc, 0.0f);
-            if (equationModeLoc != -1)
-                glUniform1i(equationModeLoc, 0);
-            if (numObjectsLoc != -1)
-                glUniform1i(numObjectsLoc, Objects::GetNumObjects());
-
-            //  Apply collision parameters
-            auto collision_params = get_collision_parameters();
-            if (enableWarmStartLoc != -1)
-                glUniform1i(enableWarmStartLoc, collision_params.first ? 1 : 0);
-            if (maxContactIterationsLoc != -1)
-                glUniform1i(maxContactIterationsLoc, collision_params.second);
-
-            // Run Compute Shader
-            Objects::Update(m_currentBuffer, 1 - m_currentBuffer, FIXED_STEP);
+        // Physics dispatch is independent of the DSL shader. Objects::Update
+        // selects the default JIT, custom JIT, and DSL-only groups separately.
+        if (Objects::Update(m_currentBuffer, 1 - m_currentBuffer, FIXED_STEP))
             m_currentBuffer = 1 - m_currentBuffer;
+        else
+        {
+            // Keep the current frame and simulation clock in sync until every
+            // object has a compiled program available for its execution path.
+            m_simulationTime -= FIXED_STEP;
+            g_simulationTime = m_simulationTime;
+            break;
+        }
 
-            // Fire collision callbacks by reading the contact buffer directly
-            if (g_collisionCallback)
+        // Fire collision callbacks by reading the contact buffer directly
+        if (g_collisionCallback)
+        {
+            GLuint contactBuffer = Objects::GetContactBuffer();
+            if (contactBuffer)
             {
-                GLuint contactBuffer = Objects::GetContactBuffer();
-                if (contactBuffer)
+                // Define the contact point layout matching the shader (48 bytes)
+                struct ContactPoint
                 {
-                    // Define the contact point layout matching the shader (48 bytes)
-                    struct ContactPoint
-                    {
-                        float normal[2];
-                        float position[2];
-                        float penetration;
-                        float accumulatedNormalImpulse;
-                        float accumulatedTangentImpulse;
-                        int frameCount;
-                        int padding[4]; // total 48 bytes
-                    };
+                    float normal[2];
+                    float position[2];
+                    float penetration;
+                    float accumulatedNormalImpulse;
+                    float accumulatedTangentImpulse;
+                    int frameCount;
+                    int padding[4]; // total 48 bytes
+                };
 
-                    glBindBuffer(GL_SHADER_STORAGE_BUFFER, contactBuffer);
-                    GLsizeiptr size = Objects::MAX_OBJECTS * 4 * sizeof(ContactPoint);
-                    void *data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-                    if (data)
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, contactBuffer);
+                GLsizeiptr size = Objects::MAX_OBJECTS * 4 * sizeof(ContactPoint);
+                void *data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+                if (data)
+                {
+                    ContactPoint *contacts = static_cast<ContactPoint *>(data);
+                    int numObjects = Objects::GetNumObjects();
+                    for (int obj = 0; obj < numObjects; ++obj)
                     {
-                        ContactPoint *contacts = static_cast<ContactPoint *>(data);
-                        int numObjects = Objects::GetNumObjects();
-                        for (int obj = 0; obj < numObjects; ++obj)
+                        int base = obj * 4;
+                        for (int c = 0; c < 4; ++c)
                         {
-                            int base = obj * 4;
-                            for (int c = 0; c < 4; ++c)
+                            int idx = base + c;
+                            if (idx * sizeof(ContactPoint) >= size)
+                                break;
+                            ContactPoint &cp = contacts[idx];
+                            if (cp.frameCount > 0)
                             {
-                                int idx = base + c;
-                                if (idx * sizeof(ContactPoint) >= size)
-                                    break;
-                                ContactPoint &cp = contacts[idx];
-                                if (cp.frameCount > 0)
-                                {
-                                    CollisionEvent ev;
-                                    ev.object_a.slot = obj;
-                                    ev.object_a.generation = 0; // generation not stored; you could add a getter
-                                    ev.object_b.slot = -1;
-                                    ev.object_b.generation = -1;
-                                    ev.normal_x = cp.normal[0];
-                                    ev.normal_y = cp.normal[1];
-                                    ev.contact_x = cp.position[0];
-                                    ev.contact_y = cp.position[1];
-                                    ev.penetration = cp.penetration;
-                                    ev.impulse = cp.accumulatedNormalImpulse + cp.accumulatedTangentImpulse;
-                                    g_collisionCallback(ev);
-                                }
+                                CollisionEvent ev;
+                                ev.object_a.slot = obj;
+                                ev.object_a.generation = 0; // generation not stored; maybe add a getter? IDK
+                                ev.object_b.slot = -1;
+                                ev.object_b.generation = -1;
+                                ev.normal_x = cp.normal[0];
+                                ev.normal_y = cp.normal[1];
+                                ev.contact_x = cp.position[0];
+                                ev.contact_y = cp.position[1];
+                                ev.penetration = cp.penetration;
+                                ev.impulse = cp.accumulatedNormalImpulse + cp.accumulatedTangentImpulse;
+                                g_collisionCallback(ev);
                             }
                         }
-                        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
                     }
-                    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
                 }
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
             }
-
-            glUseProgram(0);
         }
 
         accumulator -= FIXED_STEP;
@@ -983,6 +1011,23 @@ void SimulationWrapper::get_paint_image(std::vector<unsigned char> &jpeg_data, i
     ensure_initialized();
     Objects::GetPaintImage(jpeg_data, quality);
 }
+
+void SimulationWrapper::set_light_direction(float x, float y, float z)
+{
+    const glm::vec3 direction(x, y, z);
+    const float lengthSquared = glm::dot(direction, direction);
+
+    if (lengthSquared <= 1e-12f)
+        throw std::invalid_argument("Light direction must be non-zero.");
+
+    m_lightDir = glm::normalize(direction);
+}
+
+std::array<float, 3> SimulationWrapper::get_light_direction() const
+{
+    return {m_lightDir.x, m_lightDir.y, m_lightDir.z};
+}
+
 // ============================================================================
 // Render simulation to screen
 // ============================================================================
@@ -1029,7 +1074,6 @@ void SimulationWrapper::render()
     glm::mat4 P = g_camera3d.Projection(w, h);
     glm::mat4 V = g_camera3d.View();
     glm::vec3 camPos = g_camera3d.eye;
-    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.4f, -0.7f, -0.6f));
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -1037,8 +1081,8 @@ void SimulationWrapper::render()
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-    Objects::Draw(m_currentBuffer, P, V, camPos, lightDir);
-    glDisable(GL_CULL_FACE);
+    Objects::Draw(m_currentBuffer, P, V, camPos,
+                  m_lightDir, m_directionalLightEnabled);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
@@ -1068,7 +1112,8 @@ void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, in
     glm::mat4 projection = g_camera.GetProjectionMatrix(w, h);
 
     // Call the objects system to capture the frame
-    Objects::GetFullFrameImage(jpeg_data, quality, m_currentBuffer, projection);
+    Objects::GetFullFrameImage(jpeg_data, quality, m_currentBuffer, projection,
+                            m_lightDir, m_directionalLightEnabled);
 }
 
 // ============================================================================
@@ -2874,8 +2919,7 @@ void SimulationWrapper::update_shader_loading()
     if (!m_headless && m_window)
         glfwPollEvents();
 
-    glFlush();
-    glFinish();
+    // Shader loading completes synchronously when a program is requested.
 }
 
 // Check if all shaders are loaded and ready
@@ -3120,6 +3164,9 @@ void SimulationWrapper::cleanup()
 {
     if (!m_initialized)
         return;
+
+    if (m_window)
+        glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
 
     // Clean up axis system if initialized
     if (g_axisInitialized)

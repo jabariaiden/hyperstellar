@@ -539,4 +539,5 @@ CMakeFiles/stellar.dir/bindings.cpp.o: \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/type_half.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/integer.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/func_integer.inl \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/material.h

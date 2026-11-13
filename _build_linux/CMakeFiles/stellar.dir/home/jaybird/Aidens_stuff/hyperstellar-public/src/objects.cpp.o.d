@@ -364,39 +364,11 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /usr/include/c++/16/bits/istream.tcc \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/async_shader_loader.h \
- /usr/include/c++/16/thread /usr/include/c++/16/bits/std_thread.h \
- /usr/include/c++/16/bits/unique_ptr.h \
- /usr/include/c++/16/bits/this_thread_sleep.h \
- /usr/include/c++/16/bits/chrono.h /usr/include/c++/16/ratio \
- /usr/include/c++/16/ctime /usr/include/c++/16/bits/parse_numbers.h \
- /usr/include/c++/16/atomic /usr/include/c++/16/bits/atomic_base.h \
- /usr/include/c++/16/bits/atomic_lockfree_defines.h \
- /usr/include/c++/16/mutex /usr/include/c++/16/bits/std_mutex.h \
- /usr/include/c++/16/bits/unique_lock.h /usr/include/c++/16/fstream \
- /usr/include/c++/16/bits/codecvt.h \
- /usr/include/c++/16/x86_64-redhat-linux/bits/basic_file.h \
- /usr/include/c++/16/x86_64-redhat-linux/bits/c++io.h \
- /usr/include/c++/16/bits/fstream.tcc /usr/include/c++/16/filesystem \
- /usr/include/c++/16/bits/fs_fwd.h /usr/include/c++/16/bits/fs_path.h \
- /usr/include/c++/16/locale \
- /usr/include/c++/16/bits/locale_facets_nonio.h \
- /usr/include/c++/16/x86_64-redhat-linux/bits/time_members.h \
- /usr/include/c++/16/x86_64-redhat-linux/bits/messages_members.h \
- /usr/include/libintl.h /usr/include/c++/16/bits/locale_facets_nonio.tcc \
- /usr/include/c++/16/bits/locale_conv.h /usr/include/c++/16/iomanip \
- /usr/include/c++/16/bits/quoted_string.h /usr/include/c++/16/sstream \
- /usr/include/c++/16/bits/sstream.tcc /usr/include/c++/16/codecvt \
- /usr/include/c++/16/ext/concurrence.h \
- /usr/include/c++/16/bits/shared_ptr.h \
- /usr/include/c++/16/bits/shared_ptr_base.h \
- /usr/include/c++/16/bits/allocated_ptr.h \
- /usr/include/c++/16/bits/fs_dir.h /usr/include/c++/16/bits/fs_ops.h \
- /usr/include/c++/16/cstring /usr/include/dlfcn.h \
- /usr/include/bits/dlfcn.h /usr/include/bits/dl_find_object.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/script_manager.h \
  /usr/include/c++/16/unordered_set \
  /usr/include/c++/16/bits/unordered_set.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/material.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/quaternion.hpp \
@@ -435,11 +407,25 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_int1_sized.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_uint1.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_uint1_sized.hpp \
+ /usr/include/c++/16/cstring \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.inl \
  /usr/include/c++/16/map /usr/include/c++/16/bits/stl_tree.h \
  /usr/include/c++/16/bits/stl_map.h \
- /usr/include/c++/16/bits/stl_multimap.h \
- /usr/include/c++/16/condition_variable /usr/include/c++/16/queue \
+ /usr/include/c++/16/bits/stl_multimap.h /usr/include/c++/16/atomic \
+ /usr/include/c++/16/bits/atomic_base.h \
+ /usr/include/c++/16/bits/atomic_lockfree_defines.h \
+ /usr/include/c++/16/thread /usr/include/c++/16/bits/std_thread.h \
+ /usr/include/c++/16/bits/unique_ptr.h \
+ /usr/include/c++/16/bits/this_thread_sleep.h \
+ /usr/include/c++/16/bits/chrono.h /usr/include/c++/16/ratio \
+ /usr/include/c++/16/ctime /usr/include/c++/16/bits/parse_numbers.h \
+ /usr/include/c++/16/mutex /usr/include/c++/16/bits/std_mutex.h \
+ /usr/include/c++/16/bits/unique_lock.h \
+ /usr/include/c++/16/condition_variable \
+ /usr/include/c++/16/bits/shared_ptr.h \
+ /usr/include/c++/16/bits/shared_ptr_base.h \
+ /usr/include/c++/16/bits/allocated_ptr.h \
+ /usr/include/c++/16/ext/concurrence.h /usr/include/c++/16/queue \
  /usr/include/c++/16/deque /usr/include/c++/16/bits/stl_deque.h \
  /usr/include/c++/16/bits/deque.tcc /usr/include/c++/16/bits/stl_queue.h \
  /usr/include/c++/16/memory \

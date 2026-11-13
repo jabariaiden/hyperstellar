@@ -6,11 +6,11 @@ stellar.so: \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o \
-  CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o \
-  CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o \
+  CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o \
+  CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o \
   CMakeFiles/stellar.dir/bindings.cpp.o \
   CMakeFiles/stellar.dir/simulation_wrapper.cpp.o \
   CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o \
@@ -94,15 +94,15 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o:
 
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o:
-
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o:
-
-CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o:
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o:
 
 CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o:
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o:
+
+CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o:
 
 CMakeFiles/stellar.dir/bindings.cpp.o:
 

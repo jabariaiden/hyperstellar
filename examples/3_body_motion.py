@@ -114,8 +114,9 @@ def gravity_field():
     color.g = field * 0.6
     color.a = 1.0 
 
-sim.set_paint_script(gravity_field._script_id)
+sim.paint(gravity_field._script_id)
 sim.set_speed(50.0)
+sim.set_camera_zoom(0.01)
 
 print("Running three-body simulation with JIT scripts.")
 print("Controls: WASD to pan, scroll to zoom. Close to exit.")
@@ -124,7 +125,7 @@ print("Controls: WASD to pan, scroll to zoom. Close to exit.")
 # Main loop
 # ============================================================================
 while not sim.should_close():
-    sim.process_input()
+    sim.default_input()
     sim.update(0.001)
     sim.render()
 

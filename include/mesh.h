@@ -10,6 +10,7 @@ struct Mesh {
     glm::vec3 aabbMin = {};
     glm::vec3 aabbMax = {};
     bool valid = false;
+    int materialID = -1; // -1 = use the object's legacy color
 };
 
 namespace Meshes {
@@ -28,6 +29,8 @@ namespace Meshes {
                     const uint32_t* idx, size_t indexCount);
 
     const Mesh* Get(int id);
+    bool SetMaterial(int meshID, int materialID);
+    int GetMaterial(int meshID);
     int  Count();
     void Destroy(int id);
     void Cleanup();

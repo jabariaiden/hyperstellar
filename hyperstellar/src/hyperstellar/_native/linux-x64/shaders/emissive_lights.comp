@@ -1,0 +1,90 @@
+#version 430 core
+layout(local_size_x = 64) in;
+
+struct Object {
+    vec4 position;
+    vec4 velocity;
+    vec4 orientation;
+    vec4 spin;
+    vec4 visualData;
+    vec4 collisionData;
+    vec4 color;
+    float mass;
+    float charge;
+    int visualSkinType;
+    int collisionShapeType;
+    int equationID;
+    int scriptID;
+    int meshID;
+    int _pad[5];
+};
+layout(std430, binding = 0) readonly buffer ObjectBuffer {
+    Object objects[];
+};
+
+struct Material {
+    vec4 color;
+    float intensity;
+    uint type;
+    uint _padding0;
+    uint _padding1;
+};
+layout(std430, binding = 10) readonly buffer MaterialBuffer {
+    Material materials[];
+};
+
+struct EmissiveLight {
+    vec4 position;
+    vec4 colorIntensity;
+    int objectSlot;
+    int _padding0;
+    int _padding1;
+    int _padding2;
+};
+layout(std430, binding = 11) buffer EmissiveLightBuffer {
+    uint emissiveLightCount;
+    uint _headerPadding0;
+    uint _headerPadding1;
+    uint _headerPadding2;
+    EmissiveLight emissiveLights[];
+};
+
+layout(std430, binding = 9) readonly buffer MeshMaterialBuffer {
+    int meshMaterialIDs[];
+};
+
+uniform int uNumObjects;
+uniform int uMeshCount;
+uniform int uMaterialCount;
+uniform uint uLightCapacity;
+
+void main() {
+    uint objectSlot = gl_GlobalInvocationID.x;
+    if (objectSlot >= uint(uNumObjects))
+        return;
+
+    Object objectData = objects[objectSlot];
+    int meshID = objectData.meshID;
+    if (meshID < 0 || meshID >= uMeshCount)
+        return;
+
+    int materialID = meshMaterialIDs[meshID];
+    if (materialID < 0 || materialID >= uMaterialCount)
+        return;
+
+    Material material = materials[materialID];
+    if (material.type != 1u || material.intensity <= 0.0)
+        return;
+
+    uint lightIndex = atomicAdd(emissiveLightCount, 1u);
+    if (lightIndex >= uLightCapacity)
+        return;
+
+    emissiveLights[lightIndex].position = vec4(objectData.position.xyz, 1.0);
+    emissiveLights[lightIndex].colorIntensity =
+        vec4(material.color.rgb, material.intensity);
+    emissiveLights[lightIndex].objectSlot = int(objectSlot);
+    emissiveLights[lightIndex]._padding0 = 0;
+    emissiveLights[lightIndex]._padding1 = 0;
+    emissiveLights[lightIndex]._padding2 = 0;
+}

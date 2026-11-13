@@ -1,4 +1,5 @@
 #include "mesh.h"
+#include "material.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <vector>
@@ -134,6 +135,22 @@ namespace Meshes
         if (id < 0 || id >= (int)g_meshes.size() || !g_meshes[id].valid)
             return nullptr;
         return &g_meshes[id];
+    }
+
+    bool SetMaterial(int meshID, int materialID)
+    {
+        if (meshID < 0 || meshID >= (int)g_meshes.size() || !g_meshes[meshID].valid)
+            return false;
+        if (materialID < -1 || (materialID >= 0 && !Materials::IsValid(materialID)))
+            return false;
+        g_meshes[meshID].materialID = materialID;
+        return true;
+    }
+
+    int GetMaterial(int meshID)
+    {
+        const Mesh *mesh = Get(meshID);
+        return mesh ? mesh->materialID : -1;
     }
 
     int Count()

@@ -30,6 +30,7 @@
 #include "async_shader_loader.h"
 #include "script_manager.h"
 #include "mesh.h" // Meshes::Get() is used by the instanced draw path
+#include "material.h"
 #include "camera.h"
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -106,6 +107,32 @@ static GLuint g_objectSSBO[2] = {0, 0};
 static GLuint g_programCompute = 0;
 static GLuint g_programQuad = 0;
 
+// Renderer material storage (binding 10), emissive lights (binding 11),
+// and the per-mesh material ID table (binding 9 during the light pass).
+static GLuint g_materialSSBO = 0;
+static GLuint g_emissiveLightSSBO = 0;
+static GLuint g_meshMaterialSSBO = 0;
+static GLuint g_emissiveLightProgram = 0;
+static ShaderLoader g_emissiveLightLoader;
+static bool g_emissiveLightShaderReady = false;
+static std::vector<Material> g_materials;
+static std::vector<bool> g_materialValid;
+
+static void UploadMaterialRegistry()
+{
+    if (!g_materialSSBO)
+        return;
+
+    const Material fallback = Material::SolidColor(glm::vec4(1.0f));
+    const size_t count = std::max<size_t>(1, g_materials.size());
+    const void *data = g_materials.empty() ? static_cast<const void *>(&fallback)
+                                           : static_cast<const void *>(g_materials.data());
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_materialSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, count * sizeof(Material), data, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
 // Paint double‑buffering (replaces single texture)
 static GLuint g_paintTexture[2] = {0, 0}; // two textures for double‑buffering
 static int g_paintWriteIdx = 0;           // currently writing to this texture index
@@ -120,7 +147,7 @@ int g_paintWidth = 0;
 int g_paintHeight = 0;
 
 // Paint shader and related resources
-static AsyncShaderLoader g_paintLoader;
+static ShaderLoader g_paintLoader;
 static bool g_paintShaderReady = false;
 
 // Equation and constraint storage buffers
@@ -163,11 +190,18 @@ static float g_currentSystemStiffness = 1.0f;
 static Object *g_mappedSSBO[2] = {nullptr, nullptr};
 static bool g_useMapBuffer = true;
 
-// Async shader loading
-static AsyncShaderLoader g_computeLoader;
-static AsyncShaderLoader g_quadLoader;
+// Shader programs are compiled on the current context. The DSL program is
+// requested only for objects that explicitly use equation-based execution.
+static ShaderLoader g_computeLoader;
+static ShaderLoader g_defaultJitLoader;
+
+static ShaderLoader g_quadLoader;
 static bool g_computeShaderReady = false;
+static bool g_defaultJitShaderReady = false;
 static bool g_quadShaderReady = false;
+static bool g_dslShaderRequested = false;
+static bool g_defaultJitShaderRequested = false;
+static GLuint g_defaultJitProgram = 0;
 
 static GLuint g_paintShaderProgram = 0;
 static GLuint g_paintTokenSSBO = 0;
@@ -180,9 +214,14 @@ static std::vector<int> g_paintTokens_r, g_paintTokens_g, g_paintTokens_b, g_pai
 static std::vector<float> g_paintConsts_r, g_paintConsts_g, g_paintConsts_b, g_paintConsts_a;
 
 static std::vector<int> g_scriptIDs(Objects::MAX_OBJECTS, -1);
+static std::vector<int> g_objectEquationIDs(Objects::MAX_OBJECTS, 0);
+static std::vector<bool> g_hasDslEquation(Objects::MAX_OBJECTS, false);
 static std::unordered_map<int, std::vector<int>> g_scriptGroups;
+static std::vector<int> g_defaultJitIndices;
+static std::vector<int> g_dslIndices;
 static bool g_groupsDirty = true;
 static ScriptManager *g_scriptManager = nullptr;
+static int g_defaultEquationID = 0;
 
 // Static index SSBO for group dispatch (reused each frame)
 static GLuint g_indexSSBO = 0;
@@ -194,6 +233,117 @@ static bool g_firstPaintFrame = true;
 
 // current read buffer index for agent dispatch
 static int g_currentReadBufferIndex = 0;
+
+// ---------------------------------------------------------------------------
+// Material registry. The CPU records are mirrored into the renderer SSBO.
+// Meshes store stable material IDs; -1 keeps the legacy per-object color path.
+// ---------------------------------------------------------------------------
+namespace Materials
+{
+    int Create(const Material &material)
+    {
+        if (material.type != MaterialType::SOLID_COLOR &&
+            material.type != MaterialType::EMISSIVE)
+            return -1;
+
+        const int id = static_cast<int>(g_materials.size());
+        g_materials.push_back(material);
+        g_materialValid.push_back(true);
+        UploadMaterialRegistry();
+        return id;
+    }
+
+    bool Update(int materialID, const Material &material)
+    {
+        if (!IsValid(materialID) ||
+            (material.type != MaterialType::SOLID_COLOR &&
+             material.type != MaterialType::EMISSIVE))
+            return false;
+
+        g_materials[materialID] = material;
+        UploadMaterialRegistry();
+        return true;
+    }
+
+    bool Destroy(int materialID)
+    {
+        if (!IsValid(materialID))
+            return false;
+
+        g_materialValid[materialID] = false;
+        g_materials[materialID] = Material::SolidColor(glm::vec4(1.0f));
+
+        // Clear every mesh reference before the slot becomes unusable.
+        for (int meshID : Meshes::GetLiveIds())
+            if (Meshes::GetMaterial(meshID) == materialID)
+                Meshes::SetMaterial(meshID, -1);
+
+        UploadMaterialRegistry();
+        return true;
+    }
+
+    bool IsValid(int materialID) noexcept
+    {
+        return materialID >= 0 &&
+               materialID < static_cast<int>(g_materialValid.size()) &&
+               g_materialValid[materialID];
+    }
+
+    const Material *Get(int materialID) noexcept
+    {
+        return IsValid(materialID) ? &g_materials[materialID] : nullptr;
+    }
+
+    int Count() noexcept
+    {
+        return static_cast<int>(g_materials.size());
+    }
+
+    bool InitializeGPU()
+    {
+        if (!g_materialSSBO)
+            glGenBuffers(1, &g_materialSSBO);
+        if (!g_materialSSBO)
+            return false;
+        UploadMaterialRegistry();
+
+        // The light SSBO begins with a 16-byte std430 header: count + padding.
+        if (!g_emissiveLightSSBO)
+            glGenBuffers(1, &g_emissiveLightSSBO);
+        if (!g_emissiveLightSSBO)
+            return false;
+        const GLuint lightHeader[4] = {0, 0, 0, 0};
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_emissiveLightSSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER,
+                     16 + static_cast<GLsizeiptr>(Objects::MAX_OBJECTS) * 48,
+                     nullptr, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(lightHeader), lightHeader);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+        if (!g_meshMaterialSSBO)
+            glGenBuffers(1, &g_meshMaterialSSBO);
+        if (!g_meshMaterialSSBO)
+            return false;
+        const int noMaterial = -1;
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_meshMaterialSSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int), &noMaterial, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+        return glGetError() == GL_NO_ERROR;
+    }
+
+    void CleanupGPU()
+    {
+        for (int meshID : Meshes::GetLiveIds())
+            Meshes::SetMaterial(meshID, -1);
+
+        if (g_materialSSBO)
+            glDeleteBuffers(1, &g_materialSSBO);
+        g_materialSSBO = 0;
+        g_materials.clear();
+        g_materialValid.clear();
+    }
+}
 
 // I am sorry for my sloppy code
 GLuint Objects::GetContactBuffer() { return g_contactBufferSSBO; }
@@ -332,7 +482,9 @@ void Objects::GetPaintImage(std::vector<unsigned char> &jpeg_data, int quality)
 void Objects::GetFullFrameImage(std::vector<unsigned char> &jpeg_data,
                                 int quality,
                                 int objectBufferIndex,
-                                const glm::mat4 &projView)
+                                const glm::mat4 &projView,
+                                const glm::vec3 &lightDir,
+                                bool directionalLightEnabled)
 {
     (void)projView; // unused — camera matrices now come from g_camera3d
 
@@ -413,7 +565,6 @@ void Objects::GetFullFrameImage(std::vector<unsigned char> &jpeg_data,
     glm::mat4 P = g_camera3d.Projection(width, height);
     glm::mat4 V = g_camera3d.View();
     glm::vec3 camPos = g_camera3d.eye;
-    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.4f, -0.7f, -0.6f));
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -421,7 +572,8 @@ void Objects::GetFullFrameImage(std::vector<unsigned char> &jpeg_data,
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-    Draw(objectBufferIndex, P, V, camPos, lightDir);
+    Draw(objectBufferIndex, P, V, camPos,
+         lightDir, directionalLightEnabled);
     glDisable(GL_CULL_FACE);
 
     // --- Paint overlay on top (DispatchPaint draws its own fullscreen quad) ---
@@ -760,13 +912,69 @@ static void rebuildScriptGroups()
 {
     if (!g_groupsDirty)
         return;
+
     g_scriptGroups.clear();
+    g_defaultJitIndices.clear();
+    g_dslIndices.clear();
+
     for (int i = 0; i < g_numObjects; ++i)
     {
-        int sid = g_scriptIDs[i];
-        g_scriptGroups[sid].push_back(i);
+        const int scriptID = g_scriptIDs[i];
+        if (scriptID >= 0)
+        {
+            g_scriptGroups[scriptID].push_back(i);
+        }
+        else if (g_hasDslEquation[i])
+        {
+            g_dslIndices.push_back(i);
+        }
+        else
+        {
+            g_defaultJitIndices.push_back(i);
+        }
     }
+
     g_groupsDirty = false;
+}
+
+static void requestDefaultJitShader()
+{
+    if (g_defaultJitShaderRequested)
+        return;
+
+    g_defaultJitShaderRequested = true;
+    g_defaultJitLoader.LoadComputeShader(
+        "default_object.comp",
+        [](GLuint program)
+        {
+            g_defaultJitProgram = program;
+            g_defaultJitShaderReady = (program != 0);
+        },
+        [](const std::string &error)
+        {
+            g_defaultJitShaderReady = false;
+            std::cerr << "\n[Objects] Default JIT shader FAILED: " << error << std::endl;
+        });
+}
+
+static void requestDslShader()
+{
+    if (g_dslShaderRequested)
+        return;
+
+    g_dslShaderRequested = true;
+    g_computeLoader.LoadComputeShader(
+        "math.comp",
+        [](GLuint program)
+        {
+            g_programCompute = program;
+            g_computeShaderReady = (program != 0);
+        },
+        [](const std::string &error)
+        {
+            g_computeShaderReady = false;
+            std::cerr << "\n[Objects] DSL shader FAILED: " << error << std::endl;
+        });
 }
 
 // ============================================================================
@@ -779,6 +987,8 @@ void Objects::SetScriptID(int objectIndex, int scriptID)
         return;
     g_scriptIDs[objectIndex] = scriptID;
     g_groupsDirty = true;
+    if (scriptID < 0 && g_hasDslEquation[objectIndex])
+        requestDslShader();
 }
 
 int Objects::GetScriptID(int objectIndex)
@@ -928,6 +1138,7 @@ void Objects::AddConstraint(int objectIndex, const Constraint &constraint)
     }
 
     UploadConstraintsToGPU();
+    g_groupsDirty = true;
 }
 
 // Remove a constraint from an object
@@ -965,6 +1176,7 @@ void Objects::RemoveConstraint(int objectIndex, int constraintLocalIndex)
 
     CompactConstraintArray();
     UploadConstraintsToGPU();
+    g_groupsDirty = true;
 }
 
 // Clear all constraints from an object
@@ -992,6 +1204,7 @@ void Objects::ClearConstraints(int objectIndex)
 
     CompactConstraintArray();
     UploadConstraintsToGPU();
+    g_groupsDirty = true;
 }
 
 // Clear all constraints from all objects
@@ -1001,6 +1214,7 @@ void Objects::ClearAllConstraints()
         g_objectConstraintMappings[i] = ObjectConstraints();
     g_allConstraints.clear();
     UploadConstraintsToGPU();
+    g_groupsDirty = true;
 }
 
 // Get all constraints for an object
@@ -1203,6 +1417,8 @@ static void dispatchGroupWithProgram(GLuint program,
 // ============================================================================
 bool Objects::Init(void *glfwWindow)
 {
+    (void)glfwWindow;
+
     // Check OpenGL state
     GLenum err = glGetError();
     if (err != GL_NO_ERROR)
@@ -1218,6 +1434,7 @@ bool Objects::Init(void *glfwWindow)
     // Initialize data structures
     g_equationMappings.resize(Objects::MAX_EQUATIONS);
     g_objectConstraintMappings.resize(Objects::MAX_OBJECTS);
+    g_collisionProperties.resize(Objects::MAX_OBJECTS);
 
     for (auto &mapping : g_equationMappings)
         mapping = EquationMapping{};
@@ -1225,11 +1442,15 @@ bool Objects::Init(void *glfwWindow)
     for (auto &mapping : g_objectConstraintMappings)
         mapping = ObjectConstraints{};
 
-    // Create default equation
-    ParserContext context;
-    ParsedEquation defaultEq = ParseEquation("vx, vy, -k*x/mass, -k*y/mass, 0, 1, 0, 0, 1", context);
-    int defaultEqID = AddOrGetEquation("default_zero", defaultEq);
+    // Reset dispatch metadata before any objects are created.
     g_numObjects = 0;
+    std::fill(g_scriptIDs.begin(), g_scriptIDs.end(), -1);
+    std::fill(g_objectEquationIDs.begin(), g_objectEquationIDs.end(), 0);
+    std::fill(g_hasDslEquation.begin(), g_hasDslEquation.end(), false);
+    g_scriptGroups.clear();
+    g_defaultJitIndices.clear();
+    g_dslIndices.clear();
+    g_groupsDirty = true;
 
     // Create double-buffered SSBOs for objects
     if (g_objectSSBO[0] == 0)
@@ -1315,11 +1536,15 @@ bool Objects::Init(void *glfwWindow)
     if (err != GL_NO_ERROR)
         return false;
 
+    // Initialize the material SSBO while the renderer's GL context is current.
+    if (!Materials::InitializeGPU())
+        return false;
+
     // Upload initial data to GPU
     UploadPackedEquationsToGPU();
     UploadConstraintsToGPU();
 
-    // Upload equation mappings
+    // Allocate equation mappings before registering the built-in equation.
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_mappingsSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
                  Objects::MAX_EQUATIONS * sizeof(EquationMapping),
@@ -1330,43 +1555,41 @@ bool Objects::Init(void *glfwWindow)
         return false;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    // Load compute shader asynchronously
-    if (g_programCompute == 0)
+    // The built-in equation is registered after its backing SSBOs exist.
+    ParserContext context;
+    ParsedEquation defaultEq = ParseEquation(
+        "vx, vy, -k*x/mass, -k*y/mass, 0, 1, 0, 0, 1", context);
+    g_defaultEquationID = AddOrGetEquation("default_zero", defaultEq);
+    std::fill(g_objectEquationIDs.begin(), g_objectEquationIDs.end(), g_defaultEquationID);
+
+    // The single default JIT program is compiled before the first update.
+    // The DSL program is loaded only when an object uses set_equation().
+
+    // Compile the GPU pass that gathers per-instance emissive materials into
+    // the point-light SSBO consumed by quad.frag.
+    if (g_emissiveLightProgram == 0)
     {
-        g_computeLoader.LoadComputeShaderAsync(
-            "math.comp",
+        g_emissiveLightLoader.LoadComputeShader(
+            "emissive_lights.comp",
             [](GLuint program)
             {
-                g_programCompute = program;
-                g_computeShaderReady = true;
-
-                // Set initial collision parameters when shader is loaded
-                if (g_programCompute)
-                {
-                    glUseProgram(g_programCompute);
-
-                    GLint enableWarmStartLoc = glGetUniformLocation(g_programCompute, "uEnableWarmStart");
-                    if (enableWarmStartLoc != -1)
-                        glUniform1i(enableWarmStartLoc, g_enableWarmStart ? 1 : 0);
-
-                    GLint maxContactIterationsLoc = glGetUniformLocation(g_programCompute, "uMaxContactIterations");
-                    if (maxContactIterationsLoc != -1)
-                        glUniform1i(maxContactIterationsLoc, g_maxContactIterations);
-
-                    glUseProgram(0);
-                }
+                g_emissiveLightProgram = program;
+                g_emissiveLightShaderReady = true;
             },
             [](const std::string &error)
             {
-                std::cerr << "\n[Objects] Compute shader FAILED: " << error << std::endl;
-                g_computeShaderReady = false;
+                std::cerr << "\n[Objects] Emissive-light shader FAILED: "
+                          << error << std::endl;
+                g_emissiveLightShaderReady = false;
             });
     }
+    if (!g_emissiveLightShaderReady || !g_emissiveLightProgram)
+        return false;
 
-    // Load quad rendering shader asynchronously
+    // Load the graphics shader while the simulation context is current.
     if (g_programQuad == 0)
     {
-        g_quadLoader.LoadGraphicsShaderAsync(
+        g_quadLoader.LoadGraphicsShader(
             "quad.vert",
             "quad.frag",
             "quad.geom",
@@ -1382,6 +1605,11 @@ bool Objects::Init(void *glfwWindow)
             });
     }
     InitPaintShader(g_width, g_height);
+
+    // The default object program is ready before the first simulation step.
+    requestDefaultJitShader();
+    if (!g_defaultJitShaderReady || g_defaultJitProgram == 0)
+        return false;
 
     // ---- initialise signal queue with default capacity ----
     SetSignalQueueCapacity(1024); // default
@@ -1403,104 +1631,139 @@ bool Objects::Init(void *glfwWindow)
 // ============================================================================
 // Update object physics using compute shader
 // ============================================================================
-void Objects::Update(int inputIndex, int outputIndex, float dt)
+bool Objects::Update(int inputIndex, int outputIndex, float dt)
 {
     UpdateShaderLoadingStatus();
     rebuildScriptGroups();
 
-    // -------------------------------------------------------------
-    // 1 DSL dispatch
-    // -------------------------------------------------------------
-    if (g_programCompute && g_computeShaderReady)
+    if (inputIndex < 0 || inputIndex > 1 || outputIndex < 0 || outputIndex > 1 ||
+        inputIndex == outputIndex)
+        return false;
+    if (g_numObjects <= 0)
     {
-        glUseProgram(g_programCompute);
-
-        // ---- Set all uniforms ----
-        glUniform1f(glGetUniformLocation(g_programCompute, "uDt"), dt);
-        glUniform1f(glGetUniformLocation(g_programCompute, "uTime"), g_simulationTime);
-        glUniform1f(glGetUniformLocation(g_programCompute, "k"), g_currentSystemStiffness);
-        glUniform1f(glGetUniformLocation(g_programCompute, "b"), g_currentSystemDamping);
-        glUniform1f(glGetUniformLocation(g_programCompute, "g"), g_currentSystemGravity);
-        glUniform2f(glGetUniformLocation(g_programCompute, "uGravityDir"), 0.0f, -1.0f);
-        glUniform1f(glGetUniformLocation(g_programCompute, "uRestitution"), 0.7f);
-        glUniform1f(glGetUniformLocation(g_programCompute, "uCoupling"), 1.0f);
-        glUniform2f(glGetUniformLocation(g_programCompute, "uExternalForce"), 0.0f, 0.0f);
-        glUniform1f(glGetUniformLocation(g_programCompute, "uDriveFreq"), 1.0f);
-        glUniform1f(glGetUniformLocation(g_programCompute, "uDriveAmp"), 0.0f);
-        glUniform1i(glGetUniformLocation(g_programCompute, "uEquationMode"), 0);
-        glUniform1i(glGetUniformLocation(g_programCompute, "uNumObjects"), g_numObjects);
-        glUniform1i(glGetUniformLocation(g_programCompute, "uEnableWarmStart"), g_enableWarmStart ? 1 : 0);
-        glUniform1i(glGetUniformLocation(g_programCompute, "uMaxContactIterations"), g_maxContactIterations);
-
-        // ---- signal queue uniforms for object shaders ----
-        GLint capLoc = glGetUniformLocation(g_programCompute, "uSignalQueueCapacity");
-        if (capLoc != -1)
-            glUniform1ui(capLoc, (GLuint)g_signalQueueCapacity);
-        GLint policyLoc = glGetUniformLocation(g_programCompute, "uSignalQueueOverflowPolicy");
-        if (policyLoc != -1)
-            glUniform1i(policyLoc, g_signalQueueOverflowPolicy);
-
-        // ---- set scratchpad offsets ----
-        GLint offsetLoc = glGetUniformLocation(g_programCompute, "uScratchpadOffsets");
-        if (offsetLoc != -1)
-        {
-            int offsets[16] = {0};
-            for (auto &pair : g_scratchpads)
-            {
-                if (pair.first < 16)
-                    offsets[pair.first] = (int)(pair.second.offsetInPool); // offset already in floats
-            }
-            glUniform1iv(offsetLoc, 16, offsets);
-        }
-
-        // ---- Bind SSBOs (bindings 0–8) ----
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_objectSSBO[outputIndex]);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_allTokensSSBO);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_allConstantsSSBO);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, g_mappingsSSBO);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, g_constraintsSSBO);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
-        if (g_enableWarmStart && g_contactBufferSSBO)
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, g_contactBufferSSBO);
-
-        // ---- bind scratchpad pool (binding 10) and signal queue (binding 11) ----
-        if (g_scratchpadPool != 0)
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
-        if (g_signalQueueBuffer != 0)
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
-        // -------------------------------------------------------------
-
-        // ---- Dispatch over all objects ----
-        int workGroupSize = 64;
-        int numWorkGroups = (g_numObjects + workGroupSize - 1) / workGroupSize;
-        glDispatchCompute(numWorkGroups, 1, 1);
-
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-        glUseProgram(0);
+        g_currentReadBufferIndex = outputIndex;
+        return true;
     }
 
-    // -------------------------------------------------------------
-    // 2) JIT group overrides (overwrites results for JIT objects)
-    // -------------------------------------------------------------
-    if (g_scriptManager)
+    // Load only the programs required by the current object groups.
+    const bool needsDefaultJit = !g_defaultJitIndices.empty();
+    for (const auto &group : g_scriptGroups)
     {
-        for (auto &pair : g_scriptGroups)
+        if (!g_scriptManager || g_scriptManager->getProgram(group.first) == 0)
+            return false;
+    }
+    if (needsDefaultJit && (!g_defaultJitShaderReady || g_defaultJitProgram == 0))
+        return false;
+    if (!g_dslIndices.empty() && (!g_computeShaderReady || g_programCompute == 0))
+        return false;
+    // Every object has a ready execution path before the ping-pong buffers advance.
+    glBindBuffer(GL_COPY_READ_BUFFER, g_objectSSBO[inputIndex]);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, g_objectSSBO[outputIndex]);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
+                        0, 0, static_cast<GLsizeiptr>(g_numObjects) * sizeof(Object));
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+
+    const bool defaultReady = g_defaultJitShaderReady && g_defaultJitProgram != 0;
+
+    if (defaultReady && !g_defaultJitIndices.empty())
+    {
+        dispatchGroupWithProgram(g_defaultJitProgram, g_defaultJitIndices,
+                                 inputIndex, outputIndex, dt);
+    }
+
+    // A registered object script always takes precedence over a DSL equation.
+    for (const auto &group : g_scriptGroups)
+    {
+        const int scriptID = group.first;
+        const GLuint program = g_scriptManager
+                                   ? g_scriptManager->getProgram(scriptID)
+                                   : 0;
+        if (program != 0)
         {
-            int sid = pair.first;
-            if (sid == -1)
-                continue; // skip DSL group
-            GLuint prog = g_scriptManager->getProgram(sid);
-            if (prog)
-            {
-                dispatchGroupWithProgram(prog, pair.second, inputIndex, outputIndex, dt);
-            }
+            dispatchGroupWithProgram(program, group.second,
+                                     inputIndex, outputIndex, dt);
+        }
+        else if (defaultReady)
+        {
+            dispatchGroupWithProgram(g_defaultJitProgram, group.second,
+                                     inputIndex, outputIndex, dt);
         }
     }
 
-    // ---- store the current read buffer for agents ----
+    // math.comp is reserved for objects explicitly assigned set_equation()
+    // without an object-mode JIT script. It is never dispatched for JIT groups.
+    if (!g_dslIndices.empty())
+    {
+        if (g_computeShaderReady && g_programCompute != 0)
+        {
+            const GLuint program = g_programCompute;
+            glUseProgram(program);
+
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[inputIndex]);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, g_objectSSBO[outputIndex]);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, g_allTokensSSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, g_allConstantsSSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, g_mappingsSSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, g_constraintsSSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, g_objectConstraintsSSBO);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, g_collisionPropsSSBO);
+            if (g_enableWarmStart && g_contactBufferSSBO)
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, g_contactBufferSSBO);
+
+            if (g_indexSSBO == 0)
+                glGenBuffers(1, &g_indexSSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_indexSSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER,
+                         g_dslIndices.size() * sizeof(int),
+                         g_dslIndices.data(), GL_DYNAMIC_DRAW);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, g_indexSSBO);
+
+            if (g_scratchpadPool != 0)
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+            if (g_signalQueueBuffer != 0)
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
+
+            setCommonUniforms(program, dt,
+                              static_cast<int>(g_dslIndices.size()), g_numObjects);
+            glUniform1i(glGetUniformLocation(program, "uEquationMode"), 0);
+            glUniform1i(glGetUniformLocation(program, "uEnableWarmStart"),
+                        g_enableWarmStart ? 1 : 0);
+            glUniform1i(glGetUniformLocation(program, "uMaxContactIterations"),
+                        g_maxContactIterations);
+
+            GLint location = glGetUniformLocation(program, "uSignalQueueCapacity");
+            if (location != -1)
+                glUniform1ui(location, static_cast<GLuint>(g_signalQueueCapacity));
+            location = glGetUniformLocation(program, "uSignalQueueOverflowPolicy");
+            if (location != -1)
+                glUniform1i(location, g_signalQueueOverflowPolicy);
+
+            location = glGetUniformLocation(program, "uScratchpadOffsets");
+            if (location != -1)
+            {
+                int offsets[16] = {};
+                for (const auto &entry : g_scratchpads)
+                {
+                    if (entry.first >= 0 && entry.first < 16)
+                        offsets[entry.first] = static_cast<int>(entry.second.offsetInPool);
+                }
+                glUniform1iv(location, 16, offsets);
+            }
+
+            const GLuint groups = static_cast<GLuint>((g_dslIndices.size() + 63) / 64);
+            if (groups > 0)
+                glDispatchCompute(groups, 1, 1);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT |
+                            GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+            glUseProgram(0);
+        }
+    }
+
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
     g_currentReadBufferIndex = outputIndex;
+    return true;
 }
 
 // ============================================================================
@@ -1618,6 +1881,12 @@ void Objects::SetEquation(const std::string &equationString, const ParsedEquatio
 
     if (objectIndex >= 0 && objectIndex < g_numObjects)
     {
+        g_objectEquationIDs[objectIndex] = eqID;
+        g_hasDslEquation[objectIndex] = true;
+        g_groupsDirty = true;
+        if (g_scriptIDs[objectIndex] < 0)
+            requestDslShader();
+
         if (g_useMapBuffer && g_mappedSSBO[0])
         {
             // Update via mapped memory
@@ -1675,11 +1944,155 @@ void Objects::FetchToCPU(int sourceIndex, std::vector<Object> &out)
 // ----------------------------------------------------------------------------
 void Objects::Draw(int sourceIndex,
                    const glm::mat4 &P, const glm::mat4 &V,
-                   const glm::vec3 &cameraPos, const glm::vec3 &lightDir)
+                   const glm::vec3 &cameraPos, const glm::vec3 &lightDir,
+                   bool directionalLightEnabled)
 {
     GLuint prog = g_programQuad;
     if (!prog || !g_quadShaderReady)
         return;
+
+    const auto &meshGroups = GetMeshGroups(sourceIndex);
+
+    // These low binding points are reused by the simulation's compute shaders.
+    // Save them so the renderer restores the previous binding state afterward.
+    GLint oldSSBOBinding9 = 0, oldSSBOBinding10 = 0, oldSSBOBinding11 = 0;
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 9, &oldSSBOBinding9);
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 10, &oldSSBOBinding10);
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 11, &oldSSBOBinding11);
+
+    // Only translucent meshes need CPU positions, for back-to-front sorting.
+    // Emissive-light positions are gathered entirely on the GPU below.
+    bool needsObjectData = false;
+    bool hasEmissiveMeshes = false;
+    for (const auto &kv : meshGroups)
+    {
+        const Mesh *mesh = Meshes::Get(kv.first);
+        const Material *material = mesh ? Materials::Get(mesh->materialID) : nullptr;
+        if (!material)
+            continue;
+        if (material->type == MaterialType::EMISSIVE)
+            hasEmissiveMeshes = true;
+        if (material->type == MaterialType::SOLID_COLOR && material->color.a > 0.0f &&
+            material->color.a < 0.999f)
+            needsObjectData = true;
+    }
+
+    std::vector<Object> objectData;
+    if (needsObjectData)
+        FetchToCPU(sourceIndex, objectData);
+
+    struct OpaqueBatch
+    {
+        const Mesh *mesh;
+        int materialID;
+        const std::vector<int> *slots;
+    };
+    struct TransparentItem
+    {
+        const Mesh *mesh;
+        int materialID;
+        int objectSlot;
+        float distanceSquared;
+    };
+
+    std::vector<OpaqueBatch> opaqueBatches;
+    std::vector<TransparentItem> transparentItems;
+
+    for (const auto &kv : meshGroups)
+    {
+        const Mesh *mesh = Meshes::Get(kv.first);
+        if (!mesh || kv.second.empty())
+            continue;
+
+        int materialID = mesh->materialID;
+        const Material *material = Materials::Get(materialID);
+        if (!material)
+            materialID = -1;
+
+        if (material && material->type == MaterialType::SOLID_COLOR &&
+            material->color.a <= 0.0f)
+        {
+            // Fully transparent materials do not need a draw call.
+            continue;
+        }
+
+        if (material && material->type == MaterialType::SOLID_COLOR &&
+            material->color.a < 0.999f)
+        {
+            // Transparent instances are drawn individually and sorted
+            // back-to-front; opaque instances retain mesh instancing.
+            for (int slot : kv.second)
+            {
+                if (slot < 0 || slot >= static_cast<int>(objectData.size()))
+                    continue;
+                const glm::vec3 objectPosition(objectData[slot].position.x,
+                                               objectData[slot].position.y,
+                                               objectData[slot].position.z);
+                const glm::vec3 delta = objectPosition - cameraPos;
+                transparentItems.push_back({mesh, materialID, slot,
+                                            glm::dot(delta, delta)});
+            }
+        }
+        else
+        {
+            opaqueBatches.push_back({mesh, materialID, &kv.second});
+        }
+    }
+
+    std::sort(transparentItems.begin(), transparentItems.end(),
+              [](const TransparentItem &a, const TransparentItem &b)
+              { return a.distanceSquared > b.distanceSquared; });
+
+    // Build the meshID -> materialID table only if this frame uses an emitter.
+    // It is small (one int per mesh) and avoids an object-buffer readback.
+    const int meshCount = Meshes::Count();
+    if (hasEmissiveMeshes)
+    {
+        std::vector<int> meshMaterialIDs(static_cast<size_t>(std::max(1, meshCount)), -1);
+        for (int meshID = 0; meshID < meshCount; ++meshID)
+        {
+            const int materialID = Meshes::GetMaterial(meshID);
+            meshMaterialIDs[meshID] = Materials::IsValid(materialID) ? materialID : -1;
+        }
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_meshMaterialSSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER,
+                     meshMaterialIDs.size() * sizeof(int),
+                     meshMaterialIDs.data(), GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, g_meshMaterialSSBO);
+    }
+
+    // Reset the light count every frame. If there are active emissive meshes,
+    // one compute invocation scans each object and compacts emitters into the
+    // light SSBO. There is no per-frame CPU readback of object positions.
+    const GLuint zero = 0;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_emissiveLightSSBO);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(zero), &zero);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, g_emissiveLightSSBO);
+
+    if (hasEmissiveMeshes && g_emissiveLightShaderReady && g_emissiveLightProgram &&
+        g_numObjects > 0)
+    {
+        glUseProgram(g_emissiveLightProgram);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[sourceIndex]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, g_materialSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, g_emissiveLightSSBO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, g_meshMaterialSSBO);
+
+        glUniform1i(glGetUniformLocation(g_emissiveLightProgram, "uNumObjects"),
+                    g_numObjects);
+        glUniform1i(glGetUniformLocation(g_emissiveLightProgram, "uMeshCount"),
+                    meshCount);
+        glUniform1i(glGetUniformLocation(g_emissiveLightProgram, "uMaterialCount"),
+                    Materials::Count());
+        glUniform1ui(glGetUniformLocation(g_emissiveLightProgram, "uLightCapacity"),
+                     static_cast<GLuint>(Objects::MAX_OBJECTS));
+
+        const GLuint workGroupSize = 64;
+        const GLuint workGroupCount =
+            (static_cast<GLuint>(g_numObjects) + workGroupSize - 1) / workGroupSize;
+        glDispatchCompute(workGroupCount, 1, 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    }
 
     glUseProgram(prog);
     auto u = [&](const char *n)
@@ -1688,31 +2101,73 @@ void Objects::Draw(int sourceIndex,
     glUniformMatrix4fv(u("uView"), 1, GL_FALSE, glm::value_ptr(V));
     glUniform3fv(u("uCameraPos"), 1, &cameraPos[0]);
     glUniform3fv(u("uLightDir"), 1, &lightDir[0]);
+    glUniform1i(u("uDirectionalLightEnabled"), directionalLightEnabled ? 1 : 0);
+    glUniform1i(u("uMaterialCount"), Materials::Count());
+    glUniform1i(u("uEmissiveLightCapacity"), Objects::MAX_OBJECTS);
 
-    // Bind the source object buffer at binding 0 so the shader can read Object data.
+    // Bind object, material, emissive-light, and draw-index storage.
+    // Binding 12 is reserved for draw indices in the graphics pipeline.
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, g_objectSSBO[sourceIndex]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, g_materialSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, g_emissiveLightSSBO);
 
-    // Lazily allocated SSBO that holds the per-batch instance index list.
     static GLuint drawIdxSSBO = 0;
     if (!drawIdxSSBO)
         glGenBuffers(1, &drawIdxSSBO);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, drawIdxSSBO);
 
-    for (auto &kv : GetMeshGroups(sourceIndex))
-    {
-        const Mesh *m = Meshes::Get(kv.first);
-        if (!m || kv.second.empty())
-            continue;
+    // Save blend/depth-write state so this renderer does not leak state.
+    const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+    GLboolean oldDepthWrite = GL_TRUE;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &oldDepthWrite);
+    GLint oldBlendSrcRGB = GL_ONE, oldBlendDstRGB = GL_ZERO;
+    GLint oldBlendSrcAlpha = GL_ONE, oldBlendDstAlpha = GL_ZERO;
+    glGetIntegerv(GL_BLEND_SRC_RGB, &oldBlendSrcRGB);
+    glGetIntegerv(GL_BLEND_DST_RGB, &oldBlendDstRGB);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &oldBlendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &oldBlendDstAlpha);
 
-        // Upload the object-slot list for this mesh as the instance index buffer.
+    glDepthMask(GL_TRUE);
+    for (const OpaqueBatch &batch : opaqueBatches)
+    {
+        glUniform1i(u("uMaterialID"), batch.materialID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawIdxSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
-                     kv.second.size() * sizeof(int), kv.second.data(), GL_STREAM_DRAW);
-
-        glBindVertexArray(m->vao);
-        glDrawElementsInstanced(GL_TRIANGLES, m->indexCount,
-                                GL_UNSIGNED_INT, 0, (GLsizei)kv.second.size());
+                     batch.slots->size() * sizeof(int),
+                     batch.slots->data(), GL_STREAM_DRAW);
+        glBindVertexArray(batch.mesh->vao);
+        glDrawElementsInstanced(GL_TRIANGLES, batch.mesh->indexCount,
+                                GL_UNSIGNED_INT, 0, (GLsizei)batch.slots->size());
     }
+
+    if (!transparentItems.empty())
+    {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+
+        for (const TransparentItem &item : transparentItems)
+        {
+            glUniform1i(u("uMaterialID"), item.materialID);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawIdxSSBO);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int),
+                         &item.objectSlot, GL_STREAM_DRAW);
+            glBindVertexArray(item.mesh->vao);
+            glDrawElementsInstanced(GL_TRIANGLES, item.mesh->indexCount,
+                                    GL_UNSIGNED_INT, 0, 1);
+        }
+    }
+
+    glDepthMask(oldDepthWrite);
+    glBlendFuncSeparate(oldBlendSrcRGB, oldBlendDstRGB,
+                        oldBlendSrcAlpha, oldBlendDstAlpha);
+    if (!blendWasEnabled)
+        glDisable(GL_BLEND);
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, static_cast<GLuint>(oldSSBOBinding9));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, static_cast<GLuint>(oldSSBOBinding10));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, static_cast<GLuint>(oldSSBOBinding11));
+
     glBindVertexArray(0);
     glUseProgram(0);
 }
@@ -1730,8 +2185,11 @@ void Objects::AddObject(int meshID)
         return;
     }
 
-    // Reset per-slot bookkeeping that lives outside the Object struct
+    // Reset per-slot bookkeeping that lives outside the Object struct.
     g_scriptIDs[g_numObjects] = -1;
+    g_objectEquationIDs[g_numObjects] = g_defaultEquationID;
+    g_hasDslEquation[g_numObjects] = false;
+    g_groupsDirty = true;
     {
         CollisionProperties fresh{};
         fresh.enabled = 1;
@@ -1750,7 +2208,7 @@ void Objects::AddObject(int meshID)
     }
 
     Object newObject = CreateDefaultObjectInternal(
-        g_currentDefaultObjectType, g_numObjects, 0);
+        g_currentDefaultObjectType, g_numObjects, g_defaultEquationID);
     newObject.meshID = meshID;
 
     if (g_useMapBuffer && g_mappedSSBO[0])
@@ -1807,12 +2265,34 @@ void Objects::UploadBulkObjects(const std::vector<Object> &objects, int startInd
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
+    // Keep the CPU-side dispatch metadata aligned with the uploaded objects.
+    for (size_t i = 0; i < objects.size(); ++i)
+    {
+        const int slot = startIndex + static_cast<int>(i);
+        g_objectEquationIDs[slot] = objects[i].equationID;
+        g_hasDslEquation[slot] = objects[i].equationID != g_defaultEquationID;
+        if (slot >= 0 && slot < Objects::MAX_OBJECTS)
+            g_scriptIDs[slot] = objects[i].scriptID;
+    }
+
     // Update object count
     if (startIndex + static_cast<int>(objects.size()) > g_numObjects)
         g_numObjects = startIndex + static_cast<int>(objects.size());
 
-    // Any upload can change meshIDs; be conservative and invalidate the cache.
+    // Any upload can change mesh IDs or dispatch assignments.
+    g_groupsDirty = true;
     g_meshGroupsDirty = true;
+
+    for (size_t i = 0; i < objects.size(); ++i)
+    {
+        const int slot = startIndex + static_cast<int>(i);
+        if (slot >= 0 && slot < g_numObjects &&
+            g_scriptIDs[slot] < 0 && g_hasDslEquation[slot])
+        {
+            requestDslShader();
+            break;
+        }
+    }
 }
 
 // ============================================================================
@@ -1926,10 +2406,12 @@ void Objects::RemoveObject(int index)
             }
         }
 
-        // ---- migrate script ID (FIX) ----
+        // Move the dispatch metadata with the object occupying this slot.
         g_scriptIDs[removeIdx] = g_scriptIDs[lastObjectIdx];
+        g_objectEquationIDs[removeIdx] = g_objectEquationIDs[lastObjectIdx];
+        g_hasDslEquation[removeIdx] = g_hasDslEquation[lastObjectIdx];
 
-        // ---- migrate collision properties (FIX) ----
+        // ---- migrate collision properties ----
         g_collisionProperties[removeIdx] = g_collisionProperties[lastObjectIdx];
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER,
@@ -1943,6 +2425,8 @@ void Objects::RemoveObject(int index)
     g_objectConstraintMappings[lastObjectIdx] = ObjectConstraints();
 
     g_scriptIDs[lastObjectIdx] = -1;
+    g_objectEquationIDs[lastObjectIdx] = g_defaultEquationID;
+    g_hasDslEquation[lastObjectIdx] = false;
 
     CollisionProperties fresh{};
     fresh.enabled = 1;
@@ -2061,6 +2545,15 @@ void Objects::UpdateObjectCPU(int index, const Object &newData)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
+    if (g_objectEquationIDs[index] != newData.equationID)
+    {
+        g_objectEquationIDs[index] = newData.equationID;
+        g_hasDslEquation[index] = (newData.equationID != g_defaultEquationID);
+        g_groupsDirty = true;
+        if (g_hasDslEquation[index] && g_scriptIDs[index] < 0)
+            requestDslShader();
+    }
+
     if (oldMeshID != newData.meshID)
         g_meshGroupsDirty = true;
 }
@@ -2153,6 +2646,13 @@ void Objects::MarkMeshGroupsDirty() { g_meshGroupsDirty = true; }
 // ============================================================================
 void Objects::Cleanup()
 {
+    // Release loader state while the simulation's OpenGL context is current.
+    g_defaultJitLoader.Cancel();
+    g_computeLoader.Cancel();
+    g_quadLoader.Cancel();
+    g_paintLoader.Cancel();
+    g_emissiveLightLoader.Cancel();
+
     // Unmap buffers if mapped
     if (g_useMapBuffer)
     {
@@ -2168,24 +2668,29 @@ void Objects::Cleanup()
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
-    if (g_paintTexture[0] || g_paintTexture[1])
-    {
-        glDeleteTextures(2, g_paintTexture);
-        g_paintTexture[0] = 0;
-        g_paintTexture[1] = 0;
-    }
+    CleanupPaint();
 
-    // Delete shader programs
+    // Delete programs owned by the object system.
     glDeleteProgram(g_programCompute);
+    glDeleteProgram(g_defaultJitProgram);
     glDeleteProgram(g_programQuad);
+    glDeleteProgram(g_emissiveLightProgram);
     g_programCompute = 0;
+    g_defaultJitProgram = 0;
     g_programQuad = 0;
+    g_emissiveLightProgram = 0;
+    g_emissiveLightShaderReady = false;
 
     g_computeShaderReady = false;
+    g_defaultJitShaderReady = false;
     g_quadShaderReady = false;
+    g_dslShaderRequested = false;
+    g_defaultJitShaderRequested = false;
+    g_paintShaderReady = false;
 
     // Delete all buffers and VAOs
     SafeDeleteBuffers(g_objectSSBO, 2);
+    SafeDeleteBuffers(&g_indexSSBO, 1);
     // SafeDeleteVertexArrays(g_renderVAO, 2);
 
     SafeDeleteBuffers(&g_allTokensSSBO, 1);
@@ -2196,12 +2701,23 @@ void Objects::Cleanup()
     SafeDeleteBuffers(&g_objectConstraintsSSBO, 1);
     SafeDeleteBuffers(&g_collisionPropsSSBO, 1);
     SafeDeleteBuffers(&g_contactBufferSSBO, 1); //  Delete contact buffer
+    Materials::CleanupGPU();
+    if (g_emissiveLightSSBO)
+        glDeleteBuffers(1, &g_emissiveLightSSBO);
+    if (g_meshMaterialSSBO)
+        glDeleteBuffers(1, &g_meshMaterialSSBO);
+    g_emissiveLightSSBO = 0;
+    g_meshMaterialSSBO = 0;
 
     // ---- clean up scratchpad and signal queue ----
     if (g_scratchpadPool)
         glDeleteBuffers(1, &g_scratchpadPool);
     if (g_signalQueueBuffer)
         glDeleteBuffers(1, &g_signalQueueBuffer);
+    g_scratchpadPool = 0;
+    g_scratchpadPoolSize = 0;
+    g_scratchpadPoolDirty = false;
+    g_signalQueueBuffer = 0;
     g_scratchpads.clear();
     // ----------------------------------------------------
 
@@ -2214,6 +2730,13 @@ void Objects::Cleanup()
     g_allConstraints.clear();
     g_objectConstraintMappings.clear();
     g_collisionProperties.clear();
+    std::fill(g_scriptIDs.begin(), g_scriptIDs.end(), -1);
+    std::fill(g_objectEquationIDs.begin(), g_objectEquationIDs.end(), g_defaultEquationID);
+    std::fill(g_hasDslEquation.begin(), g_hasDslEquation.end(), false);
+    g_scriptGroups.clear();
+    g_defaultJitIndices.clear();
+    g_dslIndices.clear();
+    g_groupsDirty = true;
 
     // Clear derived caches
     g_meshGroups.clear();
@@ -2234,8 +2757,8 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
     int texW = (g_paintWidth > 0) ? g_paintWidth : screenWidth;
     int texH = (g_paintHeight > 0) ? g_paintHeight : screenHeight;
 
-    // Load paint.comp asynchronously (same as before)
-    g_paintLoader.LoadComputeShaderAsync(
+    // Load paint.comp on the current context.
+    g_paintLoader.LoadComputeShader(
         "paint.comp",
         [](GLuint program)
         {
@@ -2247,7 +2770,7 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
         },
         [](const std::string &error)
         {
-            std::cerr << "[AsyncLoader] Paint shader FAILED: " << error << std::endl;
+            std::cerr << "[ShaderLoader] Paint shader FAILED: " << error << std::endl;
             g_paintShaderReady = false;
         });
 
@@ -2360,6 +2883,34 @@ void Objects::InitPaintShader(int screenWidth, int screenHeight)
 
     glDeleteShader(vs);
     glDeleteShader(fs);
+}
+
+void Objects::CleanupPaint()
+{
+    g_paintLoader.Cancel();
+
+    if (g_paintShaderProgram)
+        glDeleteProgram(g_paintShaderProgram);
+    if (g_paintQuadProgram)
+        glDeleteProgram(g_paintQuadProgram);
+    if (g_paintQuadVAO)
+        glDeleteVertexArrays(1, &g_paintQuadVAO);
+
+    if (g_paintTexture[0] || g_paintTexture[1])
+        glDeleteTextures(2, g_paintTexture);
+
+    SafeDeleteBuffers(&g_paintTokenSSBO, 1);
+    SafeDeleteBuffers(&g_paintConstSSBO, 1);
+    SafeDeleteBuffers(&g_paintQuadVBO, 1);
+
+    g_paintShaderProgram = 0;
+    g_paintQuadProgram = 0;
+    g_paintQuadVAO = 0;
+    g_paintTexture[0] = 0;
+    g_paintTexture[1] = 0;
+    g_paintShaderReady = false;
+    g_paintWriteIdx = 0;
+    g_paintReadIdx = 1;
 }
 
 void Objects::ResizePaintTexture(int width, int height)
@@ -2653,9 +3204,6 @@ void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float
 // ============================================================================
 void Objects::UpdateShaderLoadingStatus()
 {
-    g_computeLoader.Update();
-    g_quadLoader.Update();
-    g_paintLoader.Update();
 }
 
 // ============================================================================
@@ -2679,7 +3227,9 @@ bool Objects::IsQuadShaderReady()
 // ============================================================================
 bool Objects::AreAllShadersReady()
 {
-    return g_computeShaderReady && g_quadShaderReady && g_paintShaderReady;
+    const bool defaultReady = !g_defaultJitShaderRequested || g_defaultJitShaderReady;
+    const bool dslReady = !g_dslShaderRequested || g_computeShaderReady;
+    return defaultReady && dslReady && g_quadShaderReady && g_paintShaderReady;
 }
 
 // ============================================================================
@@ -2687,10 +3237,19 @@ bool Objects::AreAllShadersReady()
 // ============================================================================
 float Objects::GetShaderLoadProgress()
 {
-    float computeProgress = g_computeLoader.GetProgress();
-    float quadProgress = g_quadLoader.GetProgress();
-    float paintProgress = g_paintLoader.GetProgress();
-    return (computeProgress + quadProgress + paintProgress) / 3.0f;
+    float total = g_quadLoader.GetProgress() + g_paintLoader.GetProgress();
+    int active = 2;
+    if (g_defaultJitShaderRequested)
+    {
+        total += g_defaultJitLoader.GetProgress();
+        ++active;
+    }
+    if (g_dslShaderRequested)
+    {
+        total += g_computeLoader.GetProgress();
+        ++active;
+    }
+    return active > 0 ? total / static_cast<float>(active) : 1.0f;
 }
 
 // ============================================================================
@@ -2698,14 +3257,15 @@ float Objects::GetShaderLoadProgress()
 // ============================================================================
 std::string Objects::GetShaderLoadStatusMessage()
 {
-    if (!g_computeShaderReady)
-        return "[1/3] " + g_computeLoader.GetStatusMessage();
-    else if (!g_quadShaderReady)
-        return "[2/3] " + g_quadLoader.GetStatusMessage();
-    else if (!g_paintShaderReady)
-        return "[3/3] " + g_paintLoader.GetStatusMessage();
-    else
-        return "All shaders ready!";
+    if (g_defaultJitShaderRequested && !g_defaultJitShaderReady)
+        return "Default JIT: " + g_defaultJitLoader.GetStatusMessage();
+    if (g_dslShaderRequested && !g_computeShaderReady)
+        return "DSL: " + g_computeLoader.GetStatusMessage();
+    if (!g_quadShaderReady)
+        return "Quad: " + g_quadLoader.GetStatusMessage();
+    if (!g_paintShaderReady)
+        return "Paint: " + g_paintLoader.GetStatusMessage();
+    return "All required shaders ready!";
 }
 
 // ============================================================================
@@ -2719,6 +3279,7 @@ void Objects::SetCollisionEnabled(int objectIndex, bool enabled)
         return;
 
     g_collisionProperties[objectIndex].enabled = enabled ? 1 : 0;
+    g_groupsDirty = true;
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,
@@ -2735,6 +3296,7 @@ void Objects::SetCollisionShape(int objectIndex, CollisionShape shape)
         return;
 
     g_collisionProperties[objectIndex].shapeType = static_cast<int>(shape);
+    g_groupsDirty = true;
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, g_collisionPropsSSBO);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER,

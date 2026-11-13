@@ -175,6 +175,9 @@ CollisionProperties collisionProps[];
 layout(std430, binding = 8) buffer ContactBuffer {
 ContactPoint contacts[];
 };
+layout(std430, binding = 9) readonly buffer ObjectIndices {
+int objectIndices[];
+};
 
 uniform float uDt;                   // time step
 uniform float uTime;                 // global time
@@ -192,6 +195,7 @@ uniform int uNumObjects;           // number of objects
 uniform int uEnableWarmStart;      // 1 = enable warm starting
 uniform int uMaxContactIterations; // maximum contact iterations
 uniform float uDerivativeEpsilon;    // step size for numerical derivatives
+uniform int uGroupCount;
 
 // ----------------------------------------------------------------------------
 // TOKEN CODES (must match CPU serializer)
@@ -2146,10 +2150,9 @@ contacts[ci].accumulatedTangentImpulse = 0.0;
 //It all comes together here. This is where we calculate the new position, velocity, and color of each object based on the physics and equations defined above.
 void main() {
 uint gid = gl_GlobalInvocationID.x;
-if(int(gid)>=uNumObjects) return;
-
-Object p = objectsIn[gid];
-int self = int(gid);
+if (gid >= uint(uGroupCount)) return;
+int self = objectIndices[gid];
+Object p = objectsIn[self];
 
 if(p.visualSkinType==-1) {
 objectsOut[self].position = p.position;

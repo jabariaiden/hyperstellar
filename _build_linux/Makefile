@@ -345,6 +345,30 @@ home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.s
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.s
 
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.o
+
+# target to build an object file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o
+
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.i: home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.i
+
+# target to preprocess a source file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.i
+
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.s: home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.s
+
+# target to generate assembly for a file
+home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s
+.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.s
+
 home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.o
 
@@ -585,30 +609,6 @@ home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
 
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.o
-
-# target to build an object file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.o
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.i: home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.i
-
-# target to preprocess a source file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.i
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.s: home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.s
-
-# target to generate assembly for a file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.cpp.s
-
 simulation_wrapper.o: simulation_wrapper.cpp.o
 .PHONY : simulation_wrapper.o
 
@@ -669,6 +669,9 @@ help:
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.s"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.o"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.i"
+	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.s"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.s"
@@ -699,9 +702,6 @@ help:
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.s"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.o"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.i"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/vectorfield.s"
 	@echo "... simulation_wrapper.o"
 	@echo "... simulation_wrapper.i"
 	@echo "... simulation_wrapper.s"

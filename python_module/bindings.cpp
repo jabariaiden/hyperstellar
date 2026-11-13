@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include "simulation_wrapper.h"
 #include "../include/mesh.h"
+#include "../include/material.h"
 #include <array>
 #include <tuple>
 #include <cstdint>
@@ -21,8 +22,97 @@
 
 namespace py = pybind11;
 
-namespace stellar_binding
+namespace stellar_binding //literally
 {
+    inline glm::vec4 parse_rgba(py::handle value)
+    {
+        if (!py::isinstance<py::tuple>(value) && !py::isinstance<py::list>(value))
+            throw py::type_error("SOLID_COLOR materials require color=(r, g, b, a)");
+
+        auto sequence = py::reinterpret_borrow<py::sequence>(value);
+        if (sequence.size() != 4)
+            throw py::value_error("SOLID_COLOR materials require exactly four color components (RGBA)");
+
+        return glm::vec4(
+            sequence[0].cast<float>(), sequence[1].cast<float>(),
+            sequence[2].cast<float>(), sequence[3].cast<float>());
+    }
+
+    inline glm::vec3 parse_rgb(py::handle value)
+    {
+        if (!py::isinstance<py::tuple>(value) && !py::isinstance<py::list>(value))
+            throw py::type_error("EMISSIVE materials require color=(r, g, b)");
+
+        auto sequence = py::reinterpret_borrow<py::sequence>(value);
+        if (sequence.size() != 3)
+            throw py::value_error("EMISSIVE materials require exactly three color components (RGB)");
+
+        return glm::vec3(
+            sequence[0].cast<float>(), sequence[1].cast<float>(),
+            sequence[2].cast<float>());
+    }
+
+    inline Material make_material(MaterialType type, py::handle color, float intensity)
+    {
+        switch (type)
+        {
+        case MaterialType::SOLID_COLOR:
+            return Material::SolidColor(parse_rgba(color));
+        case MaterialType::EMISSIVE:
+            return Material::Emissive(parse_rgb(color), intensity);
+        default:
+            throw py::value_error("Unsupported MaterialType");
+        }
+    }
+
+    template <typename RegisterMesh>
+    inline int register_mesh_with_material(int materialID, RegisterMesh &&registerMesh)
+    {
+        if (materialID < -1 ||
+            (materialID >= 0 && !Materials::IsValid(materialID)))
+            throw py::value_error("Invalid material_id");
+
+        const int meshID = registerMesh();
+        if (meshID >= 0 && materialID >= 0 && !Meshes::SetMaterial(meshID, materialID))
+        {
+            Meshes::Destroy(meshID);
+            throw py::value_error("Could not assign material to the registered mesh");
+        }
+        return meshID;
+    }
+
+    inline float config_float(const py::dict &config, const char *key, float fallback)
+    {
+        const py::str name(key);
+        return config.contains(name) ? py::cast<float>(config[name]) : fallback;
+    }
+
+    inline int config_int(const py::dict &config, const char *key, int fallback)
+    {
+        const py::str name(key);
+        return config.contains(name) ? py::cast<int>(config[name]) : fallback;
+    }
+
+    inline glm::vec3 config_vec3(const py::dict &config, const char *key,
+                                 const glm::vec3 &fallback)
+    {
+        const py::str name(key);
+        if (!config.contains(name))
+            return fallback;
+        const auto value = py::cast<std::array<float, 3>>(config[name]);
+        return glm::vec3(value[0], value[1], value[2]);
+    }
+
+    inline glm::vec4 config_vec4(const py::dict &config, const char *key,
+                                 const glm::vec4 &fallback)
+    {
+        const py::str name(key);
+        if (!config.contains(name))
+            return fallback;
+        const auto value = py::cast<std::array<float, 4>>(config[name]);
+        return glm::vec4(value[0], value[1], value[2], value[3]);
+    }
+
     inline int object_index(SimulationWrapper &self, py::handle value,
                             const char *argument_name)
     {
@@ -102,6 +192,7 @@ PYBIND11_MODULE(stellar, m)
         This module provides real-time physics simulation with GPU acceleration.
         Features include:
         - Real-time physics with OpenGL rendering
+        - Mesh materials with solid-colour and emissive types
         - Custom physics equations
         - Batch processing for headless simulations
         - Multiple constraint types
@@ -170,35 +261,140 @@ PYBIND11_MODULE(stellar, m)
         .value("BOX", PyCollisionShape::BOX, "3D oriented box collision") // new
         .export_values();
 
+    py::enum_<MaterialType>(m, "MaterialType", R"pbdoc(
+        Material model assigned to a registered mesh.
+
+        Attributes:
+            SOLID_COLOR: RGBA surface colour. Alpha controls opacity.
+            EMISSIVE: RGB emission scaled by the material intensity.
+        )pbdoc")
+        .value("SOLID_COLOR", MaterialType::SOLID_COLOR, "RGBA surface colour")
+        .value("EMISSIVE", MaterialType::EMISSIVE, "RGB emission plus intensity")
+        .export_values();
+
     // =========================================================================
     // ITEM 2: Meshes namespace bindings
     // Handles are plain ints; nothing about Mesh lifetime is exposed to Python.
     // =========================================================================
-    m.def("register_circle", [](float r, int s)
-          { return Meshes::RegisterCircle(r, s); }, py::arg("radius"), py::arg("segs") = 32);
+    m.def("register_circle", [](float r, int s, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterCircle(r, s); }); },
+          py::arg("radius"), py::arg("segs") = 32, py::arg("material_id") = -1);
 
-    m.def("register_square", [](float w, float h)
-          { return Meshes::RegisterSquare(w, h); }, py::arg("width"), py::arg("height"));
+    m.def("register_square", [](float w, float h, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterSquare(w, h); }); },
+          py::arg("width"), py::arg("height"), py::arg("material_id") = -1);
 
-    m.def("register_polygon", [](float r, int sides)
-          { return Meshes::RegisterPolygon(r, sides); }, py::arg("radius"), py::arg("sides") = 6);
+    m.def("register_polygon", [](float r, int sides, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterPolygon(r, sides); }); },
+          py::arg("radius"), py::arg("sides") = 6, py::arg("material_id") = -1);
 
-    m.def("register_sphere", [](float r, int segs, int rings)
-          { return Meshes::RegisterSphere(r, segs, rings); }, py::arg("radius"), py::arg("segs") = 32, py::arg("rings") = 16);
+    m.def("register_sphere", [](float r, int segs, int rings, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterSphere(r, segs, rings); }); },
+          py::arg("radius"), py::arg("segs") = 32, py::arg("rings") = 16,
+          py::arg("material_id") = -1);
 
-    m.def("register_cube", [](float sx, float sy, float sz)
-          { return Meshes::RegisterCube(sx, sy, sz); }, py::arg("size_x"), py::arg("size_y"), py::arg("size_z"));
+    m.def("register_cube", [](float sx, float sy, float sz, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterCube(sx, sy, sz); }); },
+          py::arg("size_x"), py::arg("size_y"), py::arg("size_z"),
+          py::arg("material_id") = -1);
 
-    m.def("register_cylinder", [](float r, float h, int segs)
-          { return Meshes::RegisterCylinder(r, h, segs); }, py::arg("radius"), py::arg("height"), py::arg("segs") = 32);
+    m.def("register_cylinder", [](float r, float h, int segs, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterCylinder(r, h, segs); }); },
+          py::arg("radius"), py::arg("height"), py::arg("segs") = 32,
+          py::arg("material_id") = -1);
 
-    m.def("register_capsule", [](float r, float h, int segs, int cap_rings)
-          { return Meshes::RegisterCapsule(r, h, segs, cap_rings); }, py::arg("radius"), py::arg("height"), py::arg("segs") = 32, py::arg("cap_rings") = 8);
+    m.def("register_capsule", [](float r, float h, int segs, int cap_rings, int materialID)
+          { return stellar_binding::register_mesh_with_material(
+                materialID, [&]() { return Meshes::RegisterCapsule(r, h, segs, cap_rings); }); },
+          py::arg("radius"), py::arg("height"), py::arg("segs") = 32,
+          py::arg("cap_rings") = 8, py::arg("material_id") = -1);
 
     m.def("destroy_mesh", &Meshes::Destroy, py::arg("mesh_id"));
     m.def("mesh_count", &Meshes::Count);
     m.def("mesh_ids", &Meshes::GetLiveIds,
           "Return a list of all currently-live mesh IDs.");
+
+    m.def("create_material",
+          [](MaterialType type, py::object color, float intensity)
+          {
+              const Material material = stellar_binding::make_material(type, color, intensity);
+              const int materialID = Materials::Create(material);
+              if (materialID < 0)
+                  throw std::runtime_error("Failed to create material");
+              return materialID;
+          },
+          py::arg("type"), py::arg("color"), py::arg("intensity") = 1.0f,
+          R"pbdoc(
+          Create a material and return its integer ID.
+
+          Args:
+              type (MaterialType): SOLID_COLOR or EMISSIVE.
+              color (tuple/list): RGBA for SOLID_COLOR, RGB for EMISSIVE.
+              intensity (float): Emission intensity; used only by EMISSIVE.
+
+          Returns:
+              int: Material ID to pass to a mesh registration function or set_mesh_material().
+          )pbdoc");
+
+    m.def("update_material",
+          [](int materialID, MaterialType type, py::object color, float intensity)
+          {
+              const Material material = stellar_binding::make_material(type, color, intensity);
+              return Materials::Update(materialID, material);
+          },
+          py::arg("material_id"), py::arg("type"), py::arg("color"),
+          py::arg("intensity") = 1.0f,
+          "Replace an existing material. Returns False for an invalid material ID.");
+
+    m.def("destroy_material", &Materials::Destroy, py::arg("material_id"),
+          "Destroy a material and clear it from meshes that reference it.");
+    m.def("is_valid_material", &Materials::IsValid, py::arg("material_id"),
+          "Return whether a material ID refers to a live material.");
+    m.def("material_count", &Materials::Count,
+          "Return the number of material slots allocated, including destroyed slots.");
+
+    m.def("get_material",
+          [](int materialID)
+          {
+              const Material *material = Materials::Get(materialID);
+              if (!material)
+                  throw py::value_error("Invalid material ID");
+
+              py::dict result;
+              result["type"] = py::cast(material->type);
+              result["color"] = py::make_tuple(
+                  material->color.x, material->color.y,
+                  material->color.z, material->color.w);
+              result["intensity"] = material->intensity;
+              return result;
+          },
+          py::arg("material_id"),
+          "Return a material's type, RGBA storage colour, and intensity.");
+
+    m.def("set_mesh_material", &Meshes::SetMaterial,
+          py::arg("mesh_id"), py::arg("material_id"),
+          R"pbdoc(
+          Assign a material to a registered mesh.
+
+          Pass -1 as material_id to restore the legacy per-object colour path.
+          Every object using the mesh shares its assigned material.
+          Returns False when either handle is invalid.
+          )pbdoc");
+    m.def("get_mesh_material",
+          [](int meshID)
+          {
+              if (!Meshes::Get(meshID))
+                  throw py::value_error("Invalid mesh ID");
+              return Meshes::GetMaterial(meshID);
+          },
+          py::arg("mesh_id"),
+          "Return the material ID assigned to a mesh, or -1 when it has no material.");
 
     // =========================================================================
     // OBJECT STATE
@@ -649,6 +845,29 @@ PYBIND11_MODULE(stellar, m)
                  bool: True if grid is enabled, False otherwise
              )pbdoc")
 
+        // Directional light control
+        .def("set_light_direction",
+             [](SimulationWrapper &self, const std::array<float, 3> &direction)
+             {
+                 self.set_light_direction(
+                     direction[0], direction[1], direction[2]);
+             },
+             py::arg("direction"),
+             "Set the normalized directional-light direction (x, y, z).")
+
+        .def("get_light_direction",
+             &SimulationWrapper::get_light_direction,
+             "Get the current directional-light direction.")
+
+        .def("set_directional_light_enabled",
+             &SimulationWrapper::set_directional_light_enabled,
+             py::arg("enabled"),
+             "Enable or disable the directional light.")
+
+        .def("get_directional_light_enabled",
+             &SimulationWrapper::get_directional_light_enabled,
+             "Check whether the directional light is enabled.")
+
         // Core simulation
         .def("update", &SimulationWrapper::update,
              py::arg("dt") = 0.016f,
@@ -731,6 +950,99 @@ PYBIND11_MODULE(stellar, m)
 
              Returns:
                  ObjectHandle: Stable handle for the new object.
+             )pbdoc")
+
+        .def("add_objects",
+             [](SimulationWrapper &self, const std::vector<py::dict> &objects, int meshID)
+             {
+                 if (meshID < 0 || !Meshes::Get(meshID))
+                     throw py::value_error("mesh_id must refer to a registered mesh");
+
+                 std::vector<ObjectHandle> handles;
+                 handles.reserve(objects.size());
+                 for (const py::dict &config : objects)
+                 {
+                     const float x = stellar_binding::config_float(config, "x", 0.0f);
+                     const float y = stellar_binding::config_float(config, "y", 0.0f);
+                     const float z = stellar_binding::config_float(config, "z", 0.0f);
+                     const float vx = stellar_binding::config_float(config, "vx", 0.0f);
+                     const float vy = stellar_binding::config_float(config, "vy", 0.0f);
+                     const float vz = stellar_binding::config_float(config, "vz", 0.0f);
+                     const float mass = stellar_binding::config_float(config, "mass", 1.0f);
+                     const float charge = stellar_binding::config_float(config, "charge", 0.0f);
+                     const glm::vec4 orientation = stellar_binding::config_vec4(
+                         config, "orientation", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                     const glm::vec3 spin = stellar_binding::config_vec3(
+                         config, "spin", glm::vec3(0.0f));
+
+                     handles.push_back(self.add_object_3d(
+                         x, y, z, vx, vy, vz, mass, charge, meshID,
+                         orientation, spin, 1.0f, 1.0f, 1.0f, 1.0f,
+                         PyCollisionShape::SPHERE));
+                 }
+                 return handles;
+             },
+             py::arg("objects"), py::arg("mesh_id"),
+             R"pbdoc(
+             Add multiple 3D objects that share one registered mesh.
+
+             Each item in objects is a dictionary. Supported keys are x, y, z,
+             vx, vy, vz, mass, charge, orientation=(qx, qy, qz, qw), and
+             spin=(sx, sy, sz). The objects inherit the mesh's material.
+
+             Returns:
+                 list[ObjectHandle]: Handles in the same order as objects.
+             )pbdoc")
+
+        .def("add_objects",
+             [](SimulationWrapper &self, const std::vector<py::dict> &objects,
+                PySkinType skin, const std::vector<std::array<float, 4>> &colors,
+                float size, float width, float height, int polygonSides)
+             {
+                 if (colors.size() != objects.size())
+                     throw py::value_error("colors must contain one RGBA tuple per object");
+
+                 std::vector<ObjectHandle> handles;
+                 handles.reserve(objects.size());
+                 for (std::size_t i = 0; i < objects.size(); ++i)
+                 {
+                     const py::dict &config = objects[i];
+                     const float x = stellar_binding::config_float(config, "x", 0.0f);
+                     const float y = stellar_binding::config_float(config, "y", 0.0f);
+                     const float vx = stellar_binding::config_float(config, "vx", 0.0f);
+                     const float vy = stellar_binding::config_float(config, "vy", 0.0f);
+                     const float mass = stellar_binding::config_float(config, "mass", 1.0f);
+                     const float charge = stellar_binding::config_float(config, "charge", 0.0f);
+                     const float rotation = stellar_binding::config_float(config, "rotation", 0.0f);
+                     const float angularVelocity = stellar_binding::config_float(
+                         config, "angular_velocity", 0.0f);
+                     const float objectSize = stellar_binding::config_float(config, "size", size);
+                     const float objectWidth = stellar_binding::config_float(config, "width", width);
+                     const float objectHeight = stellar_binding::config_float(config, "height", height);
+                     const int objectSides = stellar_binding::config_int(
+                         config, "polygon_sides", polygonSides);
+                     const auto &color = colors[i];
+
+                     handles.push_back(self.add_object(
+                         x, y, vx, vy, mass, charge, rotation, angularVelocity,
+                         skin, objectSize, objectWidth, objectHeight,
+                         color[0], color[1], color[2], color[3], objectSides));
+                 }
+                 return handles;
+             },
+             py::arg("objects"), py::arg("skin"), py::arg("colors"),
+             py::arg("size") = 0.3f, py::arg("width") = 0.5f,
+             py::arg("height") = 0.3f, py::arg("polygon_sides") = 6,
+             R"pbdoc(
+             Add multiple 2D objects using one built-in skin type.
+
+             Each item in objects is a dictionary. Supported keys are x, y,
+             vx, vy, mass, charge, rotation, angular_velocity, size, width,
+             height, and polygon_sides. colors must provide one RGBA tuple
+             for each object.
+
+             Returns:
+                 list[ObjectHandle]: Handles in the same order as objects.
              )pbdoc")
 
         // Unified accessors for mesh-backed 3D objects.

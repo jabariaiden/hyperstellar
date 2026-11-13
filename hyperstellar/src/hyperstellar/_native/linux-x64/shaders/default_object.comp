@@ -1,0 +1,1297 @@
+#version 430 core
+
+
+// ----------------------------------------------------------------------------
+// QUATERNION HELPERS (shared header)
+//
+// All vectors are stored as vec4 with .w as the scalar part.
+// ----------------------------------------------------------------------------
+vec4 quat_mul(vec4 a, vec4 b) {
+    return vec4(
+        a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+        a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+        a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+        a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z);
+}
+
+vec4 quat_conj(vec4 q) { return vec4(-q.xyz, q.w); }
+
+vec4 quat_axis_angle(vec3 axis, float angle) {
+    float h = angle * 0.5;
+    return vec4(normalize(axis) * sin(h), cos(h));
+}
+
+vec3 quat_rotate(vec4 q, vec3 v) {
+    vec3 u = q.xyz; float s = q.w;
+    return 2.0*dot(u,v)*u + (s*s - dot(u,u))*v + 2.0*s*cross(u,v);
+}
+
+// Extracts the scalar 2D rotation angle (theta) about the world Z axis from
+// an object's orientation quaternion. 2D objects live on the XY plane, so
+// orientation is Rz(theta) = (0, 0, sin(theta/2), cos(theta/2)); the angle is
+// recovered directly from the .z and .w components.
+float quat_extract_2d_angle(vec4 orientation) {
+    return 2.0 * atan(orientation.z, orientation.w);
+}
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// ----------------------------------------------------------------------------
+// DATA STRUCTURES
+//
+// The Object struct mirrors the C++ layout in objects.cpp: 7 vec4 members
+// followed by 2 floats and 5 ints. It is 160 bytes so that its std430 stride
+// matches the C++ sizeof(Object).
+// ----------------------------------------------------------------------------
+struct Object {
+    vec4 position;           // XYZ position, .w reserved
+    vec4 velocity;           // XYZ velocity, .w reserved
+    vec4 orientation;        // Unit quaternion (x, y, z, w)
+    vec4 spin;               // Angular velocity (xyz), .w reserved
+    vec4 visualData;         // Shape/visual parameters: box extents (xyz), sphere radius (w)
+    vec4 collisionData;      // Cached acceleration/other collision data
+    vec4 color;              // RGBA
+    float mass;
+    float charge;
+    int visualSkinType;
+    int collisionShapeType;
+    int equationID;
+    int scriptID;
+    int meshID;              // -1 means invisible to the mesh renderer
+    int _pad[5];
+};
+
+struct Constraint {
+    int type;
+    int targetObjectID;
+    float param1;
+    float param2;
+    float param3;
+    float param4;
+    int _pad1;
+    int _pad2;
+};
+
+struct ObjectConstraints {
+    int objectID;
+    int numConstraints;
+    int constraintOffset;
+    int _pad;
+};
+
+struct CollisionProperties {
+    int  enabled;
+    int  shapeType;
+    float restitution;
+    float friction;
+    float mass_factor;
+    uint layer;
+    uint mask;
+    int  _pad3;
+};
+
+struct CollisionInfo {
+    bool hasCollision;
+    vec2 normal;
+    float penetration;
+    int otherObjectID;
+    vec2 contactPoint;
+};
+
+// Define the 3D collision result before its function prototypes. GLSL requires
+// a structure type to be declared before it is used as a return type.
+struct CollisionInfo3D {
+    bool hasCollision;
+    vec3 normal;
+    float penetration;
+    vec3 contactPoint;
+};
+
+// ----------------------------------------------------------------------------
+// BUFFERS AND UNIFORMS
+//
+// All four constraint and collision SSBOs (Constraints, ObjectConstraint-
+// Mappings, CollisionProps, CollisionMatrix) are declared unconditionally, so
+// that the helpers the jit-inlined user calls expand to (applyConstraints,
+// _dc_inline, detectCollision, ...) always compile. The #if gates below only
+// wrap the automatic per-step paths inside main(), never the buffer
+// declarations. Binding 8 (former contact buffer) is intentionally unused.
+// ----------------------------------------------------------------------------
+layout(std430, binding = 0) readonly buffer ObjectsIn { Object objectsIn[]; };
+layout(std430, binding = 1) writeonly buffer ObjectsOut { Object objectsOut[]; };
+layout(std430, binding = 9) readonly buffer ObjectIndices { int indices[]; };
+
+layout(std430, binding = 5) readonly buffer Constraints { Constraint constraints[]; };
+layout(std430, binding = 6) readonly buffer ObjectConstraintMappings { ObjectConstraints objectConstraints[]; };
+
+layout(std430, binding = 7) readonly buffer CollisionProps { CollisionProperties collisionProps[]; };
+
+// Per-pair collision filter, row-major: collisionMatrix[a * uNumObjects + b].
+// 0 = pair excluded from the automatic collision path, non-zero = collide.
+// The host initialises every entry to 1 and updates both (a,b) and (b,a) on
+// each EnableCollisionBetween call.
+
+uniform int uNumObjects;
+uniform int uGroupCount;
+uniform float uDt;
+uniform float uTime;
+uniform float uDerivativeEpsilon;
+
+uniform float k;
+uniform float b;
+uniform float g;
+uniform vec2 uGravityDir;
+uniform float uRestitution;
+uniform float uCoupling;
+uniform vec2 uExternalForce;
+uniform float uDriveFreq;
+uniform float uDriveAmp;
+
+// ----------------------------------------------------------------------------
+// SCRATCHPAD (read-only for objects)
+// ----------------------------------------------------------------------------
+layout(std430, binding = 10) buffer ScratchpadPool { float scratchpadData[]; };
+uniform int uScratchpadOffsets[16];
+
+float scratchpad_read(int id, int idx) {
+    return scratchpadData[uScratchpadOffsets[id] + idx];
+}
+
+// ----------------------------------------------------------------------------
+// SIGNAL QUEUE (objects can only enqueue)
+//
+// objectIdx records the caller's resolved slot (indices[global_id]), so the
+// enqueued signal carries the same object identity the rest of the shader
+// uses, even when the dispatch is over a script group.
+// ----------------------------------------------------------------------------
+struct Signal {
+    uint agentID;
+    uint objectIdx;
+    float payload;
+};
+
+layout(std430, binding = 11) buffer SignalQueue {
+    uint count;
+    Signal signals[];
+};
+
+uniform uint uSignalQueueCapacity;
+
+void signal_enqueue(uint agentID, float payload) {
+    uint _sigIdx = atomicAdd(count, 1u);
+    if (_sigIdx < uSignalQueueCapacity) {
+        signals[_sigIdx].agentID = agentID;
+        signals[_sigIdx].objectIdx = uint(indices[int(gl_GlobalInvocationID.x)]);
+        signals[_sigIdx].payload = payload;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// CONSTANTS & UTILITIES
+// ----------------------------------------------------------------------------
+const float EPSILON = 1e-6;
+const float SAFE_MIN_VALUE = 1e-6;
+const float SAFE_MAX_EXP = 50.0;
+const float PI = 3.14159265359;
+const int CONSTRAINT_DISTANCE = 0;
+const int CONSTRAINT_BOUNDARY = 1;
+const int CONSTRAINT_ANGLE = 2;
+const float CONSTRAINT_STIFFNESS = 1.0;
+const int MAX_CONSTRAINT_ITERATIONS = 3;
+
+// 2D shapes
+const int COLLISION_NONE = 0;
+const int COLLISION_CIRCLE = 1;
+const int COLLISION_AABB = 2;
+const int COLLISION_POLYGON = 3;
+// 3D shapes
+const int COLLISION_SPHERE = 4;
+const int COLLISION_BOX = 5;
+
+float safeDivide(float n, float d) {
+    return (abs(d) < EPSILON) ? 0.0 : n / d;
+}
+float safePow(float base, float exp) {
+    if (base < 0.0) {
+        float intPart;
+        if (abs(modf(exp, intPart)) < EPSILON) {
+            float result = pow(-base, exp);
+            if (int(intPart) % 2 == 1) result = -result;
+            return result;
+        }
+    }
+    return pow(max(0.0, base), exp);
+}
+float safeLog(float v) { return log(max(SAFE_MIN_VALUE, v)); }
+float safeExp(float v) { return exp(clamp(v, -SAFE_MAX_EXP, SAFE_MAX_EXP)); }
+bool isInvalid(float v) { return isinf(v) || isnan(v); }
+vec2 sanitizeVec2(vec2 v) {
+    if (isInvalid(v.x)) v.x = 0.0;
+    if (isInvalid(v.y)) v.y = 0.0;
+    return v;
+}
+vec4 sanitizeVec4(vec4 v) {
+    for (int i = 0; i < 4; ++i)
+        if (isInvalid(v[i])) v[i] = 0.0;
+    return v;
+}
+float signFunc(float x) { return (x > 0.0) ? 1.0 : ((x < 0.0) ? -1.0 : 0.0); }
+float stepFunc(float x) { return (x >= 0.0) ? 1.0 : 0.0; }
+
+// ----------------------------------------------------------------------------
+// COMPLEX NUMBERS
+// ----------------------------------------------------------------------------
+const vec2 _imaginary_unit = vec2(0.0, 1.0);
+vec2 cAdd(vec2 a, vec2 b) { return a + b; }
+vec2 cSub(vec2 a, vec2 b) { return a - b; }
+vec2 cMul(vec2 a, vec2 b) {
+    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+}
+vec2 cDiv(vec2 a, vec2 b) {
+    float d = b.x*b.x + b.y*b.y;
+    if (abs(d) < EPSILON) return vec2(0.0);
+    return vec2((a.x*b.x + a.y*b.y)/d, (a.y*b.x - a.x*b.y)/d);
+}
+vec2 cLog(vec2 z) {
+    return vec2(safeLog(length(z)), atan(z.y, z.x));
+}
+vec2 cExp(vec2 z) {
+    float ea = safeExp(z.x);
+    return vec2(ea * cos(z.y), ea * sin(z.y));
+}
+vec2 cPow(vec2 b, vec2 e) {
+    if (length(b) < EPSILON) return vec2(0.0);
+    return cExp(cMul(e, cLog(b)));
+}
+vec2 cSin(vec2 z) { return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y)); }
+vec2 cCos(vec2 z) { return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y)); }
+vec2 cTan(vec2 z) { return cDiv(cSin(z), cCos(z)); }
+
+// ----------------------------------------------------------------------------
+// ROTATION HELPERS (2D)
+// ----------------------------------------------------------------------------
+vec2 rotatePoint(vec2 p, float a) {
+    float ca = cos(a), sa = sin(a);
+    return vec2(p.x*ca - p.y*sa, p.x*sa + p.y*ca);
+}
+vec2 worldToLocal(vec2 wp, vec2 op, float r) {
+    return rotatePoint(wp - op, -r);
+}
+vec2 localToWorld(vec2 lp, vec2 op, float r) {
+    return op + rotatePoint(lp, r);
+}
+vec2 getSupportPoint(vec2 pos, vec2 halfExt, float rot, vec2 dir) {
+    float cr = cos(rot), sr = sin(rot);
+    vec2 localDir = vec2(dot(dir, vec2(cr, sr)), dot(dir, vec2(-sr, cr)));
+    vec2 localSupport = vec2(sign(localDir.x) * halfExt.x, sign(localDir.y) * halfExt.y);
+    return pos + vec2(localSupport.x*cr - localSupport.y*sr, localSupport.x*sr + localSupport.y*cr);
+}
+float getMomentOfInertia(float mass, int shapeType, float w, float h, float r) {
+    if (shapeType == COLLISION_CIRCLE) return 0.5 * mass * r * r;
+    if (shapeType == COLLISION_AABB) return (1.0/12.0) * mass * (w*w + h*h);
+    return 0.5 * mass * r * r;
+}
+// ----------------------------------------------------------------------------
+// detect_collision(other) backing helper
+//
+// jit.py rewrites the user-facing `detect_collision(other)` expression into a
+// call to this function. It is a pure query: it reads objectsIn[] /
+// collisionProps[] and never touches objectsOut[], so (unlike the removed
+// GLSL-level detect_collision) it cannot be overwritten by main()'s final
+// write-back. `pos`, `z` and `q` are the caller's CURRENT-frame values and
+// `p` supplies the caller's remaining fields (visualData, etc.).
+//
+// 2D vs 3D selection mirrors the automatic path in main(): both shapes 3D ->
+// 3D detector; both 2D -> 2D detector; a mixed 2D/3D pair never collides.
+// ----------------------------------------------------------------------------
+// Forward declarations to satisfy _dc_inline before the full definitions
+CollisionInfo3D detectCollision3D(Object a, Object b, int sa, int sb);
+CollisionInfo detectCollision(Object a, Object b, int ib, int self);
+
+bool _dc_inline(int other, int selfIdx, vec2 pos, float z, vec4 q, Object p) {
+    if (other < 0 || other >= uNumObjects || other == selfIdx) return false;
+    Object _o = objectsIn[other];
+    CollisionProperties _pa = collisionProps[selfIdx];
+    CollisionProperties _pb = collisionProps[other];
+    if (_pa.shapeType == COLLISION_NONE || _pb.shapeType == COLLISION_NONE) return false;
+    if (_pa.enabled == 0 || _pb.enabled == 0) return false;
+    if (_pa.shapeType >= COLLISION_SPHERE && _pb.shapeType >= COLLISION_SPHERE) {
+        Object _me = p;
+        _me.position    = vec4(pos, z, 0.0);
+        _me.orientation = q;
+        return detectCollision3D(_me, _o, _pa.shapeType, _pb.shapeType).hasCollision;
+    }
+    if (_pa.shapeType == COLLISION_NONE || _pb.shapeType == COLLISION_NONE) return false;
+    if (_pa.enabled == 0 || _pb.enabled == 0) return false;
+    if ((_pa.layer & _pb.mask) == 0u || (_pb.layer & _pa.mask) == 0u) return false;
+    
+    // Mixed 2D/3D pairs report no hit, matching the auto path.
+    if (_pa.shapeType >= COLLISION_SPHERE || _pb.shapeType >= COLLISION_SPHERE) return false;
+    
+    Object _me2D = p;
+    _me2D.position = vec4(pos, z, 0.0);
+    _me2D.orientation = q;
+    return detectCollision(_me2D, _o, other, selfIdx).hasCollision;
+}
+// ----------------------------------------------------------------------------
+// 2D COLLISION DETECTION
+//
+// All helpers receive vec2 positions; the caller is responsible for
+// extracting .xy from the wide Object struct. Rotation angles are extracted
+// from the object's orientation quaternion via quat_extract_2d_angle().
+// ----------------------------------------------------------------------------
+CollisionInfo detectCircleCircle(vec2 pa, float ra, vec2 pb, float rb, int ob) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    vec2 d = pb - pa;
+    float dsq = dot(d, d);
+    float rs = ra + rb;
+    if (dsq < rs*rs && dsq > EPSILON) {
+        float dist = sqrt(dsq);
+        info.hasCollision = true;
+        info.normal = d / dist;
+        info.penetration = rs - dist;
+        info.contactPoint = pa + d * (ra / rs);
+    }
+    return info;
+}
+
+CollisionInfo detectAABBAABB(vec2 pa, vec2 ha, float ra, vec2 pb, vec2 hb, float rb, int ob) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    info.penetration = 1e10;
+    vec2 axes[4];
+    axes[0] = vec2(cos(ra), sin(ra));
+    axes[1] = vec2(-sin(ra), cos(ra));
+    axes[2] = vec2(cos(rb), sin(rb));
+    axes[3] = vec2(-sin(rb), cos(rb));
+    vec2 d = pb - pa;
+    for (int i = 0; i < 4; ++i) {
+        vec2 axis = axes[i];
+        float projA_rad = abs(dot(axes[0], axis)) * ha.x + abs(dot(axes[1], axis)) * ha.y;
+        float projB_rad = abs(dot(axes[2], axis)) * hb.x + abs(dot(axes[3], axis)) * hb.y;
+        float projA_center = 0.0;
+        float projB_center = dot(d, axis);
+        float sep = abs(projB_center - projA_center) - (projA_rad + projB_rad);
+        if (sep > 1e-4) return info;
+        float overlap = -sep;
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            if (dot(d, axis) < 0.0) info.normal = -axis;
+        }
+    }
+    info.hasCollision = true;
+    info.contactPoint = getSupportPoint(pa, ha, ra, info.normal);
+    return info;
+}
+
+vec2 projectPolygon(vec2 center, float radius, int sides, float rot, vec2 axis) {
+    float minP = 1e10, maxP = -1e10;
+    float step = 2.0 * PI / float(sides);
+    for (int i = 0; i < sides; ++i) {
+        float a = rot + float(i) * step;
+        vec2 v = center + radius * vec2(cos(a), sin(a));
+        float p = dot(v, axis);
+        minP = min(minP, p);
+        maxP = max(maxP, p);
+    }
+    return vec2(minP, maxP);
+}
+
+vec2 getPolygonNormal(int side, int total, float rot) {
+    float step = 2.0 * PI / float(total);
+    float a = rot + float(side) * step;
+    vec2 edge = vec2(cos(a + step), sin(a + step)) - vec2(cos(a), sin(a));
+    return normalize(vec2(-edge.y, edge.x));
+}
+
+CollisionInfo detectPolygonPolygon(vec2 pa, float ra, int sa, float rta, vec2 pb, float rb, int sb, float rtb, int ob) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    info.penetration = 1e10;
+    int total = sa + sb;
+    for (int i = 0; i < total; ++i) {
+        vec2 axis = (i < sa) ? getPolygonNormal(i, sa, rta) : getPolygonNormal(i - sa, sb, rtb);
+        vec2 projA = projectPolygon(pa, ra, sa, rta, axis);
+        vec2 projB = projectPolygon(pb, rb, sb, rtb, axis);
+        if (projA.y < projB.x || projB.y < projA.x) return info;
+        float overlap = min(projA.y, projB.y) - max(projA.x, projB.x);
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            if (dot(pb - pa, axis) < 0.0) info.normal = -axis;
+        }
+    }
+    info.hasCollision = true;
+    return info;
+}
+
+CollisionInfo detectCircleAABB(vec2 cp, float cr, vec2 bp, vec2 he, float brot, int ob) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    vec2 local = worldToLocal(cp, bp, brot);
+    vec2 closest = clamp(local, -he, he);
+    vec2 d = local - closest;
+    float dsq = dot(d, d);
+    if (dsq < cr*cr) {
+        float dist = sqrt(dsq);
+        info.hasCollision = true;
+        if (dist > EPSILON) {
+            vec2 localNormal = -(d / dist);
+            info.normal = rotatePoint(localNormal, brot);
+            info.penetration = cr - dist;
+            info.contactPoint = cp + info.normal * (cr - info.penetration * 0.5);
+        } else {
+            vec2 toEdge = -local;
+            vec2 absToEdge = abs(toEdge);
+            vec2 edgeDist = he - absToEdge;
+            vec2 localNormal;
+
+            if (edgeDist.x < edgeDist.y) {
+                localNormal = vec2(
+                    (toEdge.x >= 0.0) ? 1.0 : -1.0,
+                    0.0
+                );
+                info.penetration = cr + edgeDist.x;
+            } else {
+                localNormal = vec2(
+                    0.0,
+                    (toEdge.y >= 0.0) ? 1.0 : -1.0
+                );
+                info.penetration = cr + edgeDist.y;
+            }
+
+            info.normal = rotatePoint(localNormal, brot);
+            info.contactPoint = cp + info.normal * cr;
+        }
+    }
+    return info;
+}
+CollisionInfo detectCirclePolygon(
+    vec2 cp, float cr,
+    vec2 pp, float pr,
+    int ps, float prot, int ob
+) {
+    ps = clamp(ps, 3, 32);
+
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    info.penetration = 1e10;
+    info.normal = vec2(1.0, 0.0);
+
+    float step = 2.0 * PI / float(ps);
+
+    // Test the polygon face normals.
+    for (int i = 0; i < ps; ++i) {
+        vec2 axis = getPolygonNormal(i, ps, prot);
+
+        float cproj = dot(cp, axis);
+        vec2 crange = vec2(cproj - cr, cproj + cr);
+        vec2 prange = projectPolygon(pp, pr, ps, prot, axis);
+
+        if (crange.y < prange.x || prange.y < crange.x)
+            return info;
+
+        float overlap =
+            min(crange.y, prange.y) - max(crange.x, prange.x);
+
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+
+            if (dot(pp - cp, axis) < 0.0)
+                info.normal = -axis;
+        }
+    }
+
+    // Find the polygon vertex closest to the circle centre.
+    vec2 closest = pp;
+    float closestDsq = 1e10;
+
+    for (int i = 0; i < ps; ++i) {
+        float a = prot + float(i) * step;
+        vec2 vertex = pp + pr * vec2(cos(a), sin(a));
+        float dsq = dot(vertex - cp, vertex - cp);
+
+        if (dsq < closestDsq) {
+            closestDsq = dsq;
+            closest = vertex;
+        }
+    }
+
+    // Test the vertex axis when it is well-defined.
+    vec2 axisDelta = cp - closest;
+    float axisLength = length(axisDelta);
+
+    if (axisLength > EPSILON) {
+        vec2 vertexAxis = axisDelta / axisLength;
+
+        float cproj = dot(cp, vertexAxis);
+        vec2 crange = vec2(cproj - cr, cproj + cr);
+        vec2 prange = projectPolygon(pp, pr, ps, prot, vertexAxis);
+
+        if (crange.y < prange.x || prange.y < crange.x)
+            return info;
+
+        float overlap =
+            min(crange.y, prange.y) - max(crange.x, prange.x);
+
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = vertexAxis;
+
+            if (dot(pp - cp, vertexAxis) < 0.0)
+                info.normal = -vertexAxis;
+        }
+    }
+
+    info.hasCollision = true;
+    info.contactPoint = cp + info.normal * cr;
+
+    return info;
+}
+
+CollisionInfo detectPolygonAABB(vec2 pp, float pr, int ps, float prot, vec2 bp, vec2 he, float brot, int ob) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    info.otherObjectID = ob;
+    info.penetration = 1e10;
+    vec2 verts[32];
+    float step = 2.0 * PI / float(ps);
+    for (int i = 0; i < ps && i < 32; ++i) {
+        float a = prot + float(i) * step;
+        verts[i] = pp + pr * vec2(cos(a), sin(a));
+    }
+    vec2 bax[2];
+    bax[0] = vec2(cos(brot), sin(brot));
+    bax[1] = vec2(-sin(brot), cos(brot));
+    vec2 bc[4] = vec2[](
+        vec2(-he.x, -he.y), vec2( he.x, -he.y),
+        vec2( he.x,  he.y), vec2(-he.x,  he.y)
+    );
+    vec2 bv[4];
+    for (int i = 0; i < 4; ++i) bv[i] = bp + bc[i].x * bax[0] + bc[i].y * bax[1];
+    vec2 axes[34];
+    int ac = 0;
+    for (int i = 0; i < ps; ++i) {
+        int n = (i + 1) % ps;
+        vec2 e = verts[n] - verts[i];
+        axes[ac++] = normalize(vec2(-e.y, e.x));
+    }
+    axes[ac++] = bax[0];
+    axes[ac++] = bax[1];
+    for (int i = 0; i < ac; ++i) {
+        vec2 axis = axes[i];
+        float pmin = dot(verts[0], axis), pmax = pmin;
+        for (int j = 1; j < ps; ++j) {
+            float p = dot(verts[j], axis);
+            pmin = min(pmin, p);
+            pmax = max(pmax, p);
+        }
+        float bmin = dot(bv[0], axis), bmax = bmin;
+        for (int j = 1; j < 4; ++j) {
+            float p = dot(bv[j], axis);
+            bmin = min(bmin, p);
+            bmax = max(bmax, p);
+        }
+        if (pmax < bmin - 1e-4 || bmax < pmin - 1e-4) return info;
+        float overlap = min(pmax, bmax) - max(pmin, bmin);
+        if (overlap < info.penetration) {
+            info.penetration = overlap;
+            info.normal = axis;
+            vec2 centerDiff = bp - pp;
+            if (dot(centerDiff, axis) < 0.0) info.normal = -axis;
+        }
+    }
+    info.hasCollision = true;
+    info.contactPoint = (pp + bp) * 0.5;
+    return info;
+}
+
+// Dispatches to the correct shape-pair helper. Positions are extracted via
+// .xy from the wide Object struct; per-object rotation angles are recovered
+// from the orientation quaternion using quat_extract_2d_angle().
+CollisionInfo detectCollision(Object a, Object b, int ib, int self) {
+    CollisionInfo info;
+    info.hasCollision = false;
+    CollisionProperties pa = collisionProps[self];
+    CollisionProperties pb = collisionProps[ib];
+    if (pa.enabled == 0 || pb.enabled == 0) return info;
+    int sa = pa.shapeType, sb = pb.shapeType;
+    if (sa == COLLISION_NONE || sb == COLLISION_NONE) return info;
+
+    float angle_a = quat_extract_2d_angle(a.orientation);
+    float angle_b = quat_extract_2d_angle(b.orientation);
+
+    if (sa == COLLISION_CIRCLE && sb == COLLISION_CIRCLE)
+        return detectCircleCircle(a.position.xy, a.visualData.x, b.position.xy, b.visualData.x, ib);
+    if (sa == COLLISION_AABB && sb == COLLISION_AABB) {
+        vec2 ha = a.visualData.xy * 0.5, hb = b.visualData.xy * 0.5;
+        return detectAABBAABB(a.position.xy, ha, angle_a, b.position.xy, hb, angle_b, ib);
+    }
+    if (sa == COLLISION_POLYGON && sb == COLLISION_POLYGON)
+        return detectPolygonPolygon(a.position.xy, a.visualData.x, int(a.visualData.y), angle_a,
+                                    b.position.xy, b.visualData.x, int(b.visualData.y), angle_b, ib);
+    if (sa == COLLISION_CIRCLE && sb == COLLISION_AABB) {
+        vec2 hb = b.visualData.xy * 0.5;
+        return detectCircleAABB(a.position.xy, a.visualData.x, b.position.xy, hb, angle_b, ib);
+    }
+    if (sa == COLLISION_AABB && sb == COLLISION_CIRCLE) {
+        vec2 ha = a.visualData.xy * 0.5;
+        CollisionInfo ci = detectCircleAABB(b.position.xy, b.visualData.x, a.position.xy, ha, angle_a, ib);
+        ci.normal = -ci.normal;
+        return ci;
+    }
+    if (sa == COLLISION_CIRCLE && sb == COLLISION_POLYGON)
+        return detectCirclePolygon(a.position.xy, a.visualData.x, b.position.xy, b.visualData.x, int(b.visualData.y), angle_b, ib);
+    if (sa == COLLISION_POLYGON && sb == COLLISION_CIRCLE) {
+        CollisionInfo ci = detectCirclePolygon(b.position.xy, b.visualData.x, a.position.xy, a.visualData.x, int(a.visualData.y), angle_a, ib);
+        ci.normal = -ci.normal;
+        return ci;
+    }
+    if (sa == COLLISION_POLYGON && sb == COLLISION_AABB) {
+        vec2 hb = b.visualData.xy * 0.5;
+        return detectPolygonAABB(a.position.xy, a.visualData.x, int(a.visualData.y), angle_a,
+                                 b.position.xy, hb, angle_b, ib);
+    }
+    if (sa == COLLISION_AABB && sb == COLLISION_POLYGON) {
+        vec2 ha = a.visualData.xy * 0.5;
+        CollisionInfo ci = detectPolygonAABB(b.position.xy, b.visualData.x, int(b.visualData.y), angle_b,
+                                             a.position.xy, ha, angle_a, ib);
+        ci.normal = -ci.normal;
+        return ci;
+    }
+    return info;
+}
+
+// ----------------------------------------------------------------------------
+// 2D COLLISION RESPONSE WITH TORQUE
+// ----------------------------------------------------------------------------
+void resolveCollisionWithTorque(inout vec2 pa, inout vec2 va, inout float wa, float ma, float ia,
+                                inout vec2 pb, inout vec2 vb, inout float wb, float mb, float ib,
+                                vec2 n, vec2 cp, float pen, float rest, float fric) {
+    const float posCorr = 0.8, slop = 0.001;
+    if (pen > slop) {
+        float tot = ma + mb;
+        float invTot = 1.0 / tot;
+        vec2 corr = (pen - slop) * posCorr * n;
+        pa -= corr * (mb * invTot);
+        pb += corr * (ma * invTot);
+    }
+    vec2 ra = cp - pa;
+    vec2 rb = cp - pb;
+    vec2 vac = va + vec2(-wa * ra.y, wa * ra.x);
+    vec2 vbc = vb + vec2(-wb * rb.y, wb * rb.x);
+    vec2 rel = vbc - vac;
+    float vn = dot(rel, n);
+    if (vn > 0.0) return;
+    float e = clamp(rest, 0.0, 1.0);
+    float num = -(1.0 + e) * vn;
+    float raCrossN = ra.x * n.y - ra.y * n.x;
+    float rbCrossN = rb.x * n.y - rb.y * n.x;
+
+    float den = (1.0 / ma) + (1.0 / mb)
+          + (raCrossN * raCrossN) / ia
+          + (rbCrossN * rbCrossN) / ib;
+    if (abs(den) < EPSILON) return;
+    float j = num / den;
+    vec2 imp = j * n;
+    va -= imp / ma;
+    vb += imp / mb;
+    wa -= (ra.x * imp.y - ra.y * imp.x) / ia;
+    wb += (rb.x * imp.y - rb.y * imp.x) / ib;
+    if (fric > 0.0) {
+        vac = va + vec2(-wa * ra.y, wa * ra.x);
+        vbc = vb + vec2(-wb * rb.y, wb * rb.x);
+        rel = vbc - vac;
+        vec2 tan = rel - n * dot(rel, n);
+        float tl = length(tan);
+        if (tl > EPSILON) {
+            tan /= tl;
+            float vt = dot(rel, tan);
+            float jt = -vt * fric;
+            float raCrossT = ra.x * tan.y - ra.y * tan.x;
+            float rbCrossT = rb.x * tan.y - rb.y * tan.x;
+
+            float dent = (1.0 / ma) + (1.0 / mb)
+                    + (raCrossT * raCrossT) / ia
+                    + (rbCrossT * rbCrossT) / ib;
+                    
+            if (abs(dent) > EPSILON) {
+                jt /= dent;
+
+                float maxJt = abs(j) * fric;
+                jt = clamp(jt, -maxJt, maxJt);
+
+                vec2 fimp = jt * tan;
+
+                va -= fimp / ma;
+                vb += fimp / mb;
+
+                wa -= (ra.x * fimp.y - ra.y * fimp.x) / ia;
+                wb += (rb.x * fimp.y - rb.y * fimp.x) / ib;
+            }
+        }
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+// 3D COLLISION PRIMITIVES
+//
+// Each detector returns a CollisionInfo3D with `normal` pointing from A to B.
+// The resolver uses the "each thread updates only its own side" pattern that
+// the 2D solver uses: only `pa`, `va`, `wa` end up applied to the calling
+// object; the B-side values are treated as read-only inputs.
+// ----------------------------------------------------------------------------
+CollisionInfo3D noHit3D() {
+    CollisionInfo3D c;
+    c.hasCollision = false; c.normal = vec3(0.0, 0.0, 1.0);
+    c.penetration = 0.0;    c.contactPoint = vec3(0.0);
+    return c;
+}
+
+// Column-major rotation matrix from a quaternion: columns are the world-space
+// directions of the box's local X, Y and Z axes.
+mat3 quatToMat3(vec4 q) {
+    return mat3(quat_rotate(q, vec3(1.0,0.0,0.0)),
+                quat_rotate(q, vec3(0.0,1.0,0.0)),
+                quat_rotate(q, vec3(0.0,0.0,1.0)));
+}
+
+// Scalar inertia approximation. vd = visualData (xyz box extents, w sphere radius).
+// For a sphere we use (2/5) m r^2; for a box we use the trace of the box
+// inertia tensor scaled into a single scalar. Both are approximations - the
+// solver only needs a positive, roughly-correct magnitude to keep impulses
+// stable and spin plausible.
+float getMomentOfInertia3D(float m, int shape, vec4 vd) {
+    if (shape == COLLISION_SPHERE) return max(EPSILON, 0.4 * m * vd.w * vd.w);
+    return max(EPSILON, m * dot(vd.xyz, vd.xyz) / 18.0);
+}
+
+CollisionInfo3D detectSphereSphere(vec3 pa, float ra, vec3 pb, float rb) {
+    CollisionInfo3D c = noHit3D();
+    vec3 d = pb - pa;
+    float rs = ra + rb, dsq = dot(d, d);
+    if (dsq >= rs * rs) return c;
+    float dist = sqrt(dsq);
+    c.hasCollision = true;
+    c.normal = (dist > 1e-6) ? d / dist : vec3(0.0, 0.0, 1.0);
+    c.penetration = rs - dist;
+    c.contactPoint = pa + c.normal * (ra - c.penetration * 0.5);
+    return c;
+}
+
+// Sphere vs oriented box. The closest point on the box to the sphere centre
+// is found in the box's local frame, then transformed back to world. Normal
+// points from the sphere toward the box.
+CollisionInfo3D detectSphereBox(vec3 sp, float sr, vec3 bp, vec3 hb, vec4 bq) {
+    CollisionInfo3D c = noHit3D();
+    vec3 local = quat_rotate(quat_conj(bq), sp - bp);
+    vec3 cl = clamp(local, -hb, hb);
+    vec3 diff = local - cl;
+    float d2 = dot(diff, diff);
+    if (d2 > sr * sr) return c;
+    vec3 nLocal = vec3(0.0);
+    float pen;
+    if (d2 > 1e-10) {
+        // Sphere centre outside the box: normal is the closest-point direction.
+        float d = sqrt(d2);
+        nLocal = diff / d;
+        pen = sr - d;
+    } else {
+        // Sphere centre inside the box: pick the nearest face to escape through.
+        vec3 over = hb - abs(local);
+        if (over.x <= over.y && over.x <= over.z) {
+            nLocal.x = (local.x >= 0.0) ? 1.0 : -1.0;
+            pen = over.x + sr;
+        } else if (over.y <= over.z) {
+            nLocal.y = (local.y >= 0.0) ? 1.0 : -1.0;
+            pen = over.y + sr;
+        } else {
+            nLocal.z = (local.z >= 0.0) ? 1.0 : -1.0;
+            pen = over.z + sr;
+        }
+    }
+    c.hasCollision = true;
+    c.normal = -quat_rotate(bq, nLocal);       // sphere -> box
+    c.penetration = pen;
+    c.contactPoint = sp + c.normal * (sr - pen * 0.5);
+    return c;
+}
+
+// Oriented box vs oriented box (SAT, 15 axes: 3 per box + 9 cross products).
+// The minimum-overlap axis gives the normal; a small score bias prefers face
+// axes over cross-product axes, so face-on contacts resolve more stably.
+CollisionInfo3D detectBoxBox(vec3 pa, vec3 ha, vec4 qa, vec3 pb, vec3 hb, vec4 qb) {
+    CollisionInfo3D c = noHit3D();
+    mat3 Ra = quatToMat3(qa), Rb = quatToMat3(qb);
+    vec3 t = pb - pa;
+    float bestScore = 1e30, bestOv = 0.0;
+    vec3 bestN = vec3(0.0, 0.0, 1.0);
+    for (int k = 0; k < 15; ++k) {
+        vec3 L;
+        if (k < 3)      L = Ra[k];
+        else if (k < 6) L = Rb[k - 3];
+        else            L = cross(Ra[(k - 6) / 3], Rb[(k - 6) % 3]);
+        float len = length(L);
+        if (len < 1e-4) continue;   // near-parallel edges: skip this axis
+        L /= len;
+        float ra = ha.x*abs(dot(Ra[0],L)) + ha.y*abs(dot(Ra[1],L)) + ha.z*abs(dot(Ra[2],L));
+        float rb = hb.x*abs(dot(Rb[0],L)) + hb.y*abs(dot(Rb[1],L)) + hb.z*abs(dot(Rb[2],L));
+        float dist = dot(t, L);
+        float ov = ra + rb - abs(dist);
+        if (ov <= 0.0) return c;    // separating axis found
+        float score = ov + (k >= 6 ? 0.001 : 0.0);
+        if (score < bestScore) { bestScore = score; bestOv = ov; bestN = (dist >= 0.0) ? L : -L; }
+    }
+    float raN = ha.x*abs(dot(Ra[0],bestN)) + ha.y*abs(dot(Ra[1],bestN)) + ha.z*abs(dot(Ra[2],bestN));
+    c.hasCollision = true;
+    c.normal = bestN;
+    c.penetration = bestOv;
+    c.contactPoint = pa + bestN * (raN - bestOv * 0.5);
+    return c;
+}
+
+// Dispatch by shape pairing. A's and B's positions/orientations are read
+// directly from the passed-in Object copies; the caller is responsible for
+// having already snapped those copies to the current-frame state.
+CollisionInfo3D detectCollision3D(Object a, Object b, int sa, int sb) {
+    if (sa == COLLISION_SPHERE && sb == COLLISION_SPHERE)
+        return detectSphereSphere(a.position.xyz, a.visualData.w,
+                                  b.position.xyz, b.visualData.w);
+    if (sa == COLLISION_SPHERE && sb == COLLISION_BOX)
+        return detectSphereBox(a.position.xyz, a.visualData.w,
+                               b.position.xyz, b.visualData.xyz * 0.5, b.orientation);
+    if (sa == COLLISION_BOX && sb == COLLISION_SPHERE) {
+        CollisionInfo3D c = detectSphereBox(b.position.xyz, b.visualData.w,
+                                            a.position.xyz, a.visualData.xyz * 0.5,
+                                            a.orientation);
+        c.normal = -c.normal;       // sphere->box -> A->B
+        return c;
+    }
+    if (sa == COLLISION_BOX && sb == COLLISION_BOX)
+        return detectBoxBox(a.position.xyz, a.visualData.xyz * 0.5, a.orientation,
+                            b.position.xyz, b.visualData.xyz * 0.5, b.orientation);
+    return noHit3D();
+}
+
+// Impulse-based resolution with friction and spin. Same "each thread updates
+// only its own side" pattern as the 2D solver: `pa`/`va`/`wa` are read/write,
+// `pb`/`vb`/`wb` are effectively read-only views of the other object's state.
+void resolveCollision3D(inout vec3 pa, inout vec3 va, inout vec3 wa, float ma, float ia,
+                        inout vec3 pb, inout vec3 vb, inout vec3 wb, float mb, float ib,
+                        vec3 n, vec3 cp, float pen, float rest, float fric) {
+    const float posCorr = 0.8, slop = 0.001;
+    if (pen > slop) {
+        float invTot = 1.0 / (ma + mb);
+        vec3 corr = (pen - slop) * posCorr * n;
+        pa -= corr * (mb * invTot);
+        pb += corr * (ma * invTot);
+    }
+    vec3 ra = cp - pa, rb = cp - pb;
+    vec3 rel = (vb + cross(wb, rb)) - (va + cross(wa, ra));
+    float vn = dot(rel, n);
+    if (vn > 0.0) return;
+    vec3 raxn = cross(ra, n), rbxn = cross(rb, n);
+    float den = 1.0/ma + 1.0/mb + dot(raxn,raxn)/ia + dot(rbxn,rbxn)/ib;
+    if (den < EPSILON) return;
+    float j = -(1.0 + clamp(rest, 0.0, 1.0)) * vn / den;
+    vec3 imp = j * n;
+    va -= imp / ma;            vb += imp / mb;
+    wa -= cross(ra, imp) / ia; wb += cross(rb, imp) / ib;
+
+    if (fric > 0.0) {
+        rel = (vb + cross(wb, rb)) - (va + cross(wa, ra));
+        vec3 tv = rel - n * dot(rel, n);
+        float tl = length(tv);
+        if (tl > EPSILON) {
+            vec3 t = tv / tl;
+            vec3 rat = cross(ra, t), rbt = cross(rb, t);
+            float dent = 1.0/ma + 1.0/mb + dot(rat,rat)/ia + dot(rbt,rbt)/ib;
+            float jt = clamp(-tl / dent, -j * fric, j * fric);
+            vec3 fimp = jt * t;
+            va -= fimp / ma;            vb += fimp / mb;
+            wa -= cross(ra, fimp) / ia; wb += cross(rb, fimp) / ib;
+        }
+    }
+}
+
+
+
+
+// SDF functions and their generated raymarch wrappers are emitted after the
+// common math and ray-tracing types they may reference.
+
+
+// ----------------------------------------------------------------------------
+// USER-FACING COLLISION CALLS (intentionally not defined here)
+//
+// `detect_collision(other)` and `resolve_collision(other)` are NOT GLSL
+// functions. A GLSL function cannot safely mutate the caller's locals, and
+// writing objectsOut[] from inside one is overwritten by the unconditional
+// write-back at the end of main(). jit.py therefore inlines them:
+//   - resolve_collision(other) expands to a block that runs the 2D/3D
+//     detector + resolver below directly on the caller's pos/vel/z/vz/
+//     wx/wy/omega locals.
+//   - detect_collision(other) expands to `_dc_inline(...)` (defined with the
+//     3D collision primitives above), a read-only query.
+// The caller's own object slot is `_self` (resolved through the index
+// buffer), so scripts dispatched as a group touch the correct object.
+// 2D-vs-3D pairs report no collision, matching the automatic path in main().
+// ----------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
+// CONSTRAINT SOLVERS (used by applyConstraints, below)
+// ----------------------------------------------------------------------------
+void solveDistanceConstraint(inout vec2 pos, inout vec2 vel, Constraint c, int self) {
+    if (c.targetObjectID < 0 || c.targetObjectID >= uNumObjects || c.targetObjectID == self) return;
+    Object target = objectsIn[c.targetObjectID];
+    vec2 offset = pos - target.position.xy;
+    float dist = length(offset);
+    if (dist < EPSILON) return;
+    vec2 normal = offset / dist;
+    vec2 desired = normal * c.param1;
+    pos -= (offset - desired) * CONSTRAINT_STIFFNESS;
+    vec2 relVel = vel - target.velocity.xy;
+    vel -= dot(relVel, normal) * normal;
+}
+
+void solveBoundaryConstraint(inout vec2 pos, inout vec2 vel, Constraint c) {
+    float x1 = c.param1, x2 = c.param2, y1 = c.param3, y2 = c.param4;
+    float minX = min(x1, x2), maxX = max(x1, x2);
+    float minY = min(y1, y2), maxY = max(y1, y2);
+    const float elasticity = 0.7, friction = 0.95;
+    if (pos.x < minX) { pos.x = minX; vel.x = abs(vel.x) * elasticity; vel.y *= friction; }
+    else if (pos.x > maxX) { pos.x = maxX; vel.x = -abs(vel.x) * elasticity; vel.y *= friction; }
+    if (pos.y < minY) { pos.y = minY; vel.y = abs(vel.y) * elasticity; vel.x *= friction; }
+    else if (pos.y > maxY) { pos.y = maxY; vel.y = -abs(vel.y) * elasticity; vel.x *= friction; }
+}
+
+void solveAngleConstraint(inout vec2 pos, inout vec2 vel, Constraint c, vec2 originalPos) {
+    vec2 dir = pos - originalPos;
+    float radius = length(dir);
+    if (radius < EPSILON) return;
+    float current = atan(dir.y, dir.x);
+    current = mod(current + 2.0*PI, 2.0*PI);
+    float minA = mod(c.param1 + 2.0*PI, 2.0*PI);
+    float maxA = mod(c.param2 + 2.0*PI, 2.0*PI);
+    bool outOfBounds = false;
+    float corrected = current;
+    if (minA <= maxA) {
+        if (current < minA || current > maxA) {
+            outOfBounds = true;
+            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
+        }
+    } else {
+        if (current < minA && current > maxA) {
+            outOfBounds = true;
+            corrected = (abs(current - minA) < abs(current - maxA)) ? minA : maxA;
+        }
+    }
+    if (outOfBounds) {
+        pos = originalPos + vec2(cos(corrected), sin(corrected)) * radius;
+        vec2 radial = normalize(pos - originalPos);
+        vec2 tangent = vec2(-radial.y, radial.x);
+        vel = tangent * dot(vel, tangent) * 0.9;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+// applyConstraints
+//
+// Runs every constraint attached to object `self` against the caller-supplied
+// `pos`/`vel` (inout), MAX_CONSTRAINT_ITERATIONS times. It never touches
+// objectsOut[]: it is used both by the automatic path in main() and by the
+// inlined user-facing `apply_constraints()` call (see jit.py), and in both
+// cases the result flows through main()'s final write-back.
+// ----------------------------------------------------------------------------
+void applyConstraints(inout vec2 pos, inout vec2 vel, int self, vec2 originalPos) {
+    ObjectConstraints pc = objectConstraints[self];
+    if (pc.numConstraints <= 0) return;
+    for (int iter = 0; iter < MAX_CONSTRAINT_ITERATIONS; ++iter) {
+        for (int ci = 0; ci < pc.numConstraints; ++ci) {
+            Constraint c = constraints[pc.constraintOffset + ci];
+            if (c.type == CONSTRAINT_DISTANCE)      solveDistanceConstraint(pos, vel, c, self);
+            else if (c.type == CONSTRAINT_BOUNDARY) solveBoundaryConstraint(pos, vel, c);
+            else if (c.type == CONSTRAINT_ANGLE)    solveAngleConstraint(pos, vel, c, originalPos);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// USER EXPOSED CONSTRAINT API (read-only queries)
+//
+// Note: `apply_constraints()` is not defined here; it is inlined by jit.py
+// against the script's current pos/vel (see applyConstraints above).
+// ----------------------------------------------------------------------------
+int get_constraint_count() {
+    int _self = indices[int(gl_GlobalInvocationID.x)];
+    return objectConstraints[_self].numConstraints;
+}
+
+int get_constraint_type(int idx) {
+    int _self = indices[int(gl_GlobalInvocationID.x)];
+    ObjectConstraints pc = objectConstraints[_self];
+    if (idx < 0 || idx >= pc.numConstraints) return -1;
+    return constraints[pc.constraintOffset + idx].type;
+}
+
+int get_constraint_target(int idx) {
+    int _self = indices[int(gl_GlobalInvocationID.x)];
+    ObjectConstraints pc = objectConstraints[_self];
+    if (idx < 0 || idx >= pc.numConstraints) return -1;
+    return constraints[pc.constraintOffset + idx].targetObjectID;
+}
+
+float get_constraint_param(int idx, int n) {
+    int _self = indices[int(gl_GlobalInvocationID.x)];
+    ObjectConstraints pc = objectConstraints[_self];
+    if (idx < 0 || idx >= pc.numConstraints) return 0.0;
+    Constraint c = constraints[pc.constraintOffset + idx];
+    if (n == 1) return c.param1;
+    if (n == 2) return c.param2;
+    if (n == 3) return c.param3;
+    if (n == 4) return c.param4;
+    return 0.0;
+}
+
+// ----------------------------------------------------------------------------
+// MAIN (2D + 3D object shader)
+//
+// Read:  theta from orientation.z/.w (Rz rotation); omega from spin.z;
+//        z, vz from position/velocity.z; wx, wy from spin.xy.
+// User code operates on x, y, z, vx, vy, vz, theta, omega (alias wz), wx, wy,
+// and accelerates rotation with angular (Z, legacy), angular_x, angular_y,
+// angular_z.
+// Write: re-encode theta as quat_axis_angle(vec3(0,0,1), theta), then apply
+//        the full spin vector (wx, wy, omega) as a first-order quaternion
+//        derivative step and re-normalise.
+//
+// The object's own slot is resolved through the index buffer (objectIndex)
+// so that this works correctly when dispatched as a script group.
+//
+// Internal state is underscore-prefixed (_q, _w, _self, _originalPos,
+// _hadCollision, _dTheta, _zv) so user scripts may assign q, w, self, etc.
+// IMPORTANT: x/y/vx/vy are copies of pos/vel used as user-facing aliases.
+// They must be synced back into pos/vel before constraints and collisions,
+// and read back from pos/vel before integration and write-back, otherwise
+// collision and constraint results are silently discarded.
+// The jit-inlined user calls (apply_constraints / resolve_collision) operate
+// on pos/vel directly, so jit.py must copy x/y/vx/vy into pos/vel before the
+// inlined block and back into x/y/vx/vy afterwards; z, vz, wx, wy and omega
+// are shared locals and need no copying.
+// ----------------------------------------------------------------------------
+void main() {
+    int idx = int(gl_GlobalInvocationID.x);
+    if (idx >= uGroupCount) return;
+    int objectIndex = indices[idx];
+
+    Object p = objectsIn[objectIndex];
+
+    vec2 pos = p.position.xy;
+    vec2 vel = p.velocity.xy;
+    float z  = p.position.z;
+    float vz = p.velocity.z;
+    float az = 0.0;
+
+    vec4 _q = p.orientation;
+    float theta  = quat_extract_2d_angle(_q);   // legacy 2D view
+    float _theta0 = theta;
+    float wx = p.spin.x, wy = p.spin.y;
+    float omega = p.spin.z;                    // Z-axis spin (legacy name)
+    float _wz0 = omega;                        // value of omega on entry
+    float wz = omega;                          // 3D-style alias of omega
+
+    float mass = max(EPSILON, p.mass);
+    float charge = p.charge;
+    vec4 color = p.color;
+    int _self = objectIndex;
+    vec2 _originalPos = pos;
+
+    float ax = 0.0, ay = 0.0, angular = 0.0;
+    // 3D angular acceleration (rad/s^2 about world X/Y/Z). `angular` and
+    // `angular_z` are both Z-axis torques and sum; prefer angular_z in 3D.
+    float angular_x = 0.0, angular_y = 0.0, angular_z = 0.0;
+
+    float x = pos.x;
+    float y = pos.y;
+    float vx = vel.x;
+    float vy = vel.y;
+
+ax = -k * x / mass;
+ay = -k * y / mass;
+angular = 0.0;
+color.r = 1.0;
+color.g = 0.0;
+color.b = 0.0;
+color.a = 1.0;
+
+    // ---- fold the wz alias back into omega ----
+    // The script may write omega, wz, or both; applying wz's delta keeps both
+    // writes (writing only omega leaves wz == _wz0, so the delta is zero).
+    omega += wz - _wz0;
+
+    // ---- sanitize outputs ----
+    ax = (isInvalid(ax) ? 0.0 : ax);
+    ay = (isInvalid(ay) ? 0.0 : ay);
+    az = (isInvalid(az) ? 0.0 : az);
+    angular = (isInvalid(angular) ? 0.0 : angular);
+    angular_x = (isInvalid(angular_x) ? 0.0 : angular_x);
+    angular_y = (isInvalid(angular_y) ? 0.0 : angular_y);
+    angular_z = (isInvalid(angular_z) ? 0.0 : angular_z);
+    color = sanitizeVec4(color);
+
+    // ---- sync scalar aliases into pos/vel before constraints/collisions ----
+    pos = vec2(x, y);
+    vel = vec2(vx, vy);
+
+    #if 1
+    applyConstraints(pos, vel, _self, _originalPos);
+    #endif
+
+    #if 1
+    bool _hadCollision = false;
+    for (int i = 0; i < uNumObjects; ++i) {
+        if (i == _self) continue;
+        // Host-controlled per-pair exclusion (EnableCollisionBetween).
+        Object _other = objectsIn[i];
+        CollisionProperties propA = collisionProps[_self];
+        CollisionProperties propB = collisionProps[i];
+        if (propA.enabled == 0 || propB.enabled == 0) continue;
+        if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
+        if (propA.enabled == 0 || propB.enabled == 0) continue;
+        if (propA.shapeType == COLLISION_NONE || propB.shapeType == COLLISION_NONE) continue;
+        if ((propA.layer & propB.mask) == 0u || (propB.layer & propA.mask) == 0u) continue;
+
+        // ---- 3D shapes ----
+        if (propA.shapeType >= COLLISION_SPHERE || propB.shapeType >= COLLISION_SPHERE) {
+            // Mixed 2D/3D pairs do not collide.
+            if (propA.shapeType < COLLISION_SPHERE || propB.shapeType < COLLISION_SPHERE) continue;
+
+            // Snap the current-frame state into a copy of p so the 3D
+            // detector sees the user's updated positions, not the pre-update
+            // SSBO state.
+            Object _me = p;
+            _me.position = vec4(pos, z, 0.0);
+            _me.orientation = _q;
+
+            CollisionInfo3D _c3 = detectCollision3D(_me, _other, propA.shapeType, propB.shapeType);
+            if (_c3.hasCollision) {
+                _hadCollision = true;
+                float rest = min(propA.restitution, propB.restitution);
+                float fric = sqrt(propA.friction * propB.friction);
+                float mA = mass, mB = max(EPSILON, _other.mass);
+                float iA = getMomentOfInertia3D(mA, propA.shapeType, p.visualData);
+                float iB = getMomentOfInertia3D(mB, propB.shapeType, _other.visualData);
+                vec3 pa = vec3(pos, z), va = vec3(vel, vz), wa = vec3(wx, wy, omega);
+                vec3 pb = _other.position.xyz, vb = _other.velocity.xyz, wb = _other.spin.xyz;
+                resolveCollision3D(pa, va, wa, mA, iA, pb, vb, wb, mB, iB,
+                                   _c3.normal, _c3.contactPoint, _c3.penetration, rest, fric);
+                pos = pa.xy; z = pa.z;
+                vel = va.xy; vz = va.z;
+                wx = wa.x; wy = wa.y; omega = wa.z;
+            }
+            continue;
+        }
+
+        // ---- 2D shapes (unchanged) ----
+        Object _me2D = p;
+        _me2D.position = vec4(pos, z, 0.0);
+        _me2D.orientation = quat_axis_angle(
+            vec3(0.0, 0.0, 1.0), theta
+        );
+        CollisionInfo _col = detectCollision(_me2D, _other, i, _self);
+
+        if (_col.hasCollision) {
+            _hadCollision = true;
+            float rest = min(propA.restitution, propB.restitution);
+            float fric = sqrt(propA.friction * propB.friction);
+            float mA = mass, mB = max(EPSILON, _other.mass);
+            float wA = omega, wB = _other.spin.z;
+            float iA = getMomentOfInertia(
+                mA, propA.shapeType,
+                p.visualData.x,
+                p.visualData.y,
+                p.visualData.x
+            );
+
+            float iB = getMomentOfInertia(
+                mB, propB.shapeType,
+                _other.visualData.x,
+                _other.visualData.y,
+                _other.visualData.x
+            );
+            vec2 tempPos = _other.position.xy;
+            vec2 tempVel = _other.velocity.xy;
+            float tempOmega = wB;
+            resolveCollisionWithTorque(pos, vel, omega, mA, iA,
+                                       tempPos, tempVel, tempOmega, mB, iB,
+                                       _col.normal, _col.contactPoint, _col.penetration,
+                                       rest, fric);
+        }
+    }
+    if (_hadCollision) {
+        vel = sanitizeVec2(vel);
+        omega = clamp(omega, -100.0, 100.0);
+        wx = clamp(wx, -100.0, 100.0);
+        wy = clamp(wy, -100.0, 100.0);
+    }
+    #endif
+
+    // ---- pull results back into the scalar aliases ----
+    x = pos.x; y = pos.y; vx = vel.x; vy = vel.y;
+
+    // ---- symplectic Euler (3 axes) ----
+    vx += ax * uDt;  vy += ay * uDt;  vz += az * uDt;
+    x  += vx * uDt;  y  += vy * uDt;  z  += vz * uDt;
+
+    // ---- 3D angular acceleration ----
+    // Integrates the spin vector (wx, wy, omega) before the orientation step
+    // below consumes it. angular_z acts on omega (Z); the legacy scalar
+    // `angular` is applied separately as a Z rotation in the orientation step.
+    wx    += angular_x * uDt;
+    wy    += angular_y * uDt;
+    omega += angular_z * uDt;
+
+    // ---- orientation: legacy theta/angular, then full 3D spin ----
+    float _dTheta = (theta - _theta0) + angular * uDt;
+    if (_dTheta != 0.0) _q = quat_mul(quat_axis_angle(vec3(0.0, 0.0, 1.0), _dTheta), _q);
+    vec3 _w = vec3(wx, wy, omega);
+    if (dot(_w, _w) > 1e-12) _q = normalize(_q + 0.5 * uDt * quat_mul(vec4(_w, 0.0), _q));
+    if (any(isnan(_q)) || any(isinf(_q))) _q = vec4(0.0, 0.0, 0.0, 1.0);
+
+    // ---- sanitize ----
+    x = sanitizeVec2(vec2(x, y)).x;
+    y = sanitizeVec2(vec2(x, y)).y;
+    vx = sanitizeVec2(vec2(vx, vy)).x;
+    vy = sanitizeVec2(vec2(vx, vy)).y;
+    vec2 _zv = sanitizeVec2(vec2(z, vz));
+    z = _zv.x; vz = _zv.y;
+
+    // ---- write back ----
+    objectsOut[objectIndex].position    = vec4(x, y, z, 0.0);
+    objectsOut[objectIndex].velocity    = vec4(vx, vy, vz, 0.0);
+    objectsOut[objectIndex].orientation = _q;
+    objectsOut[objectIndex].spin        = vec4(wx, wy, omega, 0.0);
+    objectsOut[objectIndex].mass = mass;
+    objectsOut[objectIndex].charge = charge;
+    objectsOut[objectIndex].visualSkinType = p.visualSkinType;
+    objectsOut[objectIndex].collisionShapeType = p.collisionShapeType;
+    objectsOut[objectIndex].visualData = p.visualData;      // preserves xyz extents + w radius
+    objectsOut[objectIndex].collisionData.x = ax;
+    objectsOut[objectIndex].collisionData.y = ay;
+    objectsOut[objectIndex].collisionData.z = az;
+    objectsOut[objectIndex].collisionData.w = p.collisionData.w;
+    objectsOut[objectIndex].color = color;
+    objectsOut[objectIndex].equationID = p.equationID;
+    objectsOut[objectIndex].scriptID = p.scriptID;
+    objectsOut[objectIndex].meshID = p.meshID;
+}

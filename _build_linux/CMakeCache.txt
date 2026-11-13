@@ -415,7 +415,7 @@ CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //Details about finding Python3
-FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/Aidens_stuff/testing/test/bin/python][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.16(3.9)]
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[/home/jaybird/Aidens_stuff/testing/test/bin/python][/usr/include/python3.13][found components: Interpreter Development.Module ][v3.13.18(3.9)]
 //Test HAS_FLTO_AUTO
 HAS_FLTO_AUTO:INTERNAL=1
 //Python executable during the last CMake run
@@ -435,7 +435,7 @@ _Python3_EXECUTABLE:INTERNAL=/home/jaybird/Aidens_stuff/testing/test/bin/python
 //Path to a file.
 _Python3_INCLUDE_DIR:INTERNAL=/usr/include/python3.13
 //Python3 Properties
-_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;13;16;64;<none>;cpython-313-x86_64-linux-gnu;abi3;/usr/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib/python3.13/site-packages;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;13;18;64;<none>;cpython-313-x86_64-linux-gnu;abi3;/usr/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13;/home/jaybird/Aidens_stuff/testing/test/lib/python3.13/site-packages;/home/jaybird/Aidens_stuff/testing/test/lib64/python3.13/site-packages
 _Python3_INTERPRETER_SIGNATURE:INTERNAL=707ab3a78e0c26a1e46f1f0213c3625b
 //NumPy reason failure
 _Python3_NumPy_REASON_FAILURE:INTERNAL=

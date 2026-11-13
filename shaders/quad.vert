@@ -32,6 +32,7 @@ out vec3 vWorldPos;
 out vec3 vNormal;
 out vec4 vColor;
 out vec2 vUV;
+flat out int vObjectSlot;
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     vec3 u = q.xyz; float s = q.w;
@@ -49,6 +50,7 @@ void main() {
     vNormal   = worldNrm;
     vColor    = inst.color;
     vUV       = aUV;
+    vObjectSlot = slot;
 
     gl_Position = uProjection * uView * vec4(worldPos, 1.0);
 }

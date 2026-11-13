@@ -117,7 +117,8 @@ namespace Objects
               const glm::mat4 &projection,
               const glm::mat4 &view,
               const glm::vec3 &cameraPos,
-              const glm::vec3 &lightDir);
+              const glm::vec3 &lightDir,
+              bool directionalLightEnabled);
 
     // In the Objects class:
     GLuint GetPaintTexture(int &width, int &height);
@@ -156,11 +157,12 @@ namespace Objects
     void CleanupPaint();
     void SetPaintScript(int scriptID);
     void GetFullFrameImage(std::vector<unsigned char> &jpeg_data, int quality,
-                           int objectBufferIndex, const glm::mat4 &projView);
+                           int objectBufferIndex, const glm::mat4 &projView,
+                           const glm::vec3 &lightDir, bool directionalLightEnabled);
 
     // ---- Core simulation ----
     bool Init(void *glfwWindow = nullptr);
-    void Update(int inputIndex, int outputIndex, float dt);
+    bool Update(int inputIndex, int outputIndex, float dt);
     void Cleanup();
 
     // ---- Equation (DSL) management ----

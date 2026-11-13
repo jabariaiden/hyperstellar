@@ -221,6 +221,8 @@ private:
     int m_width, m_height;
     float m_simulationTime = 0.0f;
     bool m_enable_grid;
+    glm::vec3 m_lightDir = glm::normalize(glm::vec3(-0.4f, -0.7f, -0.6f));
+    bool m_directionalLightEnabled = true;
     float m_speed = 1.0f;
     ObjectState object_to_state(const Object &p) const;
     float m_gravity = 9.81f;
@@ -254,6 +256,19 @@ public:
 
     void set_grid_enabled(bool enabled) { m_enable_grid = enabled; }
     bool get_grid_enabled() const { return m_enable_grid; }
+
+    void set_light_direction(float x, float y, float z);
+    std::array<float, 3> get_light_direction() const;
+
+    void set_directional_light_enabled(bool enabled)
+    {
+        m_directionalLightEnabled = enabled;
+    }
+
+    bool get_directional_light_enabled() const
+    {
+        return m_directionalLightEnabled;
+    }
 
     // Keyboard queries
     bool is_key_pressed(int key) const;
