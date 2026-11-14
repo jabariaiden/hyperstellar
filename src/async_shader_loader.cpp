@@ -173,6 +173,20 @@ void ShaderLoader::LoadGraphicsShader(
     LoadShader(paths, std::move(onComplete), std::move(onError));
 }
 
+void ShaderLoader::LoadGraphicsShaderFromSource(
+    const std::string &vertPath,
+    const std::string &fragmentSource,
+    const std::string &geomPath,
+    std::function<void(GLuint)> onComplete,
+    std::function<void(const std::string &)> onError)
+{
+    ShaderPaths paths;
+    paths.vertex = vertPath;
+    paths.geometry = geomPath;
+    paths.fragment = "<generated-material-fragment>";
+    LoadShader(paths, std::move(onComplete), std::move(onError), &fragmentSource);
+}
+
 std::string ShaderLoader::BuildShaderName(const ShaderPaths &paths) const
 {
     if (!paths.compute.empty())
@@ -297,7 +311,8 @@ void ShaderLoader::SaveBinaryToCache(GLuint program, const std::string &path)
 void ShaderLoader::LoadShader(
     const ShaderPaths &paths,
     std::function<void(GLuint)> onComplete,
-    std::function<void(const std::string &)> onError)
+    std::function<void(const std::string &)> onError,
+    const std::string *fragmentSourceOverride)
 {
     if (m_state != ShaderLoadState::IDLE)
     {
@@ -326,10 +341,19 @@ void ShaderLoader::LoadShader(
     sources.hasGeometry = paths.HasGeometry();
 
     std::string error;
-    if (!readShader(paths.vertex, sources.vertex, error) ||
-        !readShader(paths.geometry, sources.geometry, error) ||
-        !readShader(paths.fragment, sources.fragment, error) ||
-        !readShader(paths.compute, sources.compute, error))
+    bool sourcesReady = readShader(paths.vertex, sources.vertex, error) &&
+                        readShader(paths.geometry, sources.geometry, error);
+    if (sourcesReady)
+    {
+        if (fragmentSourceOverride)
+            sources.fragment = *fragmentSourceOverride;
+        else
+            sourcesReady = readShader(paths.fragment, sources.fragment, error);
+    }
+    if (sourcesReady)
+        sourcesReady = readShader(paths.compute, sources.compute, error);
+
+    if (!sourcesReady)
     {
         m_state = ShaderLoadState::FAILED;
         m_errorMessage = error;

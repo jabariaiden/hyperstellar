@@ -14,8 +14,8 @@ sim.set_equation(rot_obj, "ax=0; ay=0; angular=0; color.a=0")
 
 @sim.script(mode='paint')
 def raycast_3d():
-    yaw = p[rot_obj].x
-    pitch = p[rot_obj].y
+    yaw = p[0].x
+    pitch = p[0].y
     dist = 5.0
     center = [0.0, 0.0, 0.0]
 

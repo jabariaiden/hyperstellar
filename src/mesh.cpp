@@ -153,6 +153,20 @@ namespace Meshes
         return mesh ? mesh->materialID : -1;
     }
 
+    bool SetMaterialScript(int meshID, int scriptID)
+    {
+        if (!Get(meshID) || scriptID < -1)
+            return false;
+        g_meshes[meshID].materialScriptID = scriptID;
+        return true;
+    }
+
+    int GetMaterialScript(int meshID)
+    {
+        const Mesh *mesh = Get(meshID);
+        return mesh ? mesh->materialScriptID : -1;
+    }
+
     int Count()
     {
         return (int)g_meshes.size();

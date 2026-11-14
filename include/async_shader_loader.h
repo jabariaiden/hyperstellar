@@ -69,6 +69,13 @@ public:
         std::function<void(GLuint)> onComplete,
         std::function<void(const std::string &)> onError);
 
+    void LoadGraphicsShaderFromSource(
+        const std::string &vertPath,
+        const std::string &fragmentSource,
+        const std::string &geomPath,
+        std::function<void(GLuint)> onComplete,
+        std::function<void(const std::string &)> onError);
+
     void Cancel();
 
     ShaderLoadState GetState() const { return m_state; }
@@ -85,7 +92,8 @@ public:
 private:
     void LoadShader(const ShaderPaths &paths,
                     std::function<void(GLuint)> onComplete,
-                    std::function<void(const std::string &)> onError);
+                    std::function<void(const std::string &)> onError,
+                    const std::string *fragmentSourceOverride = nullptr);
     bool TryLoadCachedBinary(GLuint &program, const CachedBinary &cached);
     void SaveBinaryToCache(GLuint program, const std::string &cachePath);
     bool CompileStage(GLenum type, const std::string &source,

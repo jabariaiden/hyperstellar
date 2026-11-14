@@ -7,6 +7,7 @@ Supports three modes:
   - 'object' (default): runs per particle, updates Object SSBOs.
   - 'paint': runs per pixel, reads/writes textures (double‑buffered).
   - 'agent': runs over the signal queue (one workgroup per signal).
+  - 'material': runs per fragment on meshes with an attached material script.
 
 This module contains:
   - NameChecker: A linter that validates variable and function names, detects
@@ -86,6 +87,9 @@ class NameChecker(ast.NodeVisitor):
 
     def _get_builtin_vars(self) -> Set[str]:
         """Return built-in variables that are valid in the current mode."""
+        if self.mode == 'material':
+            return {'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time'}
+
         common = {
             'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
         }
@@ -113,6 +117,24 @@ class NameChecker(ast.NodeVisitor):
 
     def _get_builtin_funcs(self) -> Set[str]:
         """Return functions implemented by the current shader mode."""
+        if self.mode == 'material':
+            return {
+                'sqrt', 'inversesqrt', 'sin', 'cos', 'tan', 'asin', 'acos',
+                'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh',
+                'atanh', 'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor',
+                'ceil', 'frac', 'fract', 'sign', 'step', 'smoothstep', 'mix',
+                'clamp', 'mod', 'min', 'max', 'dot', 'cross', 'length',
+                'distance', 'normalize', 'reflect', 'refract', 'faceforward',
+                'transpose', 'inverse', 'determinant', 'outerProduct',
+                'matrixCompMult', 'radians', 'degrees', 'saturate', 'lerp',
+                'fbm', 'noise', 'rand', 'random', 'int', 'float', 'range',
+                'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
+                'look_at', 'camera_ray_ndc', 'offset_ray_origin', 'raymarch',
+                'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
+                'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
+                'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4',
+            }
+
         common = {
             # GLSL math.
             'sqrt', 'inversesqrt', 'sin', 'cos', 'tan', 'asin', 'acos',
@@ -372,8 +394,8 @@ class NameChecker(ast.NodeVisitor):
 # =============================================================================
 class GLSLGenerator(ast.NodeVisitor):
     """
-    Translates a decorated Python function into a GLSL compute shader.
-    Supports three modes: 'object' (default), 'paint', and 'agent'.
+    Translates a decorated Python function into GLSL.
+    Supports object, paint, agent, and per-fragment material modes.
     """
 
     def __init__(self, debug: bool = False, mode: str = 'object') -> None:
@@ -436,6 +458,30 @@ class GLSLGenerator(ast.NodeVisitor):
             raise ValueError("Not a function definition")
         func_node = tree.body[0]
         self.root_function_name = func_node.name
+        if self.mode == 'material':
+            args = func_node.args
+            positional = list(args.posonlyargs) + list(args.args)
+            if (args.posonlyargs or len(args.args) != 1 or args.args[0].arg != 'mesh_id' or
+                    args.defaults or args.kw_defaults or args.kwonlyargs or
+                    args.vararg is not None or args.kwarg is not None):
+                raise SyntaxError(
+                    "A material script must have exactly one parameter named 'mesh_id' "
+                    "and no defaults or keyword-only parameters."
+                )
+            def has_root_return(node: ast.AST) -> bool:
+                for child in ast.iter_child_nodes(node):
+                    # Nested one-argument SDF functions have their own return
+                    # value and are emitted separately from the material body.
+                    if isinstance(child, ast.FunctionDef):
+                        continue
+                    if isinstance(child, ast.Return) or has_root_return(child):
+                        return True
+                return False
+
+            if has_root_return(func_node):
+                raise SyntaxError(
+                    "Material scripts assign the output to 'color'; return statements are not supported."
+                )
         self.loop_vars = {
             node.target.id
             for node in ast.walk(func_node)
@@ -479,7 +525,11 @@ class GLSLGenerator(ast.NodeVisitor):
         common_predefined = {
             'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
         }
-        if self.mode == 'paint':
+        if self.mode == 'material':
+            predefined = {
+                'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time'
+            }
+        elif self.mode == 'paint':
             predefined = common_predefined | {
                 'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
                 't', 'color',
@@ -576,6 +626,9 @@ class GLSLGenerator(ast.NodeVisitor):
             'agent': {
                 'signal_object_idx', 'signal_payload', 'idx',
                 'num_objects', 'group_count', 'dt', 'time', 'i',
+            },
+            'material': {
+                'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time',
             },
         }.get(self.mode, set())
 
@@ -1003,6 +1056,16 @@ float fbm(vec2 p, int octaves) {
                     raise SyntaxError("distance constraint syntax is only available in 'object' scripts.")
                 self._handle_distance(node.value)
                 return
+        # These APIs are side-effecting GLSL calls whose return values are
+        # intentionally unused in normal Python scripts.
+        if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
+            func_name = node.value.func.id
+            if func_name in ('signal', 'scratchpad_write'):
+                self.lines.append(
+                    self.indent_str() + self._expr_to_glsl(node.value) + ";"
+                )
+                return
+
         self.generic_visit(node)
 
     # ---- Inline constraint handlers ----
@@ -1349,6 +1412,13 @@ float fbm(vec2 p, int octaves) {
                 return None
             if node.id == 'i' and node.id not in self.loop_vars:
                 return 'vec2'
+            if self.mode == 'material':
+                material_types = {
+                    'mesh_id': 'int', 'uv': 'vec2', 'world_pos': 'vec3',
+                    'normal': 'vec3', 'view_dir': 'vec3', 'color': 'vec4',
+                }
+                if node.id in material_types:
+                    return material_types[node.id]
             return self.var_types.get(node.id)
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
@@ -1562,14 +1632,13 @@ float fbm(vec2 p, int octaves) {
     def _visit_attribute(self, node: ast.Attribute) -> str:
         if isinstance(node.value, ast.Name):
             var_name = node.value.id
-            if var_name in self.var_types:
-                typ = self.var_types[var_name]
-                if typ and typ.startswith('vec'):
-                    attr = node.attr
-                    valid_sets = ['xyzw', 'rgba', 'stpq']
-                    for s in valid_sets:
-                        if all(c in s for c in attr) and len(attr) <= 4:
-                            return f"{var_name}.{attr}"
+            typ = self._infer_expr_type(node.value)
+            if typ and typ.startswith('vec'):
+                attr = node.attr
+                valid_sets = ['xyzw', 'rgba', 'stpq']
+                for swizzle_set in valid_sets:
+                    if all(c in swizzle_set for c in attr) and 1 <= len(attr) <= 4:
+                        return f"{var_name}.{attr}"
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
             mapping = {
                 'x': 'x', 'y': 'y', 'z': 'z',
@@ -2193,10 +2262,11 @@ class AssignCollector(ast.NodeVisitor):
 # -----------------------------------------------------------------------------
 def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
     """
-    Decorator that compiles a Python function into a GPU compute shader.
+    Decorator that compiles a Python function into a GPU shader for the selected mode.
+    Material mode generates a fragment shader; the other modes generate compute shaders.
     """
-    if mode not in {'object', 'paint', 'agent'}:
-        raise ValueError("mode must be 'object', 'paint', or 'agent'")
+    if mode not in {'object', 'paint', 'agent', 'material'}:
+        raise ValueError("mode must be 'object', 'paint', 'agent', or 'material'")
 
     def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)
@@ -2204,8 +2274,12 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
 
         if mode == 'agent':
             script_id = sim.register_agent(shader_source)   # marks as agent
+        elif mode == 'material':
+            script_id = sim.register_material_script(shader_source)
         else:
             script_id = sim.register_script(shader_source)
+        if script_id < 0:
+            raise RuntimeError(f"Failed to register {mode} JIT script")
         func._script_id = script_id
         func._mode = mode
         return func

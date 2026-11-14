@@ -298,6 +298,8 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/parser.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/async_shader_loader.h \
  /usr/include/c++/16/fstream /usr/include/c++/16/istream \
  /usr/include/c++/16/ios /usr/include/c++/16/exception \
  /usr/include/c++/16/bits/exception_ptr.h \

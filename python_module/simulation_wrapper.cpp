@@ -1046,9 +1046,20 @@ void SimulationWrapper::render()
     glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Paint is the background layer. Dispatch it before drawing the grid
+    // and meshes; DispatchPaint also composites its fullscreen texture quad.
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    Objects::DispatchPaint(w, h,
+                           g_camera3d.target.x, g_camera3d.target.y,
+                           g_camera3d.ApparentHalfHeight(),
+                           m_currentBuffer);
+
+    // Restore the 3D scene state before drawing the grid and objects.
+    glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
@@ -1083,15 +1094,6 @@ void SimulationWrapper::render()
     glFrontFace(GL_CCW);
     Objects::Draw(m_currentBuffer, P, V, camPos,
                   m_lightDir, m_directionalLightEnabled);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    Objects::DispatchPaint(w, h,
-                           g_camera3d.target.x, g_camera3d.target.y,
-                           g_camera3d.ApparentHalfHeight(),
-                           m_currentBuffer);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
 
     glfwSwapBuffers((GLFWwindow *)m_window);
     glfwPollEvents();
@@ -2088,14 +2090,38 @@ int SimulationWrapper::register_script(const std::string &source)
     return scriptManager.registerScript(source);
 }
 
+int SimulationWrapper::register_material_script(const std::string &source)
+{
+    ensure_initialized();
+    return scriptManager.registerMaterialScript(source);
+}
+
 void SimulationWrapper::set_script(int objectIndex, int scriptId)
 {
     ensure_initialized();
-    if (objectIndex < 0 || objectIndex >= Objects::GetNumObjects())
+
+    // Material-mode scripts attach to meshes. Other modes retain the existing
+    // object-index behavior, so Python keeps a single sim.set_script API.
+    if (scriptManager.isMaterialScript(scriptId))
     {
-        throw std::runtime_error("Invalid object index");
+        if (!Meshes::SetMaterialScript(objectIndex, scriptId))
+            throw std::runtime_error("Invalid mesh ID for material script");
+        return;
     }
+
+    if (objectIndex < 0 || objectIndex >= Objects::GetNumObjects())
+        throw std::runtime_error("Invalid object index");
     Objects::SetScriptID(objectIndex, scriptId);
+}
+
+void SimulationWrapper::set_script(const ObjectHandle &handle, int scriptId)
+{
+    ensure_initialized();
+    if (!is_handle_valid(handle))
+        throw std::runtime_error("ObjectHandle is invalid (object was removed)");
+    if (scriptManager.isMaterialScript(scriptId))
+        throw std::runtime_error("Material-mode scripts attach to a mesh ID, not an ObjectHandle");
+    set_script(get_slot_index(handle), scriptId);
 }
 
 // ============================================================================

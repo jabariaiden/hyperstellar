@@ -18,7 +18,9 @@ public:
     ~ScriptManager();
 
     int  registerScript(const std::string& source);
+    int  registerMaterialScript(const std::string& fragmentSource);
     GLuint getProgram(int scriptId) const;
+    bool isMaterialScript(int scriptId) const;
 
     // ---- Agent tracking ----
     void markAsAgent(int id);
@@ -34,6 +36,7 @@ private:
 
     // ---- Store agent script IDs ----
     std::unordered_set<int> agentIDs;
+    std::unordered_set<int> materialScriptIDs;
 
     // Cache helpers
     std::string getCachePath(const std::string& source) const;

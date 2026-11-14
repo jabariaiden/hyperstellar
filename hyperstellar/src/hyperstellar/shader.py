@@ -311,7 +311,7 @@ def wrap_shader(
     Wrap the user's generated GLSL body into a complete shader.
 
     Args:
-        mode: 'object', 'paint', or 'agent'
+        mode: 'object', 'paint', 'agent', or 'material'
         body: The GLSL code generated from the user's Python function.
         header: The ray‑tracing and utility header (common to all modes).
         sdf_defs: SDF and raymarch function definitions.
@@ -324,7 +324,9 @@ def wrap_shader(
     Returns:
         The complete GLSL shader source code.
     """
-    if mode == 'paint':
+    if mode == 'material':
+        return _wrap_material_shader(body, header, sdf_defs, assigned_vars, var_types)
+    elif mode == 'paint':
         return _wrap_paint_shader(body, header, sdf_defs, assigned_vars, var_types)
     elif mode == 'agent':
         return _wrap_agent_shader(body, header, sdf_defs, assigned_vars, var_types)
@@ -1468,6 +1470,128 @@ void main() {{
 }}
 """
     return shader
+
+
+# -----------------------------------------------------------------------------
+# Material mode wrapper
+#
+# Runs once per fragment for a mesh carrying a material-mode JIT script. The
+# engine provides mesh_id, uv, world_pos, normal, view_dir, color and time.
+# The original registered material seeds `color`; the script can then modify
+# it or replace it entirely.
+# -----------------------------------------------------------------------------
+def _wrap_material_shader(body: str, header: str, sdf_defs: str,
+                          assigned_vars: Set[str], var_types: Dict[str, str]) -> str:
+    decls = []
+    for name in sorted(assigned_vars):
+        decls.append(f"    {var_types.get(name, 'float')} {name};")
+    decls_str = "\n".join(decls)
+
+    return f"""#version 430 core
+{header}
+{sdf_defs}
+
+in vec3 fWorldPos;
+in vec3 fNormal;
+in vec4 fColor;
+in vec2 fUV;
+flat in int fObjectSlot;
+
+uniform vec3 uCameraPos;
+uniform vec3 uLightDir;
+uniform int uMaterialID;
+uniform int uMaterialCount;
+uniform int uEmissiveLightCapacity;
+uniform int uMeshID;
+uniform float uTime;
+
+struct Material {{
+    vec4 color;
+    float intensity;
+    uint type;
+    uint _padding0;
+    uint _padding1;
+}};
+layout(std430, binding = 10) readonly buffer MaterialBuffer {{
+    Material materials[];
+}};
+
+struct EmissiveLight {{
+    vec4 position;
+    vec4 colorIntensity;
+    int objectSlot;
+    int _padding0;
+    int _padding1;
+    int _padding2;
+}};
+layout(std430, binding = 11) readonly buffer EmissiveLightBuffer {{
+    uint emissiveLightCount;
+    uint _headerPadding0;
+    uint _headerPadding1;
+    uint _headerPadding2;
+    EmissiveLight emissiveLights[];
+}};
+
+out vec4 FragColor;
+
+void main() {{
+    vec3 world_pos = fWorldPos;
+    vec3 normal = normalize(fNormal);
+    vec3 view_dir = normalize(uCameraPos - fWorldPos);
+    vec2 uv = fUV;
+    int mesh_id = uMeshID;
+    vec4 color = fColor;
+
+    bool _isEmissive = false;
+    float _emissionIntensity = 0.0;
+    if (uMaterialID >= 0 && uMaterialID < uMaterialCount) {{
+        Material _material = materials[uMaterialID];
+        if (_material.type == 0u) {{
+            color = _material.color;
+        }} else if (_material.type == 1u) {{
+            color = vec4(_material.color.rgb, 1.0);
+            _isEmissive = true;
+            _emissionIntensity = max(_material.intensity, 0.0);
+        }}
+    }}
+
+{decls_str}
+{body}
+
+    if (!_isEmissive && color.a <= 0.0)
+        discard;
+
+    vec3 emissiveIllumination = vec3(0.0);
+    uint activeLightCount = min(emissiveLightCount,
+                                uint(max(uEmissiveLightCapacity, 0)));
+    for (uint _lightIndex = 0u; _lightIndex < activeLightCount; ++_lightIndex) {{
+        EmissiveLight _light = emissiveLights[_lightIndex];
+        if (_light.objectSlot == fObjectSlot)
+            continue;
+        vec3 _toLight = _light.position.xyz - world_pos;
+        float _distanceSquared = max(dot(_toLight, _toLight), 0.0001);
+        vec3 _lightDirection = _toLight * inversesqrt(_distanceSquared);
+        float _lightNdotL = max(dot(normal, _lightDirection), 0.0);
+        float _attenuation = max(_light.colorIntensity.a, 0.0) /
+                             (1.0 + _distanceSquared);
+        emissiveIllumination += _light.colorIntensity.rgb *
+                                _lightNdotL * _attenuation;
+    }}
+
+    if (_isEmissive) {{
+        vec3 emitted = color.rgb * _emissionIntensity + emissiveIllumination;
+        FragColor = vec4(emitted, 1.0);
+    }} else {{
+        vec3 halfVector = normalize(view_dir - uLightDir);
+        float ndl = max(dot(normal, -uLightDir), 0.0);
+        float specular = pow(max(dot(normal, halfVector), 0.0), 48.0) * 0.25;
+        vec3 litColor = color.rgb * (0.25 + 0.75 * ndl)
+                      + vec3(specular)
+                      + emissiveIllumination;
+        FragColor = vec4(litColor, color.a);
+    }}
+}}
+"""
 
 
 # -----------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 #include "script_manager.h"
-#include "objects.h"   
+#include "objects.h"
+#include "mesh.h"
+#include "async_shader_loader.h"
 #include <glad/glad.h>
 #include <fstream>
 #include <iostream>
@@ -127,6 +129,33 @@ int ScriptManager::registerScript(const std::string& source) {
     return id;
 }
 
+int ScriptManager::registerMaterialScript(const std::string& fragmentSource) {
+    ShaderLoader loader;
+    GLuint program = 0;
+    std::string error;
+
+    loader.LoadGraphicsShaderFromSource(
+        "quad.vert", fragmentSource, "quad.geom",
+        [&](GLuint compiled) { program = compiled; },
+        [&](const std::string& message) { error = message; });
+
+    if (program == 0) {
+        if (!error.empty())
+            std::cerr << "[Material JIT] " << error << std::endl;
+        return -1;
+    }
+
+    const int id = nextId++;
+    scripts[id].program = program;
+    scripts[id].sourceHash = computeHash(std::string("material:") + fragmentSource);
+    materialScriptIDs.insert(id);
+    return id;
+}
+
+bool ScriptManager::isMaterialScript(int scriptId) const {
+    return materialScriptIDs.find(scriptId) != materialScriptIDs.end();
+}
+
 GLuint ScriptManager::getProgram(int scriptId) const {
     auto it = scripts.find(scriptId);
     return (it != scripts.end()) ? it->second.program : 0;
@@ -143,6 +172,10 @@ void ScriptManager::unregisterScript(int script_id)
         glDeleteProgram(it->second.program);
         scripts.erase(it);
         agentIDs.erase(script_id);
+        materialScriptIDs.erase(script_id);
+        for (int meshID : Meshes::GetLiveIds())
+            if (Meshes::GetMaterialScript(meshID) == script_id)
+                Meshes::SetMaterialScript(meshID, -1);
     }
 }
 

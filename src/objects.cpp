@@ -1967,6 +1967,10 @@ void Objects::Draw(int sourceIndex,
     for (const auto &kv : meshGroups)
     {
         const Mesh *mesh = Meshes::Get(kv.first);
+        if (mesh && mesh->materialScriptID >= 0 && g_scriptManager &&
+            g_scriptManager->getProgram(mesh->materialScriptID) != 0)
+            needsObjectData = true;
+
         const Material *material = mesh ? Materials::Get(mesh->materialID) : nullptr;
         if (!material)
             continue;
@@ -1991,6 +1995,8 @@ void Objects::Draw(int sourceIndex,
     {
         const Mesh *mesh;
         int materialID;
+        int meshID;
+        GLuint program; // 0 selects the built-in material shader
         int objectSlot;
         float distanceSquared;
     };
@@ -2008,6 +2014,30 @@ void Objects::Draw(int sourceIndex,
         const Material *material = Materials::Get(materialID);
         if (!material)
             materialID = -1;
+
+        const GLuint materialProgram =
+            (mesh->materialScriptID >= 0 && g_scriptManager)
+                ? g_scriptManager->getProgram(mesh->materialScriptID)
+                : 0;
+        if (materialProgram != 0)
+        {
+            // Material scripts need fragment-level inputs and may output alpha,
+            // so draw their instances individually and sort them with other
+            // translucent items. The built-in material ID remains available
+            // to seed the script's initial `color` value.
+            for (int slot : kv.second)
+            {
+                if (slot < 0 || slot >= static_cast<int>(objectData.size()))
+                    continue;
+                const glm::vec3 objectPosition(objectData[slot].position.x,
+                                               objectData[slot].position.y,
+                                               objectData[slot].position.z);
+                const glm::vec3 delta = objectPosition - cameraPos;
+                transparentItems.push_back({mesh, materialID, kv.first, materialProgram,
+                                             slot, glm::dot(delta, delta)});
+            }
+            continue;
+        }
 
         if (material && material->type == MaterialType::SOLID_COLOR &&
             material->color.a <= 0.0f)
@@ -2029,8 +2059,8 @@ void Objects::Draw(int sourceIndex,
                                                objectData[slot].position.y,
                                                objectData[slot].position.z);
                 const glm::vec3 delta = objectPosition - cameraPos;
-                transparentItems.push_back({mesh, materialID, slot,
-                                            glm::dot(delta, delta)});
+                transparentItems.push_back({mesh, materialID, kv.first, 0, slot,
+                                             glm::dot(delta, delta)});
             }
         }
         else
@@ -2094,16 +2124,33 @@ void Objects::Draw(int sourceIndex,
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
-    glUseProgram(prog);
-    auto u = [&](const char *n)
-    { return glGetUniformLocation(prog, n); };
-    glUniformMatrix4fv(u("uProjection"), 1, GL_FALSE, glm::value_ptr(P));
-    glUniformMatrix4fv(u("uView"), 1, GL_FALSE, glm::value_ptr(V));
-    glUniform3fv(u("uCameraPos"), 1, &cameraPos[0]);
-    glUniform3fv(u("uLightDir"), 1, &lightDir[0]);
-    glUniform1i(u("uDirectionalLightEnabled"), directionalLightEnabled ? 1 : 0);
-    glUniform1i(u("uMaterialCount"), Materials::Count());
-    glUniform1i(u("uEmissiveLightCapacity"), Objects::MAX_OBJECTS);
+    GLuint activeDrawProgram = 0;
+    auto bindDrawProgram = [&](GLuint program)
+    {
+        if (program == activeDrawProgram)
+            return;
+        activeDrawProgram = program;
+        glUseProgram(program);
+        glUniformMatrix4fv(glGetUniformLocation(program, "uProjection"),
+                           1, GL_FALSE, glm::value_ptr(P));
+        glUniformMatrix4fv(glGetUniformLocation(program, "uView"),
+                           1, GL_FALSE, glm::value_ptr(V));
+        glUniform3fv(glGetUniformLocation(program, "uCameraPos"), 1, &cameraPos[0]);
+        glUniform3fv(glGetUniformLocation(program, "uLightDir"), 1, &lightDir[0]);
+        glUniform1i(glGetUniformLocation(program, "uDirectionalLightEnabled"), directionalLightEnabled ? 1 : 0);
+        glUniform1i(glGetUniformLocation(program, "uMaterialCount"), Materials::Count());
+        glUniform1i(glGetUniformLocation(program, "uEmissiveLightCapacity"), Objects::MAX_OBJECTS);
+    };
+    bindDrawProgram(prog);
+    auto setMaterialUniforms = [&](GLuint program, int materialID, int meshID)
+    {
+        glUniform1i(glGetUniformLocation(program, "uMaterialID"), materialID);
+        if (meshID >= 0)
+        {
+            glUniform1i(glGetUniformLocation(program, "uMeshID"), meshID);
+            glUniform1f(glGetUniformLocation(program, "uTime"), g_simulationTime);
+        }
+    };
 
     // Bind object, material, emissive-light, and draw-index storage.
     // Binding 12 is reserved for draw indices in the graphics pipeline.
@@ -2130,7 +2177,7 @@ void Objects::Draw(int sourceIndex,
     glDepthMask(GL_TRUE);
     for (const OpaqueBatch &batch : opaqueBatches)
     {
-        glUniform1i(u("uMaterialID"), batch.materialID);
+        setMaterialUniforms(prog, batch.materialID, -1);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawIdxSSBO);
         glBufferData(GL_SHADER_STORAGE_BUFFER,
                      batch.slots->size() * sizeof(int),
@@ -2148,7 +2195,10 @@ void Objects::Draw(int sourceIndex,
 
         for (const TransparentItem &item : transparentItems)
         {
-            glUniform1i(u("uMaterialID"), item.materialID);
+            const GLuint itemProgram = item.program != 0 ? item.program : prog;
+            bindDrawProgram(itemProgram);
+            setMaterialUniforms(itemProgram, item.materialID,
+                                item.program != 0 ? item.meshID : -1);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawIdxSSBO);
             glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int),
                          &item.objectSlot, GL_STREAM_DRAW);

@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -11,6 +12,7 @@ struct Mesh {
     glm::vec3 aabbMax = {};
     bool valid = false;
     int materialID = -1; // -1 = use the object's legacy color
+    int materialScriptID = -1; // -1 = use the built-in material / object color
 };
 
 namespace Meshes {
@@ -31,6 +33,8 @@ namespace Meshes {
     const Mesh* Get(int id);
     bool SetMaterial(int meshID, int materialID);
     int GetMaterial(int meshID);
+    bool SetMaterialScript(int meshID, int scriptID);
+    int GetMaterialScript(int meshID);
     int  Count();
     void Destroy(int id);
     void Cleanup();

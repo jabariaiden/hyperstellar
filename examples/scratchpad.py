@@ -11,26 +11,15 @@ Controls: WASD to pan, scroll to zoom.
 
 import hyperstellar as se
 import random
-import time
 
-# ----------------------------------------------------------------------------
-# Simulation setup
-# ----------------------------------------------------------------------------
 sim = se.Simulation(
     headless=False,
-    width=1200,
-    height=800,
-    title="Agents & Scratchpads Demo",
-    enable_grid=False
+    enable_grid = False,
 )
 
 while not sim.are_all_shaders_ready():
     sim.update_shader_loading()
-    time.sleep(0.01)
 
-# Clear any default objects
-while sim.object_count() > 0:
-    sim.remove_object(0)
 
 sim.set_paint_resolution(512, 512)
 
@@ -71,7 +60,7 @@ for _ in range(NUM_PARTICLES):
 # ----------------------------------------------------------------------------
 # Object JIT script: free motion + boundary detection with signal emission
 # ----------------------------------------------------------------------------
-@sim.script(mode='object', debug=True)
+@sim.script(mode='object')
 def bounce_and_signal():
     # Simple physics: constant velocity
     ax = 0.0
@@ -93,14 +82,12 @@ def bounce_and_signal():
         vy = -abs(vy)
         signal(0, 3.0)    # bottom
 
-# Assign the same script to all particles
-for pid in particles:
-    sim.set_script(pid, bounce_and_signal._script_id)
+
 
 # ----------------------------------------------------------------------------
 # Agent: processes signals, increments scratchpad counters
 # ----------------------------------------------------------------------------
-@sim.script(mode='agent', debug=True)
+@sim.script(mode='agent')
 def wall_counter():
     # This runs per signal
     idx = int(signal_payload)
@@ -115,7 +102,7 @@ AGENT_ID = wall_counter._script_id
 # ----------------------------------------------------------------------------
 # Paint JIT: read scratchpad and show counters as bars
 # ----------------------------------------------------------------------------
-@sim.script(mode='paint', debug=True)
+@sim.script(mode='paint')
 def show_counters():
     # Read the four counters
     left = scratchpad_read(0, 0)
@@ -159,8 +146,10 @@ def show_counters():
 
     color.a = 1.0
 
-sim.set_paint_script(show_counters._script_id)
-
+sim.paint(show_counters._script_id)
+# Assign the same script to all particles
+for pid in particles:
+    sim.set_script(pid, bounce_and_signal._script_id)
 # ----------------------------------------------------------------------------
 # Main loop
 # ----------------------------------------------------------------------------
@@ -171,7 +160,7 @@ print("Close the window to exit.\n")
 sim.set_speed(2.0)
 
 while not sim.should_close():
-    sim.process_input()
+    sim.default_input()
 
     # 1. Physics update (objects run their scripts, emit signals)
     sim.update(0.016)
@@ -181,5 +170,3 @@ while not sim.should_close():
 
     # 3. Render (paint shader reads scratchpad)
     sim.render()
-
-sim.cleanup()

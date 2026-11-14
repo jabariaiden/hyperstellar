@@ -11,8 +11,12 @@
 #include <array>
 #include <tuple>
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <stdexcept>
+#include <cmath>
+#include <algorithm>
+#include <limits>
 
 // -------------------------------------------------------------------------
 // PRE-STEP includes required by the 3D bindings
@@ -79,6 +83,166 @@ namespace stellar_binding //literally
             throw py::value_error("Could not assign material to the registered mesh");
         }
         return meshID;
+    }
+
+    inline std::vector<glm::vec3> parse_vec3_array(py::handle value, const char *name)
+    {
+        if (!py::isinstance<py::sequence>(value) || py::isinstance<py::str>(value) ||
+            py::isinstance<py::bytes>(value))
+            throw py::type_error(std::string(name) + " must be a sequence of 3D points");
+
+        auto sequence = py::reinterpret_borrow<py::sequence>(value);
+        std::vector<glm::vec3> result;
+        result.reserve(sequence.size());
+        for (py::handle item : sequence)
+        {
+            if (!py::isinstance<py::sequence>(item) || py::isinstance<py::str>(item) ||
+                py::isinstance<py::bytes>(item))
+                throw py::type_error(std::string(name) + " entries must be 3-component sequences");
+            auto point = py::reinterpret_borrow<py::sequence>(item);
+            if (point.size() != 3)
+                throw py::value_error(std::string(name) + " entries must contain exactly 3 components");
+            glm::vec3 v(point[0].cast<float>(), point[1].cast<float>(), point[2].cast<float>());
+            if (!std::isfinite(v.x) || !std::isfinite(v.y) || !std::isfinite(v.z))
+                throw py::value_error(std::string(name) + " values must be finite");
+            result.push_back(v);
+        }
+        return result;
+    }
+
+    inline std::vector<glm::vec2> parse_vec2_array(py::handle value, const char *name)
+    {
+        if (!py::isinstance<py::sequence>(value) || py::isinstance<py::str>(value) ||
+            py::isinstance<py::bytes>(value))
+            throw py::type_error(std::string(name) + " must be a sequence of 2D coordinates");
+
+        auto sequence = py::reinterpret_borrow<py::sequence>(value);
+        std::vector<glm::vec2> result;
+        result.reserve(sequence.size());
+        for (py::handle item : sequence)
+        {
+            if (!py::isinstance<py::sequence>(item) || py::isinstance<py::str>(item) ||
+                py::isinstance<py::bytes>(item))
+                throw py::type_error(std::string(name) + " entries must be 2-component sequences");
+            auto uv = py::reinterpret_borrow<py::sequence>(item);
+            if (uv.size() != 2)
+                throw py::value_error(std::string(name) + " entries must contain exactly 2 components");
+            glm::vec2 v(uv[0].cast<float>(), uv[1].cast<float>());
+            if (!std::isfinite(v.x) || !std::isfinite(v.y))
+                throw py::value_error(std::string(name) + " values must be finite");
+            result.push_back(v);
+        }
+        return result;
+    }
+
+    inline std::vector<std::uint32_t> parse_mesh_indices(py::handle value)
+    {
+        if (!py::isinstance<py::sequence>(value) || py::isinstance<py::str>(value) ||
+            py::isinstance<py::bytes>(value))
+            throw py::type_error("indices must be a flat sequence of triangle indices");
+        auto sequence = py::reinterpret_borrow<py::sequence>(value);
+        if (sequence.size() == 0 || sequence.size() % 3 != 0)
+            throw py::value_error("indices must contain a non-empty multiple of 3 entries");
+        std::vector<std::uint32_t> result;
+        result.reserve(sequence.size());
+        for (py::handle item : sequence)
+        {
+            const long long index = py::cast<long long>(item);
+            if (index < 0 || static_cast<unsigned long long>(index) >
+                                 std::numeric_limits<std::uint32_t>::max())
+                throw py::value_error("indices must be non-negative 32-bit integers");
+            result.push_back(static_cast<std::uint32_t>(index));
+        }
+        return result;
+    }
+
+    inline int register_custom_mesh(py::handle verticesValue, py::handle indicesValue,
+                                    py::handle normalsValue, py::handle uvsValue)
+    {
+        const std::vector<glm::vec3> positions = parse_vec3_array(verticesValue, "vertices");
+        const std::vector<std::uint32_t> indices = parse_mesh_indices(indicesValue);
+        if (positions.size() < 3)
+            throw py::value_error("a custom mesh needs at least 3 vertices");
+        if (positions.size() > static_cast<size_t>(std::numeric_limits<unsigned int>::max()) ||
+            indices.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+            throw py::value_error("custom mesh exceeds the engine's supported geometry size");
+
+        for (std::uint32_t index : indices)
+            if (index >= positions.size())
+                throw py::value_error("an index is outside the vertices array");
+
+        std::vector<glm::vec3> normals;
+        if (normalsValue.is_none())
+        {
+            normals.assign(positions.size(), glm::vec3(0.0f));
+            for (size_t i = 0; i < indices.size(); i += 3)
+            {
+                const std::uint32_t i0 = indices[i];
+                const std::uint32_t i1 = indices[i + 1];
+                const std::uint32_t i2 = indices[i + 2];
+                const glm::vec3 face = glm::cross(positions[i1] - positions[i0],
+                                                  positions[i2] - positions[i0]);
+                if (glm::dot(face, face) > 1.0e-20f)
+                {
+                    normals[i0] += face;
+                    normals[i1] += face;
+                    normals[i2] += face;
+                }
+            }
+            for (glm::vec3 &normal : normals)
+                normal = glm::dot(normal, normal) > 1.0e-20f
+                             ? glm::normalize(normal)
+                             : glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+        else
+        {
+            normals = parse_vec3_array(normalsValue, "normals");
+            if (normals.size() != positions.size())
+                throw py::value_error("normals must contain exactly one 3D vector per vertex");
+            for (glm::vec3 &normal : normals)
+                normal = glm::dot(normal, normal) > 1.0e-20f
+                             ? glm::normalize(normal)
+                             : glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+
+        std::vector<glm::vec2> uvs;
+        if (uvsValue.is_none())
+        {
+            glm::vec3 minimum(std::numeric_limits<float>::max());
+            glm::vec3 maximum(std::numeric_limits<float>::lowest());
+            for (const glm::vec3 &position : positions)
+            {
+                minimum = glm::min(minimum, position);
+                maximum = glm::max(maximum, position);
+            }
+            const glm::vec3 extent = maximum - minimum;
+            int uAxis = 0, vAxis = 1;
+            if (extent.x <= extent.y && extent.x <= extent.z) { uAxis = 1; vAxis = 2; }
+            else if (extent.y <= extent.x && extent.y <= extent.z) { uAxis = 0; vAxis = 2; }
+            const float uExtent = std::max(extent[uAxis], 1.0e-8f);
+            const float vExtent = std::max(extent[vAxis], 1.0e-8f);
+            uvs.reserve(positions.size());
+            for (const glm::vec3 &position : positions)
+                uvs.emplace_back((position[uAxis] - minimum[uAxis]) / uExtent,
+                                 (position[vAxis] - minimum[vAxis]) / vExtent);
+        }
+        else
+        {
+            uvs = parse_vec2_array(uvsValue, "uvs");
+            if (uvs.size() != positions.size())
+                throw py::value_error("uvs must contain exactly one 2D coordinate per vertex");
+        }
+
+        std::vector<float> packed;
+        packed.reserve(positions.size() * 8);
+        for (size_t i = 0; i < positions.size(); ++i)
+        {
+            const glm::vec3 &p = positions[i];
+            const glm::vec3 &n = normals[i];
+            const glm::vec2 &uv = uvs[i];
+            packed.insert(packed.end(), {p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y});
+        }
+        return Meshes::RegisterRaw(packed.data(), positions.size(), indices.data(), indices.size());
     }
 
     inline float config_float(const py::dict &config, const char *key, float fallback)
@@ -276,6 +440,33 @@ PYBIND11_MODULE(stellar, m)
     // ITEM 2: Meshes namespace bindings
     // Handles are plain ints; nothing about Mesh lifetime is exposed to Python.
     // =========================================================================
+    m.def("register_mesh",
+          [](py::object vertices, py::object indices, py::object normals,
+             py::object uvs, int materialID)
+          {
+              return stellar_binding::register_mesh_with_material(
+                  materialID, [&]()
+                  {
+                      const int meshID = stellar_binding::register_custom_mesh(
+                          vertices, indices, normals, uvs);
+                      if (meshID < 0)
+                          throw py::value_error("custom mesh registration failed; check vertices and triangle indices");
+                      return meshID;
+                  });
+          },
+          py::arg("vertices"), py::arg("indices"),
+          py::arg("normals") = py::none(), py::arg("uvs") = py::none(),
+          py::arg("material_id") = -1,
+          R"pbdoc(
+          Register an indexed custom 3D mesh from vertices and triangle indices.
+
+          vertices is a sequence of (x, y, z) points. indices is a flat sequence
+          of triangle indices. If normals are omitted, smooth vertex normals are
+          calculated from the indexed triangles. If uvs are omitted, a planar
+          projection using the two largest mesh extents is generated. Optional
+          normals and UVs must contain one value per vertex.
+          )pbdoc");
+
     m.def("register_circle", [](float r, int s, int materialID)
           { return stellar_binding::register_mesh_with_material(
                 materialID, [&]() { return Meshes::RegisterCircle(r, s); }); },
@@ -386,6 +577,16 @@ PYBIND11_MODULE(stellar, m)
           Every object using the mesh shares its assigned material.
           Returns False when either handle is invalid.
           )pbdoc");
+    m.def("get_mesh_material_script",
+          [](int meshID)
+          {
+              if (!Meshes::Get(meshID))
+                  throw py::value_error("Invalid mesh ID");
+              return Meshes::GetMaterialScript(meshID);
+          },
+          py::arg("mesh_id"),
+          "Return the JIT material script ID assigned to a mesh, or -1 when none is assigned.");
+
     m.def("get_mesh_material",
           [](int meshID)
           {
@@ -1664,6 +1865,9 @@ PYBIND11_MODULE(stellar, m)
 
         // Scripting JIT
         .def("register_script", &SimulationWrapper::register_script, py::arg("source"), "Compile a Python script (source) and return script ID")
+        .def("register_material_script", &SimulationWrapper::register_material_script,
+             py::arg("source"),
+             "Compile a material-mode JIT fragment shader and return its script ID.")
         .def("set_script", [](SimulationWrapper &self, int object_index, py::object script_or_id)
              {
                     int script_id;
@@ -1676,13 +1880,10 @@ PYBIND11_MODULE(stellar, m)
                     else {
                     throw py::type_error("set_script() expects an int or a callable with a '_script_id' attribute");
                     }
-            self.set_script(object_index, script_id); }, py::arg("object_index"), py::arg("script"), R"pbdoc(Assign a JIT script to an object. Accepts a script ID or a decorated function.)pbdoc")
+            self.set_script(object_index, script_id); }, py::arg("object_index"), py::arg("script"), R"pbdoc(Assign a JIT script to an object, or a material-mode script to a mesh. The script mode determines the target type.)pbdoc")
 
         .def("set_script", [](SimulationWrapper &self, const ObjectHandle &handle, py::object script_or_id)
              {
-            if (!self.is_handle_valid(handle)) {
-                throw std::runtime_error("ObjectHandle is invalid (object was removed)");
-            }
             int script_id;
             if (py::isinstance<py::int_>(script_or_id)) {
                 script_id = py::cast<int>(script_or_id);
@@ -1693,7 +1894,7 @@ PYBIND11_MODULE(stellar, m)
             else {
                 throw py::type_error("set_script() expects an int or a callable with a '_script_id' attribute");
             }
-            self.set_script(self.get_slot_index(handle), script_id); }, py::arg("handle"), py::arg("script"), "Assign a JIT script to an object by stable handle.")
+            self.set_script(handle, script_id); }, py::arg("handle"), py::arg("script"), "Assign an object-mode JIT script to an object by stable handle.")
 
         // ----- Unified paint: removed set_paint_script, replaced paint with overloaded version -----
         .def("paint", [](SimulationWrapper &self, py::object arg)

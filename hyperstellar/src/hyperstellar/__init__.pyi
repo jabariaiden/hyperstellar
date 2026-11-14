@@ -1,6 +1,6 @@
 ﻿# Type stubs for hyperstellar package
 import typing
-from typing import Any, List, Dict, Optional, Union, Callable, ClassVar, Tuple, Iterator, overload
+from typing import Any, List, Dict, Optional, Union, Callable, ClassVar, Tuple, Iterator, Sequence, overload
 
 # ============================================================================
 # ENUMS
@@ -417,6 +417,24 @@ def register_polygon(radius: float, sides: int = 6, material_id: int = -1) -> in
     ...
 
 
+def register_mesh(
+    vertices: Sequence[Sequence[float]],
+    indices: Sequence[int],
+    normals: Optional[Sequence[Sequence[float]]] = None,
+    uvs: Optional[Sequence[Sequence[float]]] = None,
+    material_id: int = -1,
+) -> int:
+    """Register a custom indexed 3D mesh and return its mesh ID.
+
+    ``vertices`` contains local-space ``(x, y, z)`` points. ``indices`` is a
+    flat list of triangle indices (three entries per triangle). Optional
+    ``normals`` and ``uvs`` contain one value per vertex. When omitted,
+    smooth vertex normals and a planar UV projection are generated.
+    An existing ``material_id`` may be attached at registration.
+    """
+    ...
+
+
 def register_sphere(radius: float, segs: int = 32, rings: int = 16, material_id: int = -1) -> int:
     """Register a UV sphere mesh for 3D objects.
 
@@ -551,6 +569,11 @@ def set_mesh_material(mesh_id: int, material_id: int) -> bool:
     ``material_id=-1`` to remove the material and return the mesh to the
     legacy per-object-colour path. Returns ``False`` if either ID is invalid.
     """
+    ...
+
+
+def get_mesh_material_script(mesh_id: int) -> int:
+    """Return the JIT material script ID assigned to a mesh, or -1 if absent."""
     ...
 
 
@@ -1311,13 +1334,22 @@ class Simulation:
         """Compile a Python script (source) and return script ID."""
         ...
 
+    def register_material_script(self, source: str) -> int:
+        """Compile a material-mode JIT fragment shader and return its script ID."""
+        ...
+
     @overload
     def set_script(self, object_index: int, script: Union[int, Callable[..., Any]]) -> None: ...
     @overload
     def set_script(self, handle: ObjectHandle, script: Union[int, Callable[..., Any]]) -> None: ...
 
     def set_script(self, object_index: int, script: Union[int, Callable[..., Any]]) -> None:
-        """Assign a JIT script to an object. Accepts a script ID or a decorated function."""
+        """Assign a JIT script to an object or mesh.
+
+        Object/agent scripts target an object index or stable handle. A
+        material-mode script targets a mesh ID and controls its fragment colour.
+        Accepts a script ID or decorated function.
+        """
         ...
 
     # ========================================================================
@@ -1969,8 +2001,12 @@ class Simulation:
         program and registers it with this simulation.
 
         ``mode="object"`` runs the function for objects, ``mode="paint"``
-        targets the paint pass, and ``mode="agent"`` registers an agent
-        program. ``debug=True`` enables the decorator's debugging path.
+        targets the paint pass, ``mode="agent"`` registers an agent program,
+        and ``mode="material"`` runs per fragment for a mesh. A material
+        function takes exactly one parameter, ``mesh_id``; the engine exposes
+        ``uv``, ``world_pos``, ``normal``, ``view_dir``, ``color``, and ``time``
+        inside its body. Assign the output to ``color``. ``debug=True`` enables
+        the decorator's debugging path.
         """
         ...
 
@@ -2039,6 +2075,10 @@ def script(
         >>> @script(sim)
         >>> def my_physics():
         >>>     ax = -x; ay = -y
+
+    Use ``mode="material"`` for a fragment script with exactly one ``mesh_id``
+    parameter. The script can read ``uv``, ``world_pos``, ``normal``, ``view_dir``,
+    ``color``, and ``time``; assign its output to ``color``.
     """
     ...
 

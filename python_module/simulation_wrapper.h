@@ -277,7 +277,9 @@ public:
 
     // script management
     int register_script(const std::string &source);
+    int register_material_script(const std::string &source);
     void set_script(int objectIndex, int scriptId);
+    void set_script(const ObjectHandle &handle, int scriptId);
 
     // Camera control
     void set_camera_position(float x, float y);
