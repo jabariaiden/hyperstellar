@@ -38,6 +38,7 @@
 #include <cstring>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <atomic>
 #include <cstdint> // for uint32_t
@@ -1647,10 +1648,29 @@ bool Objects::Update(int inputIndex, int outputIndex, float dt)
 
     // Load only the programs required by the current object groups.
     const bool needsDefaultJit = !g_defaultJitIndices.empty();
+    // Returning false freezes the whole simulation clock (see
+    // SimulationWrapper::update), so say why, once per cause, instead of
+    // stalling silently.
+    static std::unordered_set<int> s_warnedMissingScripts;
     for (const auto &group : g_scriptGroups)
     {
         if (!g_scriptManager || g_scriptManager->getProgram(group.first) == 0)
+        {
+            if (s_warnedMissingScripts.insert(group.first).second)
+                std::cerr << "[Objects] Update stalled: object script id " << group.first
+                          << " has no linked program (" << group.second.size()
+                          << " object(s) use it). Is it a paint/agent/material script"
+                             " assigned with set_script()?" << std::endl;
             return false;
+        }
+        if (g_scriptManager->isAgent(group.first) ||
+            g_scriptManager->isMaterialScript(group.first))
+        {
+            if (s_warnedMissingScripts.insert(-1000 - group.first).second)
+                std::cerr << "[Objects] Script id " << group.first
+                          << " is an agent/material script but is assigned as an"
+                             " OBJECT script; it will not behave as one." << std::endl;
+        }
     }
     if (needsDefaultJit && (!g_defaultJitShaderReady || g_defaultJitProgram == 0))
         return false;
@@ -2174,6 +2194,35 @@ void Objects::Draw(int sourceIndex,
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &oldBlendSrcAlpha);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &oldBlendDstAlpha);
 
+    // ---- Diagnostic: report the draw state whenever it changes ----
+    {
+        static int s_lastOpaque = -1, s_lastTransparent = -1, s_lastGroups = -1, s_lastPaint = -2;
+        const int opaqueN = (int)opaqueBatches.size();
+        const int transN = (int)transparentItems.size();
+        const int groupsN = (int)meshGroups.size();
+        if (opaqueN != s_lastOpaque || transN != s_lastTransparent ||
+            groupsN != s_lastGroups || g_paintScriptID != s_lastPaint)
+        {
+            s_lastOpaque = opaqueN; s_lastTransparent = transN;
+            s_lastGroups = groupsN; s_lastPaint = g_paintScriptID;
+            std::cerr << "[Draw] program=" << prog << " meshGroups=" << groupsN
+                      << " opaqueBatches=" << opaqueN << " transparentItems=" << transN
+                      << " numObjects=" << g_numObjects
+                      << " paintScript=" << g_paintScriptID << std::endl;
+        }
+    }
+    {
+        // Drain any error left by earlier passes so it is not blamed on the draw below.
+        GLenum stale = glGetError();
+        static bool s_staleReported = false;
+        if (stale != GL_NO_ERROR && !s_staleReported)
+        {
+            s_staleReported = true;
+            std::cerr << "[Draw] stale GL error 0x" << std::hex << stale << std::dec
+                      << " entering object draw (left by paint/physics pass)" << std::endl;
+        }
+    }
+
     glDepthMask(GL_TRUE);
     for (const OpaqueBatch &batch : opaqueBatches)
     {
@@ -2208,6 +2257,16 @@ void Objects::Draw(int sourceIndex,
         }
     }
 
+    {
+        static bool s_drawErrReported = false;
+        GLenum derr = glGetError();
+        if (derr != GL_NO_ERROR && !s_drawErrReported)
+        {
+            s_drawErrReported = true;
+            std::cerr << "[Draw] GL error 0x" << std::hex << derr << std::dec
+                      << " during object draw (paintScript=" << g_paintScriptID << ")" << std::endl;
+        }
+    }
     glDepthMask(oldDepthWrite);
     glBlendFuncSeparate(oldBlendSrcRGB, oldBlendDstRGB,
                         oldBlendSrcAlpha, oldBlendDstAlpha);
@@ -3078,6 +3137,10 @@ void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float
         GLuint program = g_scriptManager->getProgram(g_paintScriptID);
         if (program)
         {
+            // Make the latest object-physics, scratchpad (agent) and signal writes
+            // visible to the paint compute pass before it reads them.
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+
             glUseProgram(program);
 
             // ---- Set all uniforms for the paint script ----
@@ -3128,9 +3191,18 @@ void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float
             if (g_scratchpadPool != 0)
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
 
+            // The paint shader declares the signal queue (binding 11) too; bind it
+            // explicitly so it never depends on whatever the previous pass left there.
+            if (g_signalQueueBuffer != 0)
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SIGNAL_QUEUE_BINDING, g_signalQueueBuffer);
+            GLint policyLoc = glGetUniformLocation(program, "uSignalQueueOverflowPolicy");
+            if (policyLoc != -1)
+                glUniform1i(policyLoc, g_signalQueueOverflowPolicy);
+
             // Dispatch compute shader
             glDispatchCompute((texW + 15) / 16, (texH + 15) / 16, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT |
+                            GL_SHADER_STORAGE_BARRIER_BIT);
 
             // ---- Draw the quad using the texture we just wrote ----
             glUseProgram(g_paintQuadProgram);
@@ -3141,6 +3213,25 @@ void Objects::DispatchPaint(int screenWidth, int screenHeight, float camX, float
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glBindVertexArray(0);
             glUseProgram(0);
+
+            // Leave no paint state behind for the object draw / next physics step:
+            // unit 1 (prev-frame sampler) and the paint texture on unit 0.
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, 0);
+
+            static bool s_paintErrorReported = false;
+            if (!s_paintErrorReported)
+            {
+                GLenum perr = glGetError();
+                if (perr != GL_NO_ERROR)
+                {
+                    s_paintErrorReported = true;
+                    std::cerr << "[Paint JIT] OpenGL error 0x" << std::hex << perr << std::dec
+                              << " after paint dispatch" << std::endl;
+                }
+            }
 
             // ---- Swap indices for next frame ----
             int oldWrite = g_paintWriteIdx;
@@ -3790,6 +3881,56 @@ void Objects::DispatchAgent(int agentID, bool clearAfter)
     {
         ClearSignalQueue();
     }
+}
+
+// ----------------------------------------------------------------------------
+// Kernel dispatch: general-purpose compute over `threadCount` threads. Kernels
+// use no objects and no signal queue; they read/write scratchpads only. The
+// dispatch is 2D when needed so thread counts beyond 65535 * 64 still work
+// (the shader folds it back into one linear index).
+// ----------------------------------------------------------------------------
+void Objects::DispatchKernel(int kernelID, int threadCount, float dt)
+{
+    if (threadCount <= 0)
+        return;
+    const GLuint prog = g_scriptManager ? g_scriptManager->getProgram(kernelID) : 0;
+    if (prog == 0)
+    {
+        static std::unordered_set<int> s_warned;
+        if (s_warned.insert(kernelID).second)
+            std::cerr << "[Kernel] script id " << kernelID
+                      << " has no linked program; dispatch skipped." << std::endl;
+        return;
+    }
+
+    glUseProgram(prog);
+    if (g_scratchpadPool != 0)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SCRATCHPAD_BINDING, g_scratchpadPool);
+
+    GLint offsetLoc = glGetUniformLocation(prog, "uScratchpadOffsets");
+    if (offsetLoc != -1)
+    {
+        int offsets[16] = {0};
+        for (auto &pair : g_scratchpads)
+            if (pair.first >= 0 && pair.first < 16)
+                offsets[pair.first] = (int)pair.second.offsetInPool;
+        glUniform1iv(offsetLoc, 16, offsets);
+    }
+    glUniform1i(glGetUniformLocation(prog, "uNumObjects"), g_numObjects);
+    glUniform1f(glGetUniformLocation(prog, "uTime"), g_simulationTime);
+    glUniform1f(glGetUniformLocation(prog, "uDt"), dt);
+    glUniform1i(glGetUniformLocation(prog, "uThreadCount"), threadCount);
+
+    const GLuint kGroupSize = 64;
+    const GLuint kMaxGroupsX = 65535; // minimum every GL 4.3 implementation guarantees
+    const GLuint groups = (static_cast<GLuint>(threadCount) + kGroupSize - 1) / kGroupSize;
+    const GLuint gx = groups < kMaxGroupsX ? groups : kMaxGroupsX;
+    const GLuint gy = (groups + kMaxGroupsX - 1) / kMaxGroupsX;
+    glDispatchCompute(gx, gy, 1);
+
+    // Later kernels, the paint pass and agents must see these scratchpad writes.
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glUseProgram(0);
 }
 
 void Objects::DispatchAllAgents(bool clearAfter)

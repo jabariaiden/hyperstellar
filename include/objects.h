@@ -120,7 +120,6 @@ namespace Objects
               const glm::vec3 &lightDir,
               bool directionalLightEnabled);
 
-    // In the Objects class:
     GLuint GetPaintTexture(int &width, int &height);
     void GetPaintImage(std::vector<unsigned char> &jpeg_data, int quality = 85);
     int CreateScratchpad(size_t numElements);
@@ -130,6 +129,8 @@ namespace Objects
     void UnmapScratchpad(int id);
     size_t GetScratchpadSize(int id);
     bool IsValidScratchpad(int id);
+    // kernel dispatch
+    void DispatchKernel(int kernelID, int threadCount, float dt);
 
     // Signal queue
     void SetSignalQueueCapacity(size_t capacity);

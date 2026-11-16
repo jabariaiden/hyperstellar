@@ -421,8 +421,8 @@ PYBIND11_MODULE(stellar, m)
         .value("CIRCLE", PyCollisionShape::CIRCLE, "Circle collision")
         .value("AABB", PyCollisionShape::AABB, "Rectangle AABB collision")
         .value("POLYGON", PyCollisionShape::POLYGON, "Polygon SAT collision")
-        .value("SPHERE", PyCollisionShape::SPHERE, "3D sphere collision") // new
-        .value("BOX", PyCollisionShape::BOX, "3D oriented box collision") // new
+        .value("SPHERE", PyCollisionShape::SPHERE, "3D sphere collision") 
+        .value("BOX", PyCollisionShape::BOX, "3D oriented box collision") 
         .export_values();
 
     py::enum_<MaterialType>(m, "MaterialType", R"pbdoc(
@@ -912,9 +912,9 @@ PYBIND11_MODULE(stellar, m)
         case PyCollisionShape::CIRCLE:  shapeStr = "CIRCLE";  break;
         case PyCollisionShape::AABB:    shapeStr = "AABB";    break;
         case PyCollisionShape::POLYGON: shapeStr = "POLYGON"; break;
-        case PyCollisionShape::SPHERE:  shapeStr = "SPHERE";  break;   // new
-        case PyCollisionShape::BOX:     shapeStr = "BOX";     break;   // new
-        default:                        shapeStr = "UNKNOWN"; break;   // new (defensive)
+        case PyCollisionShape::SPHERE:  shapeStr = "SPHERE";  break;   
+        case PyCollisionShape::BOX:     shapeStr = "BOX";     break;   
+        default:                        shapeStr = "UNKNOWN"; break;    
         }
         return "<CollisionConfig shape=" + shapeStr +
             " restitution=" + std::to_string(c.restitution) +
@@ -2307,6 +2307,21 @@ PYBIND11_MODULE(stellar, m)
                  >>> # Camera will smoothly follow the object
              )pbdoc")
 
+             
+        .def("set_camera_projection", &SimulationWrapper::set_camera_projection,
+            py::arg("orthographic"),
+            "Set camera projection: True for orthographic, False for perspective.")
+
+        .def("get_camera_projection", &SimulationWrapper::get_camera_projection,
+            "Return True if the camera is using orthographic projection.")
+
+        .def("set_camera_clipping", &SimulationWrapper::set_camera_clipping,
+            py::arg("near_clip"), py::arg("far_clip"),
+            "Set camera near and far clipping planes.")
+
+        .def("get_camera_clipping", &SimulationWrapper::get_camera_clipping,
+            "Return the camera near and far clipping planes.")
+
         .def("follow_object", [](SimulationWrapper &self, const ObjectHandle &handle, float smoothing = 0.05f)
              {
             if (!self.is_handle_valid(handle)) {
@@ -2335,6 +2350,17 @@ PYBIND11_MODULE(stellar, m)
 
         // Agent dispatch
         .def("dispatch_agent", &SimulationWrapper::dispatch_agent, py::arg("agent_id"), py::arg("clear_after") = true, "Dispatch a specific agent over all pending signals for that agent.")
+        .def("dispatch_kernel", &SimulationWrapper::dispatch_kernel, py::arg("kernel_id"), py::arg("thread_count"), py::arg("dt") = 1.0f / 60.0f,
+             R"pbdoc(
+             Run a 'kernel'-mode script for `thread_count` threads.
+
+             Kernels are plain compute: no objects, collisions, constraints or signals.
+             They read and write scratchpads (scratchpad_read / scratchpad_write) and see
+             `idx` (0 .. thread_count-1), `group_count` (= thread_count), `dt` and `time`.
+             Separate dispatches are ordered; threads inside one dispatch are not, so do
+             not read cells another thread of the same dispatch writes (use two
+             scratchpads and alternate them instead).
+             )pbdoc")
         .def("dispatch_all_agents", &SimulationWrapper::dispatch_all_agents, py::arg("clear_after") = true, "Dispatch all registered agents over pending signals (each agent processes its own).")
 
         // Agent registration

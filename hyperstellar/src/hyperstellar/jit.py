@@ -7,6 +7,9 @@ Supports three modes:
   - 'object' (default): runs per particle, updates Object SSBOs.
   - 'paint': runs per pixel, reads/writes textures (double‑buffered).
   - 'agent': runs over the signal queue (one workgroup per signal).
+  - 'kernel': general-purpose compute. Dispatched for an explicit thread count
+              (sim.dispatch_kernel); no objects, collisions, constraints or
+              signals. Reads and writes scratchpads only.
   - 'material': runs per fragment on meshes with an attached material script.
 
 This module contains:
@@ -113,7 +116,7 @@ class NameChecker(ast.NodeVisitor):
             }
         if self.mode == 'agent':
             return common | {'signal_object_idx', 'signal_payload'}
-        return common
+        return common  # 'kernel' gets exactly the common built-ins
 
     def _get_builtin_funcs(self) -> Set[str]:
         """Return functions implemented by the current shader mode."""
@@ -170,7 +173,7 @@ class NameChecker(ast.NodeVisitor):
                 'sample_prev_a', 'avg_prev_r', 'avg_prev_g',
                 'avg_prev_b', 'avg_prev_a',
             }
-        if self.mode == 'agent':
+        if self.mode in ('agent', 'kernel'):
             return common | {'scratchpad_write'}
         return common
 
@@ -538,6 +541,8 @@ class GLSLGenerator(ast.NodeVisitor):
             predefined = common_predefined | {
                 'signal_object_idx', 'signal_payload',
             }
+        elif self.mode == 'kernel':
+            predefined = common_predefined
         else:
             predefined = common_predefined | {
                 'p', 'x', 'y', 'vx', 'vy', 'z', 'vz',
@@ -626,6 +631,9 @@ class GLSLGenerator(ast.NodeVisitor):
             'agent': {
                 'signal_object_idx', 'signal_payload', 'idx',
                 'num_objects', 'group_count', 'dt', 'time', 'i',
+            },
+            'kernel': {
+                'idx', 'num_objects', 'group_count', 'dt', 'time', 'i',
             },
             'material': {
                 'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time',
@@ -1601,6 +1609,8 @@ float fbm(vec2 p, int octaves) {
 
     def _visit_subscript(self, node: ast.Subscript) -> str:
         if isinstance(node.value, ast.Name) and node.value.id == 'p':
+            if self.mode == 'kernel':
+                raise SyntaxError("p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects.")
             slice_expr = self._get_slice_expr(node.slice)
             idx = self._expr_to_glsl(slice_expr)
             return f"objectsIn[{idx}]"
@@ -1653,6 +1663,8 @@ float fbm(vec2 p, int octaves) {
             raise SyntaxError(f"Unknown p attribute: {node.attr}")
         if isinstance(node.value, ast.Subscript):
             if isinstance(node.value.value, ast.Name) and node.value.value.id == 'p':
+                if self.mode == 'kernel':
+                    raise SyntaxError("p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects.")
                 slice_expr = self._get_slice_expr(node.value.slice)
                 idx_expr = self._expr_to_glsl(slice_expr)
                 obj_ref = f"objectsIn[{idx_expr}]"
@@ -1751,12 +1763,16 @@ float fbm(vec2 p, int octaves) {
                     return '(coord.y * uTexWidth + coord.x)'
                 if self.mode == 'agent':
                     return 'int(gl_GlobalInvocationID.x)'
+                if self.mode == 'kernel':
+                    return '_kernel_index()'
                 return 'objectIndex'
             if name == 'group_count':
                 if self.mode == 'paint':
                     return '(uTexWidth * uTexHeight)'
                 if self.mode == 'agent':
                     return 'uSignalCount'
+                if self.mode == 'kernel':
+                    return 'uThreadCount'
                 return 'uGroupCount'
             if self.mode == 'agent' and name in ('signal_object_idx', 'signal_payload'):
                 return name
@@ -1837,8 +1853,8 @@ float fbm(vec2 p, int octaves) {
 
             # ---- Mode-specific enforcement ----
             if func_name == 'scratchpad_write':
-                if self.mode != 'agent':
-                    raise SyntaxError("scratchpad_write() is only available in 'agent' scripts.")
+                if self.mode not in ('agent', 'kernel'):
+                    raise SyntaxError("scratchpad_write() is only available in 'agent' and 'kernel' scripts.")
                 if len(args) == 3:
                     return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
                 raise SyntaxError("scratchpad_write(id, index, value)")
@@ -1846,6 +1862,8 @@ float fbm(vec2 p, int octaves) {
             if func_name == 'signal':
                 if self.mode == 'agent':
                     raise SyntaxError("signal() cannot be used in 'agent' scripts (agents receive signals, they do not enqueue).")
+                if self.mode == 'kernel':
+                    raise SyntaxError("signal() cannot be used in 'kernel' scripts (kernels have no signal queue).")
                 if len(args) == 2:
                     return f"signal_enqueue(int({args[0]}), {args[1]})"
                 raise SyntaxError("signal(agent_id, payload)")
@@ -2265,8 +2283,8 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
     Decorator that compiles a Python function into a GPU shader for the selected mode.
     Material mode generates a fragment shader; the other modes generate compute shaders.
     """
-    if mode not in {'object', 'paint', 'agent', 'material'}:
-        raise ValueError("mode must be 'object', 'paint', 'agent', or 'material'")
+    if mode not in {'object', 'paint', 'agent', 'material', 'kernel'}:
+        raise ValueError("mode must be 'object', 'paint', 'agent', 'kernel', or 'material'")
 
     def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)
@@ -2276,6 +2294,10 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
             script_id = sim.register_agent(shader_source)   # marks as agent
         elif mode == 'material':
             script_id = sim.register_material_script(shader_source)
+        elif mode == 'kernel':
+            # Plain compiled program; NOT marked as an agent, so dispatch_all_agents()
+            # never touches it. Run it with sim.dispatch_kernel(id, thread_count).
+            script_id = sim.register_script(shader_source)
         else:
             script_id = sim.register_script(shader_source)
         if script_id < 0:

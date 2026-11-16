@@ -330,6 +330,8 @@ def wrap_shader(
         return _wrap_paint_shader(body, header, sdf_defs, assigned_vars, var_types)
     elif mode == 'agent':
         return _wrap_agent_shader(body, header, sdf_defs, assigned_vars, var_types)
+    elif mode == 'kernel':
+        return _wrap_kernel_shader(body, header, sdf_defs, assigned_vars, var_types)
     else:
         return _wrap_object_shader(body, header, sdf_defs, assigned_vars, var_types,
                                    user_handles_collisions, user_applies_constraints)
@@ -2104,3 +2106,144 @@ void main() {{
 }}
 """
     return shader 
+
+
+# -----------------------------------------------------------------------------
+# Kernel mode wrapper
+#
+# A kernel is plain compute: no Object struct, no object SSBOs, no collision or
+# constraint code, no signal queue. The only state it touches is the scratchpad
+# pool (binding 10), which it can read and write. It is dispatched for an explicit
+# thread count (uThreadCount) rather than per signal or per object.
+#
+# The dispatch may be 2D so that more than 65535 workgroups can be launched;
+# _kernel_index() folds it back into one linear index, which is what `idx` is.
+# -----------------------------------------------------------------------------
+def _wrap_kernel_shader(body: str, header: str, sdf_defs: str,
+                        assigned_vars: Set[str], var_types: Dict[str, str]) -> str:
+    """Produce the full GLSL shader for a 'kernel' script."""
+    decls = []
+    for v in sorted(assigned_vars):
+        typ = var_types.get(v, "float")
+        decls.append(f"    {typ} {v};")
+    decls_str = "\n".join(decls)
+
+    shader = f"""#version 430 core
+{header}
+{_QUAT_HELPERS}
+layout(local_size_x = 64) in;
+
+// ----------------------------------------------------------------------------
+// COMMON MATHEMATICAL HELPERS
+// ----------------------------------------------------------------------------
+const float EPSILON = 1e-6;
+const float SAFE_MIN_VALUE = 1e-6;
+const float SAFE_MAX_EXP = 50.0;
+const vec2 _imaginary_unit = vec2(0.0, 1.0);
+
+float safeDivide(float n, float d) {{
+    return (abs(d) < EPSILON) ? 0.0 : n / d;
+}}
+float safePow(float base, float exponent) {{
+    if (base < 0.0) {{
+        float intPart;
+        if (abs(modf(exponent, intPart)) < EPSILON) {{
+            float result = pow(-base, exponent);
+            if (int(intPart) % 2 == 1) result = -result;
+            return result;
+        }}
+    }}
+    return pow(max(0.0, base), exponent);
+}}
+float safeLog(float value) {{ return log(max(SAFE_MIN_VALUE, value)); }}
+float safeExp(float value) {{ return exp(clamp(value, -SAFE_MAX_EXP, SAFE_MAX_EXP)); }}
+bool isInvalid(float value) {{ return isinf(value) || isnan(value); }}
+vec2 sanitizeVec2(vec2 value) {{
+    if (isInvalid(value.x)) value.x = 0.0;
+    if (isInvalid(value.y)) value.y = 0.0;
+    return value;
+}}
+vec4 sanitizeVec4(vec4 value) {{
+    for (int component = 0; component < 4; ++component)
+        if (isInvalid(value[component])) value[component] = 0.0;
+    return value;
+}}
+float signFunc(float value) {{
+    return (value > 0.0) ? 1.0 : ((value < 0.0) ? -1.0 : 0.0);
+}}
+float stepFunc(float value) {{ return (value >= 0.0) ? 1.0 : 0.0; }}
+
+// Complex values are represented as vec2(real, imaginary).
+vec2 cAdd(vec2 a, vec2 b) {{ return a + b; }}
+vec2 cSub(vec2 a, vec2 b) {{ return a - b; }}
+vec2 cMul(vec2 a, vec2 b) {{
+    return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+}}
+vec2 cDiv(vec2 a, vec2 b) {{
+    float denominator = b.x*b.x + b.y*b.y;
+    if (abs(denominator) < EPSILON) return vec2(0.0);
+    return vec2((a.x*b.x + a.y*b.y)/denominator,
+                (a.y*b.x - a.x*b.y)/denominator);
+}}
+vec2 cLog(vec2 z) {{
+    return vec2(safeLog(length(z)), atan(z.y, z.x));
+}}
+vec2 cExp(vec2 z) {{
+    float magnitude = safeExp(z.x);
+    return vec2(magnitude*cos(z.y), magnitude*sin(z.y));
+}}
+vec2 cPow(vec2 base, vec2 exponent) {{
+    if (length(base) < EPSILON) return vec2(0.0);
+    return cExp(cMul(exponent, cLog(base)));
+}}
+vec2 cSin(vec2 z) {{
+    return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y));
+}}
+vec2 cCos(vec2 z) {{
+    return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y));
+}}
+vec2 cTan(vec2 z) {{ return cDiv(cSin(z), cCos(z)); }}
+float real(vec2 z) {{ return z.x; }}
+float imag(vec2 z) {{ return z.y; }}
+vec2 conj(vec2 z) {{ return vec2(z.x, -z.y); }}
+float arg(vec2 z) {{ return atan(z.y, z.x); }}
+
+// ----------------------------------------------------------------------------
+// SCRATCHPAD (read/write)
+// ----------------------------------------------------------------------------
+layout(std430, binding = 10) buffer ScratchpadPool {{ float scratchpadData[]; }};
+uniform int uScratchpadOffsets[16];
+
+float scratchpad_read(int id, int idx) {{
+    return scratchpadData[uScratchpadOffsets[id] + idx];
+}}
+void scratchpad_write(int id, int idx, float val) {{
+    scratchpadData[uScratchpadOffsets[id] + idx] = val;
+}}
+
+uniform int uNumObjects;
+uniform float uTime;
+uniform float uDt;
+uniform int uThreadCount;
+
+int _kernel_index() {{
+    return int(gl_GlobalInvocationID.x +
+               gl_GlobalInvocationID.y * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
+}}
+
+{sdf_defs}
+
+// ----------------------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------------------
+void main() {{
+    if (_kernel_index() >= uThreadCount) return;
+
+    // Declare user variables
+{decls_str}
+
+    // User code
+{body}
+}}
+"""
+    return shader

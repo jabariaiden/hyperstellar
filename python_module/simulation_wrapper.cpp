@@ -38,6 +38,10 @@ static std::function<void(const CollisionEvent &)> g_collisionCallback;
 static std::atomic<int> g_activeSimCount{0};
 bool AnySimulationInitialized() { return g_activeSimCount.load() > 0; }
 
+static bool g_cameraScrollActive = false;
+static double g_cameraScrollLastTime = 0.0;
+static constexpr double CAMERA_SCROLL_IDLE_TIME = 0.2;
+
 namespace
 {
     bool g_axisInitialized = false; // Tracks axis system initialization
@@ -270,6 +274,14 @@ void SimulationWrapper::dispatch_agent(int agent_id, bool clear_after)
     Objects::DispatchAgent(agent_id, clear_after);
 }
 
+void SimulationWrapper::dispatch_kernel(int kernel_id, int thread_count, float dt)
+{
+    ensure_initialized();
+    if (m_window)
+        glfwMakeContextCurrent(static_cast<GLFWwindow *>(m_window));
+    Objects::DispatchKernel(kernel_id, thread_count, dt);
+}
+
 void SimulationWrapper::dispatch_all_agents(bool clear_after)
 {
     ensure_initialized();
@@ -428,11 +440,52 @@ void camera_scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
     if (yoffset == 0.0)
         return;
 
+    // Temporarily enter perspective, preserving the current framing.
+    if (g_camera3d.use_ortho)
+    {
+        const float distance = glm::length(g_camera3d.target - g_camera3d.eye);
+
+        if (distance > 1e-6f)
+        {
+            g_camera3d.fov = glm::degrees(
+                2.0f * std::atan(g_camera3d.zoom / distance));
+            g_camera3d.use_ortho = false;
+        }
+    }
+
     const float zoomAmount =
         static_cast<float>(yoffset) *
         g_camera3d.ApparentHalfHeight() * 0.12f;
 
     g_camera3d.Dolly(zoomAmount);
+
+    g_cameraScrollLastTime = glfwGetTime();
+    g_cameraScrollActive = true;
+}
+
+void SimulationWrapper::set_camera_projection(bool orthographic)
+{
+    g_camera3d.use_ortho = orthographic;
+}
+
+bool SimulationWrapper::get_camera_projection() const
+{
+    return g_camera3d.use_ortho;
+}
+
+void SimulationWrapper::set_camera_clipping(float near_clip, float far_clip)
+{
+    if (near_clip <= 0.0f || far_clip <= near_clip)
+        throw std::invalid_argument(
+            "Camera clipping requires near > 0 and far > near");
+
+    g_camera3d.near_z = near_clip;
+    g_camera3d.far_z = far_clip;
+}
+
+std::pair<float, float> SimulationWrapper::get_camera_clipping() const
+{
+    return {g_camera3d.near_z, g_camera3d.far_z};
 }
 
 void SimulationWrapper::set_paint_resolution(int width, int height)
@@ -1037,6 +1090,24 @@ void SimulationWrapper::render()
         return;
     glfwMakeContextCurrent((GLFWwindow *)m_window);
 
+    // Return to orthographic after scrolling stops, preserving the framing.
+    if (g_cameraScrollActive &&
+        glfwGetTime() - g_cameraScrollLastTime >= CAMERA_SCROLL_IDLE_TIME)
+    {
+        const float distance =
+            glm::length(g_camera3d.target - g_camera3d.eye);
+
+        if (distance > 1e-6f)
+        {
+            g_camera3d.zoom =
+                std::tan(glm::radians(g_camera3d.fov) * 0.5f) * distance;
+
+            g_camera3d.use_ortho = true;
+        }
+
+        g_cameraScrollActive = false;
+    }
+
     int w, h;
     glfwGetFramebufferSize((GLFWwindow *)m_window, &w, &h);
     if (w <= 0 || h <= 0)
@@ -1115,7 +1186,7 @@ void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, in
 
     // Call the objects system to capture the frame
     Objects::GetFullFrameImage(jpeg_data, quality, m_currentBuffer, projection,
-                            m_lightDir, m_directionalLightEnabled);
+                               m_lightDir, m_directionalLightEnabled);
 }
 
 // ============================================================================

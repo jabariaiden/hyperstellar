@@ -287,6 +287,12 @@ public:
     void set_camera_zoom(float zoom);
     float get_camera_zoom() const;
 
+    void set_camera_projection(bool orthographic);
+    bool get_camera_projection() const;
+
+    void set_camera_clipping(float near_clip, float far_clip);
+    std::pair<float, float> get_camera_clipping() const;
+
     // Core simulation
     void update(float dt);
     float get_speed() const { return m_speed; }
@@ -391,6 +397,9 @@ public:
     void set_paint_script(int script_id);
     void get_paint_image(std::vector<unsigned char> &jpeg_data, int quality = 85);
     void get_full_frame(std::vector<unsigned char> &jpeg_data, int quality = 85);
+
+    // kernels
+    void dispatch_kernel(int kernel_id, int thread_count, float dt = 1.0f / 60.0f);
 
     // Convenience methods for specific properties
     void set_rotation(int index, float rotation);
