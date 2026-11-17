@@ -1,5 +1,8 @@
-import hyperstellar as se
+#!/usr/bin/env python3
 import math
+
+import hyperstellar as se
+from hyperstellar import *
 
 # Create simulation (visual mode)
 sim = se.Simulation(headless=False, enable_grid=False, width=1400, height=1000, title="Collision Test")

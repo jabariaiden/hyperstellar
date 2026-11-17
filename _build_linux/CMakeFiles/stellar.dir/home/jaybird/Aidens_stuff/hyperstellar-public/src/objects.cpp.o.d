@@ -291,10 +291,8 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /usr/include/asm-generic/errno-base.h /usr/include/bits/types/error_t.h \
  /usr/include/c++/16/bits/charconv.h \
  /usr/include/c++/16/bits/basic_string.tcc \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/parser.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/shader_utils.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/camera.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.hpp \
@@ -310,16 +308,6 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.inl \
- /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
- /usr/include/c++/16/bits/algorithmfwd.h \
- /usr/include/c++/16/bits/stl_heap.h \
- /usr/include/c++/16/bits/uniform_int_dist.h \
- /usr/include/c++/16/bits/stl_tempbuf.h \
- /usr/include/c++/16/pstl/glue_algorithm_defs.h \
- /usr/include/c++/16/pstl/execution_defs.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/utils.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/debug_helpers.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/gpu_serializer.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/objects.h \
  /usr/include/c++/16/iostream /usr/include/c++/16/ostream \
@@ -409,12 +397,14 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_uint1_sized.hpp \
  /usr/include/c++/16/cstring \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.inl \
- /usr/include/c++/16/map /usr/include/c++/16/bits/stl_tree.h \
- /usr/include/c++/16/bits/stl_map.h \
- /usr/include/c++/16/bits/stl_multimap.h /usr/include/c++/16/atomic \
- /usr/include/c++/16/bits/atomic_base.h \
- /usr/include/c++/16/bits/atomic_lockfree_defines.h \
- /usr/include/c++/16/thread /usr/include/c++/16/bits/std_thread.h \
+ /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
+ /usr/include/c++/16/bits/algorithmfwd.h \
+ /usr/include/c++/16/bits/stl_heap.h \
+ /usr/include/c++/16/bits/uniform_int_dist.h \
+ /usr/include/c++/16/bits/stl_tempbuf.h \
+ /usr/include/c++/16/pstl/glue_algorithm_defs.h \
+ /usr/include/c++/16/pstl/execution_defs.h /usr/include/c++/16/thread \
+ /usr/include/c++/16/bits/std_thread.h \
  /usr/include/c++/16/bits/unique_ptr.h \
  /usr/include/c++/16/bits/this_thread_sleep.h \
  /usr/include/c++/16/bits/chrono.h /usr/include/c++/16/ratio \
@@ -432,5 +422,7 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects
  /usr/include/c++/16/bits/stl_raw_storage_iter.h \
  /usr/include/c++/16/bits/align.h \
  /usr/include/c++/16/bits/shared_ptr_atomic.h \
+ /usr/include/c++/16/bits/atomic_base.h \
+ /usr/include/c++/16/bits/atomic_lockfree_defines.h \
  /usr/include/c++/16/backward/auto_ptr.h \
  /usr/include/c++/16/pstl/glue_memory_defs.h

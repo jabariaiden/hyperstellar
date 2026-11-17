@@ -1,8 +1,5 @@
-#define NO_TEXT_RENDERING
 #include "axis.h"
 #include "camera.h"
-#include "text_renderer.h"
-#include "buffer_helpers.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
 #include <sstream>
@@ -174,7 +171,6 @@ float Axis::CalculateDynamicBuffer(const Camera& camera, float halfWidth, float 
 
     // Constants matching camera.cpp
     const float MOVE_SPEED = 5.0f;           // Camera::moveSpeed
-    const float MAX_ZOOM = 100.0f;           // Camera::ProcessInput clamp
     const float WORST_DELTA_TIME = 0.05f;    // 20 FPS during lag
 
     // How many frames ahead we need to cover

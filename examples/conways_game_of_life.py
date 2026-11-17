@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+import random
+
+import hyperstellar as se
+from hyperstellar import *
+
 """
 Kernel mode demo: Conway's Game of Life with ZERO objects.
 
@@ -10,9 +14,6 @@ Per frame: two kernel dispatches (A->B, then B->A), then render.
 Threads inside one dispatch must not read cells another thread of the same
 dispatch writes, hence the two scratchpads.
 """
-import random
-import hyperstellar as se
-
 W = 64
 CELLS = W * W
 

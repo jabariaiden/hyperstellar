@@ -1,6 +1,4 @@
 #include "camera.h"
-#include "globals.h"
-#include <algorithm>
 #include <cmath>
 #include <glm/glm.hpp>
 

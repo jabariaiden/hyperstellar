@@ -1126,8 +1126,8 @@ void main() {
     float vx = vel.x;
     float vy = vel.y;
 
-ax = -k * x / mass;
-ay = -k * y / mass;
+ax = 0.0;
+ay = 0.0;
 angular = 0.0;
 color.r = 1.0;
 color.g = 0.0;

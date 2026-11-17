@@ -4,7 +4,6 @@
 #include <pybind11/gil.h>
 #include <string>
 #include <vector>
-#include <unordered_map>
 #include "simulation_wrapper.h"
 #include "../include/mesh.h"
 #include "../include/material.h"

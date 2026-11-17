@@ -1,6 +1,10 @@
-import hyperstellar as se
+#!/usr/bin/env python3
 import math
 from typing import TYPE_CHECKING
+
+import hyperstellar as se
+
+#You can also disable undefined warnings like this apart from using "from hyperstellar import *"
 if TYPE_CHECKING:
     from hyperstellar.typed import *
 # ---------------------------------------------------------------------
@@ -9,7 +13,7 @@ if TYPE_CHECKING:
 sim = se.Simulation(
     headless=False,
     width=1400, height=900,
-    title="Schwarzschild GR Lensing (JIT)",
+    title="Blackhole Demo",
     enable_grid=False
 )
 
@@ -246,14 +250,15 @@ def blackhole_gr():
 sim.paint(blackhole_gr._script_id)
 sim.set_camera_zoom(3)
 
-print("Schwarzschild GR Lensing (JIT)")
+print("Blackhole demo with Schwarzschild GR Lensing")
 print("Controls: Left/Right : orbit yaw, Up/Down : orbit pitch")
 
 yaw, pitch = 0.5, 1.7
 step = 0.01
 
+sim.set_camera_projection(False)
+sim.set_camera_zoom(3.0)
 while not sim.should_close():
-    sim.default_input()
     sim.process_input()
 
     if sim.keyboard.Left.pressed:   yaw -= step

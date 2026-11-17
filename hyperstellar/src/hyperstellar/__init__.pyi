@@ -366,6 +366,24 @@ class BoundaryConstraint:
 # colour path.
 # ============================================================================
 
+def register_mesh(
+    vertices: List[Tuple[float, float, float]],
+    indices: List[int],
+    normals: Optional[List[Tuple[float, float, float]]] = None,
+    uvs: Optional[List[Tuple[float, float]]] = None,
+    material_id: int = -1
+) -> int:
+    """
+    Register an indexed custom 3D mesh from vertices and triangle indices.
+
+    vertices is a sequence of (x, y, z) points. indices is a flat sequence
+    of triangle indices. If normals are omitted, smooth vertex normals are
+    calculated from the indexed triangles. If uvs are omitted, a planar
+    projection using the two largest mesh extents is generated. Optional
+    normals and UVs must contain one value per vertex.
+    """
+    ...
+
 def register_circle(radius: float, segs: int = 32, material_id: int = -1) -> int: ...
 def register_square(width: float, height: float, material_id: int = -1) -> int: ...
 def register_polygon(radius: float, sides: int = 6, material_id: int = -1) -> int: ...
@@ -452,6 +470,10 @@ def set_mesh_material(mesh_id: int, material_id: int) -> bool:
     """
     ...
 
+def get_mesh_material_script(mesh_id: int) -> int:
+    """Return the JIT material script ID assigned to a mesh, or -1 when none is assigned."""
+    ...
+
 def get_mesh_material(mesh_id: int) -> int:
     """Return the material ID assigned to a mesh, or -1 when it has no material."""
     ...
@@ -495,7 +517,7 @@ class Simulation:
     def __iter__(self) -> Iterator[ObjectState]: ...
 
     # ========================================================================
-    # WINDOW MANAGEMENT
+    # WINDOW MANAGEMENT & RENDERING
     # ========================================================================
 
     def render(self) -> None:
@@ -535,7 +557,7 @@ class Simulation:
         ...
 
     # ========================================================================
-    # GRID CONTROL
+    # GRID & LIGHTING CONTROL
     # ========================================================================
 
     def set_grid_enabled(self, enabled: bool) -> None:
@@ -554,6 +576,22 @@ class Simulation:
         Returns:
             bool: True if grid is enabled, False otherwise
         """
+        ...
+
+    def set_light_direction(self, direction: Tuple[float, float, float]) -> None:
+        """Set the normalized directional-light direction (x, y, z)."""
+        ...
+
+    def get_light_direction(self) -> Tuple[float, float, float]:
+        """Get the current directional-light direction."""
+        ...
+
+    def set_directional_light_enabled(self, enabled: bool) -> None:
+        """Enable or disable the directional light."""
+        ...
+
+    def get_directional_light_enabled(self) -> bool:
+        """Check whether the directional light is enabled."""
         ...
 
     # ========================================================================
@@ -1577,6 +1615,22 @@ class Simulation:
         """Return the current camera zoom level."""
         ...
 
+    def set_camera_projection(self, orthographic: bool) -> None:
+        """Set camera projection: True for orthographic, False for perspective."""
+        ...
+
+    def get_camera_projection(self) -> bool:
+        """Return True if the camera is using orthographic projection."""
+        ...
+
+    def set_camera_clipping(self, near_clip: float, far_clip: float) -> None:
+        """Set camera near and far clipping planes."""
+        ...
+
+    def get_camera_clipping(self) -> Tuple[float, float]:
+        """Return the camera near and far clipping planes."""
+        ...
+
     # ========================================================================
     # INPUT HELPERS
     # ========================================================================
@@ -2251,6 +2305,49 @@ def scratchpad_write(id: int, index: int, value: float) -> None:
     'kernel' scripts only (object/paint/material scripts can only read).
     """
     ...
+
+# ============================================================================
+# MODULE EXPORTS
+# ============================================================================
+__all__ = [
+    "SkinType", "CollisionShape", "ConstraintType", "MaterialType",
+    "ObjectState", "CollisionConfig", "ObjectHandle", "CollisionEvent",
+    "KeyState", "KeyboardMonitor", "ObjectConfig", "ConstraintConfig",
+    "BatchConfig", "BatchGetData", "BatchUpdateData", "DistanceConstraint",
+    "BoundaryConstraint",
+    "register_mesh", "register_circle", "register_square", "register_polygon",
+    "register_sphere", "register_cube", "register_cylinder", "register_capsule",
+    "destroy_mesh", "mesh_count", "mesh_ids", "create_material",
+    "update_material", "destroy_material", "is_valid_material",
+    "material_count", "get_material", "set_mesh_material",
+    "get_mesh_material", "get_mesh_material_script",
+    "Simulation", "EquationPresets", "script",
+    # JIT builtins (for `from hyperstellar import *` in type checking)
+    "p", "num_objects", "dt", "time", "idx", "group_count", "i",
+    "x", "y", "z", "vx", "vy", "vz", "mass", "charge", "theta", "omega",
+    "ax", "ay", "az", "angular", "wx", "wy", "wz", "angular_x",
+    "angular_y", "angular_z", "color", "pos", "vel", "px", "py",
+    "prev_r", "prev_g", "prev_b", "prev_a", "t", "signal_object_idx",
+    "signal_payload", "mesh_id", "uv", "world_pos", "normal", "view_dir",
+    "sqrt", "inversesqrt", "sin", "cos", "tan", "asin", "acos", "atan",
+    "atan2", "sinh", "cosh", "tanh", "asinh", "acosh", "atanh", "exp",
+    "log", "log2", "exp2", "pow", "abs", "floor", "ceil", "frac", "fract",
+    "sign", "step", "smoothstep", "mix", "clamp", "mod", "min", "max",
+    "dot", "cross", "length", "distance", "normalize", "reflect", "refract",
+    "faceforward", "transpose", "inverse", "determinant", "outerProduct",
+    "matrixCompMult", "radians", "degrees", "saturate", "lerp", "fbm",
+    "noise", "rand", "random", "int", "float", "len", "sum", "range",
+    "scratchpad_read", "diff", "vec2", "vec3", "vec4", "mat2", "mat3",
+    "mat4", "sphere", "plane", "intersect", "miss_hit", "closest_hit",
+    "look_at", "camera_ray_ndc", "camera_ray", "offset_ray_origin",
+    "raymarch", "cAdd", "cSub", "cMul", "cDiv", "cLog", "cExp", "cPow",
+    "cSin", "cCos", "cTan", "real", "imag", "conj", "arg", "signal",
+    "apply_constraints", "detect_collision", "resolve_collision", "spring",
+    "boundary", "angle", "get_constraint_count", "get_constraint_type",
+    "get_constraint_target", "get_constraint_param", "sample_prev_r",
+    "sample_prev_g", "sample_prev_b", "sample_prev_a", "avg_prev_r",
+    "avg_prev_g", "avg_prev_b", "avg_prev_a", "scratchpad_write"
+]
 
 # Version information
 __version__: str

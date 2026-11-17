@@ -1,12 +1,7 @@
 #include "parser.h"
-#include <sstream>
 #include <cctype>
-#include <algorithm>
 #include <unordered_map>
 #include <stdexcept>
-#include <iostream>
-#include <set>
-#include <cmath>
 #include <cstdlib>
 #include <vector>
 #include <string>
@@ -101,7 +96,6 @@ static std::string trim(const std::string &str)
     return str.substr(first, last - first + 1);
 }
 
-static bool isRightAssoc(TokenType t) { return t == TOKEN_POW; }
 
 // ============================================================================
 // OPERATOR PRECEDENCE & FUNCTION ARITY

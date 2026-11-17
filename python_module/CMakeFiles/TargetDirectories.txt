@@ -1,0 +1,5 @@
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/CMakeFiles/stellar.dir
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/CMakeFiles/edit_cache.dir
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/CMakeFiles/rebuild_cache.dir
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/CMakeFiles/edit_cache.dir
+/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/CMakeFiles/rebuild_cache.dir

@@ -2150,7 +2150,7 @@ contacts[ci].accumulatedTangentImpulse = 0.0;
 //It all comes together here. This is where we calculate the new position, velocity, and color of each object based on the physics and equations defined above.
 void main() {
 uint gid = gl_GlobalInvocationID.x;
-if (gid >= uint(uGroupCount)) return;
+if(gid>=uint(uGroupCount)) return;
 int self = objectIndices[gid];
 Object p = objectsIn[self];
 
@@ -2270,7 +2270,7 @@ if(hadCollision) {
 newVel = sanitizeVec2(newVel);
 newOmega = clamp(newOmega,-100.0, 100.0);
 }
-if(uEnableWarmStart==1) ageContacts(self);
+if(uEnableWarmStart==1) ageContacts(self); 
 
 newPos = sanitizeVec2(newPos);
 newVel = sanitizeVec2(newVel);

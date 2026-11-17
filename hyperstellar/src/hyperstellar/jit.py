@@ -32,7 +32,7 @@ import ast
 import inspect
 import textwrap
 import difflib
-from typing import Any, Dict, Set, Optional, Callable, Union, List, Tuple
+from typing import Any, Dict, Set, Optional, Callable, Union, List, Tuple  # noqa: UP035
 
 # =============================================================================
 # IMPORT FROM SIBLING MODULE
@@ -57,29 +57,44 @@ class NameChecker(ast.NodeVisitor):
     module globals, and imported names.
     """
 
-    def __init__(self, mode: str, debug: bool, source: str, func_node: ast.FunctionDef, globals_dict: dict):
+    def __init__(
+        self,
+        mode: str,
+        debug: bool,
+        source: str,
+        func_node: ast.FunctionDef,
+        globals_dict: dict,
+    ):
         self.mode = mode
         self.debug = debug
         self.source = source
         self.func_node = func_node
-        self.globals = set(globals_dict.keys())  # Track module-level constants (e.g., CAM = 0)
+        self.globals = set(
+            globals_dict.keys()
+        )  # Track module-level constants (e.g., CAM = 0)
 
         # --- Sets to be populated during AST traversal ---
-        self.assigned: Set[str] = set()          # variables assigned (including parameters)
-        self.referenced: Set[str] = set()        # variables referenced
+        self.assigned: Set[str] = set()  # variables assigned (including parameters)
+        self.referenced: Set[str] = set()  # variables referenced
         self.called_functions: Set[str] = set()  # function names called
-        self.user_functions: Set[str] = set()    # functions defined inside the script
+        self.user_functions: Set[str] = set()  # functions defined inside the script
         self.user_function_arities: Dict[str, int] = {}
         self.raymarch_sdf_names: Set[str] = set()
-        self.imported_names: Set[str] = set()    # imported from hyperstellar.glsl
-        self.param_names: Set[str] = set()       # function parameters
+        self.imported_names: Set[str] = set()  # imported from hyperstellar.glsl
+        self.param_names: Set[str] = set()  # function parameters
 
         # --- Name nodes with their line numbers for error reporting ---
-        self.name_nodes: List[Tuple[str, int, int, bool]] = []  # (name, lineno, col, is_func_call)
+        self.name_nodes: List[
+            Tuple[str, int, int, bool]
+        ] = []  # (name, lineno, col, is_func_call)
 
         # --- Error and warning accumulation ---
-        self.errors: List[Tuple[str, int, int, Optional[str]]] = []   # (msg, lineno, col, suggestion)
-        self.warnings: List[Tuple[str, int, int, Optional[str]]] = [] # (msg, lineno, col, suggestion)
+        self.errors: List[
+            Tuple[str, int, int, Optional[str]]
+        ] = []  # (msg, lineno, col, suggestion)
+        self.warnings: List[
+            Tuple[str, int, int, Optional[str]]
+        ] = []  # (msg, lineno, col, suggestion)
 
         # --- Built-in sets ---
         self.builtin_vars = self._get_builtin_vars()
@@ -90,91 +105,267 @@ class NameChecker(ast.NodeVisitor):
 
     def _get_builtin_vars(self) -> Set[str]:
         """Return built-in variables that are valid in the current mode."""
-        if self.mode == 'material':
-            return {'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time'}
+        if self.mode == "material":
+            return {"mesh_id", "uv", "world_pos", "normal", "view_dir", "color", "time"}
 
-        common = {
-            'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
-        }
+        common = {"num_objects", "dt", "time", "idx", "group_count", "i"}
 
-        if self.mode == 'object':
+        if self.mode == "object":
             return common | {
-                'p',
+                "p",
                 # 2D user-facing aliases.
-                'x', 'y', 'vx', 'vy',
-                'mass', 'charge', 'theta', 'omega',
-                'ax', 'ay', 'angular', 'color', 'pos', 'vel',
+                "x",
+                "y",
+                "vx",
+                "vy",
+                "mass",
+                "charge",
+                "theta",
+                "omega",
+                "ax",
+                "ay",
+                "angular",
+                "color",
+                "pos",
+                "vel",
                 # 3D state variables declared by the object shader.
-                'z', 'vz', 'az',
-                'wx', 'wy', 'wz',
-                'angular_x', 'angular_y', 'angular_z',
+                "z",
+                "vz",
+                "az",
+                "wx",
+                "wy",
+                "wz",
+                "angular_x",
+                "angular_y",
+                "angular_z",
             }
-        if self.mode == 'paint':
+        if self.mode == "paint":
             return common | {
-                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
-                'color', 't',
+                "px",
+                "py",
+                "prev_r",
+                "prev_g",
+                "prev_b",
+                "prev_a",
+                "color",
+                "t",
             }
-        if self.mode == 'agent':
-            return common | {'signal_object_idx', 'signal_payload'}
+        if self.mode == "agent":
+            return common | {"signal_object_idx", "signal_payload"}
         return common  # 'kernel' gets exactly the common built-ins
 
     def _get_builtin_funcs(self) -> Set[str]:
         """Return functions implemented by the current shader mode."""
-        if self.mode == 'material':
+        if self.mode == "material":
             return {
-                'sqrt', 'inversesqrt', 'sin', 'cos', 'tan', 'asin', 'acos',
-                'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh',
-                'atanh', 'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor',
-                'ceil', 'frac', 'fract', 'sign', 'step', 'smoothstep', 'mix',
-                'clamp', 'mod', 'min', 'max', 'dot', 'cross', 'length',
-                'distance', 'normalize', 'reflect', 'refract', 'faceforward',
-                'transpose', 'inverse', 'determinant', 'outerProduct',
-                'matrixCompMult', 'radians', 'degrees', 'saturate', 'lerp',
-                'fbm', 'noise', 'rand', 'random', 'int', 'float', 'range',
-                'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
-                'look_at', 'camera_ray_ndc', 'offset_ray_origin', 'raymarch',
-                'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
-                'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
-                'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4',
+                "sqrt",
+                "inversesqrt",
+                "sin",
+                "cos",
+                "tan",
+                "asin",
+                "acos",
+                "atan",
+                "atan2",
+                "sinh",
+                "cosh",
+                "tanh",
+                "asinh",
+                "acosh",
+                "atanh",
+                "exp",
+                "log",
+                "log2",
+                "exp2",
+                "pow",
+                "abs",
+                "floor",
+                "ceil",
+                "frac",
+                "fract",
+                "sign",
+                "step",
+                "smoothstep",
+                "mix",
+                "clamp",
+                "mod",
+                "min",
+                "max",
+                "dot",
+                "cross",
+                "length",
+                "distance",
+                "normalize",
+                "reflect",
+                "refract",
+                "faceforward",
+                "transpose",
+                "inverse",
+                "determinant",
+                "outerProduct",
+                "matrixCompMult",
+                "radians",
+                "degrees",
+                "saturate",
+                "lerp",
+                "fbm",
+                "noise",
+                "rand",
+                "random",
+                "int",
+                "float",
+                "range",
+                "sphere",
+                "plane",
+                "intersect",
+                "miss_hit",
+                "closest_hit",
+                "look_at",
+                "camera_ray_ndc",
+                "offset_ray_origin",
+                "raymarch",
+                "cAdd",
+                "cSub",
+                "cMul",
+                "cDiv",
+                "cLog",
+                "cExp",
+                "cPow",
+                "cSin",
+                "cCos",
+                "cTan",
+                "real",
+                "imag",
+                "conj",
+                "arg",
+                "vec2",
+                "vec3",
+                "vec4",
+                "mat2",
+                "mat3",
+                "mat4",
             }
 
         common = {
             # GLSL math.
-            'sqrt', 'inversesqrt', 'sin', 'cos', 'tan', 'asin', 'acos',
-            'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh',
-            'atanh', 'exp', 'log', 'log2', 'exp2', 'pow', 'abs', 'floor',
-            'ceil', 'frac', 'fract', 'sign', 'step', 'smoothstep', 'mix',
-            'clamp', 'mod', 'min', 'max', 'dot', 'cross', 'length',
-            'distance', 'normalize', 'reflect', 'refract', 'faceforward',
-            'transpose', 'inverse', 'determinant', 'outerProduct',
-            'matrixCompMult', 'radians', 'degrees', 'saturate', 'lerp',
-            'fbm', 'noise', 'rand', 'random',
+            "sqrt",
+            "inversesqrt",
+            "sin",
+            "cos",
+            "tan",
+            "asin",
+            "acos",
+            "atan",
+            "atan2",
+            "sinh",
+            "cosh",
+            "tanh",
+            "asinh",
+            "acosh",
+            "atanh",
+            "exp",
+            "log",
+            "log2",
+            "exp2",
+            "pow",
+            "abs",
+            "floor",
+            "ceil",
+            "frac",
+            "fract",
+            "sign",
+            "step",
+            "smoothstep",
+            "mix",
+            "clamp",
+            "mod",
+            "min",
+            "max",
+            "dot",
+            "cross",
+            "length",
+            "distance",
+            "normalize",
+            "reflect",
+            "refract",
+            "faceforward",
+            "transpose",
+            "inverse",
+            "determinant",
+            "outerProduct",
+            "matrixCompMult",
+            "radians",
+            "degrees",
+            "saturate",
+            "lerp",
+            "fbm",
+            "noise",
+            "rand",
+            "random",
             # Shared JIT and utility helpers.
-            'scratchpad_read', 'diff', 'int', 'float', 'len', 'sum', 'range',
+            "scratchpad_read",
+            "diff",
+            "int",
+            "float",
+            "len",
+            "sum",
+            "range",
             # Ray-tracing primitives are included in every wrapper.
-            'sphere', 'plane', 'intersect', 'miss_hit', 'closest_hit',
-            'look_at', 'camera_ray_ndc', 'offset_ray_origin', 'raymarch',
+            "sphere",
+            "plane",
+            "intersect",
+            "miss_hit",
+            "closest_hit",
+            "look_at",
+            "camera_ray_ndc",
+            "offset_ray_origin",
+            "raymarch",
             # Complex-number helpers are included in every wrapper.
-            'cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp', 'cPow',
-            'cSin', 'cCos', 'cTan', 'real', 'imag', 'conj', 'arg',
+            "cAdd",
+            "cSub",
+            "cMul",
+            "cDiv",
+            "cLog",
+            "cExp",
+            "cPow",
+            "cSin",
+            "cCos",
+            "cTan",
+            "real",
+            "imag",
+            "conj",
+            "arg",
         }
 
-        if self.mode == 'object':
+        if self.mode == "object":
             return common | {
-                'signal', 'detect_collision', 'resolve_collision',
-                'apply_constraints', 'spring', 'boundary', 'angle',
-                'get_constraint_count', 'get_constraint_type',
-                'get_constraint_target', 'get_constraint_param',
+                "signal",
+                "detect_collision",
+                "resolve_collision",
+                "apply_constraints",
+                "spring",
+                "boundary",
+                "angle",
+                "get_constraint_count",
+                "get_constraint_type",
+                "get_constraint_target",
+                "get_constraint_param",
             }
-        if self.mode == 'paint':
+        if self.mode == "paint":
             return common | {
-                'signal', 'camera_ray',
-                'sample_prev_r', 'sample_prev_g', 'sample_prev_b',
-                'sample_prev_a', 'avg_prev_r', 'avg_prev_g',
-                'avg_prev_b', 'avg_prev_a',
+                "signal",
+                "camera_ray",
+                "sample_prev_r",
+                "sample_prev_g",
+                "sample_prev_b",
+                "sample_prev_a",
+                "avg_prev_r",
+                "avg_prev_g",
+                "avg_prev_b",
+                "avg_prev_a",
             }
-        if self.mode in ('agent', 'kernel'):
-            return common | {'scratchpad_write'}
+        if self.mode in ("agent", "kernel"):
+            return common | {"scratchpad_write"}
         return common
 
     def _collect(self) -> None:
@@ -218,7 +409,7 @@ class NameChecker(ast.NodeVisitor):
             self.visit(stmt)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module == 'hyperstellar.glsl':
+        if node.module == "hyperstellar.glsl":
             for alias in node.names:
                 self.imported_names.add(alias.asname or alias.name)
         # No further traversal needed for imports
@@ -230,7 +421,7 @@ class NameChecker(ast.NodeVisitor):
     def visit_Subscript(self, node: ast.Subscript) -> None:
         # p[index] is translated directly to objectsIn[index] in paint/agent
         # scripts; p itself is not a GLSL variable in those wrappers.
-        if isinstance(node.value, ast.Name) and node.value.id == 'p':
+        if isinstance(node.value, ast.Name) and node.value.id == "p":
             self.visit(node.slice)
             return
         self.generic_visit(node)
@@ -259,12 +450,16 @@ class NameChecker(ast.NodeVisitor):
 
         # raymarch(ray, sdf, ...) takes an SDF function identifier as data,
         # not as a variable or a direct function call at this AST position.
-        if func_name == 'raymarch':
+        if func_name == "raymarch":
             if len(node.args) < 2 or not isinstance(node.args[1], ast.Name):
-                self.errors.append((
-                    "raymarch() requires a named one-argument SDF function as its second argument.",
-                    node.lineno, node.col_offset, None
-                ))
+                self.errors.append(
+                    (
+                        "raymarch() requires a named one-argument SDF function as its second argument.",
+                        node.lineno,
+                        node.col_offset,
+                        None,
+                    )
+                )
                 args_to_visit = node.args
             else:
                 self.raymarch_sdf_names.add(node.args[1].id)
@@ -283,38 +478,68 @@ class NameChecker(ast.NodeVisitor):
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         self.errors.append(
-            ("Lambda expressions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+            (
+                "Lambda expressions are not supported in JIT scripts.",
+                node.lineno,
+                node.col_offset,
+                None,
+            )
         )
         self.generic_visit(node)
 
     def visit_Yield(self, node: ast.Yield) -> None:
         self.errors.append(
-            ("Yield statements are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+            (
+                "Yield statements are not supported in JIT scripts.",
+                node.lineno,
+                node.col_offset,
+                None,
+            )
         )
         self.generic_visit(node)
 
     def visit_With(self, node: ast.With) -> None:
         self.errors.append(
-            ("With statements are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+            (
+                "With statements are not supported in JIT scripts.",
+                node.lineno,
+                node.col_offset,
+                None,
+            )
         )
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.errors.append(
-            ("Async functions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+            (
+                "Async functions are not supported in JIT scripts.",
+                node.lineno,
+                node.col_offset,
+                None,
+            )
         )
         self.generic_visit(node)
 
     def visit_Await(self, node: ast.Await) -> None:
         self.errors.append(
-            ("Await expressions are not supported in JIT scripts.", node.lineno, node.col_offset, None)
+            (
+                "Await expressions are not supported in JIT scripts.",
+                node.lineno,
+                node.col_offset,
+                None,
+            )
         )
         self.generic_visit(node)
 
     def visit_Compare(self, node: ast.Compare) -> None:
         if len(node.ops) > 1:
             self.errors.append(
-                ("Chained comparisons (e.g., a < b < c) are not supported; use 'and'.", node.lineno, node.col_offset, None)
+                (
+                    "Chained comparisons (e.g., a < b < c) are not supported; use 'and'.",
+                    node.lineno,
+                    node.col_offset,
+                    None,
+                )
             )
         self.generic_visit(node)
 
@@ -328,12 +553,18 @@ class NameChecker(ast.NodeVisitor):
 
     def _suggest_function(self, name: str) -> Optional[str]:
         """Suggest a similar function name from built-in or user-defined functions."""
-        candidates = (self.builtin_funcs | self.user_functions | self.imported_names) - {name}
+        candidates = (
+            self.builtin_funcs | self.user_functions | self.imported_names
+        ) - {name}
         matches = debug.get_close_matches(name, candidates, n=1, cutoff=0.7)
         return matches[0] if matches else None
 
-    def check(self) -> Tuple[List[Tuple[str, int, int, Optional[str]]],
-                             List[Tuple[str, int, int, Optional[str]]]]:
+    def check(
+        self,
+    ) -> Tuple[
+        List[Tuple[str, int, int, Optional[str]]],
+        List[Tuple[str, int, int, Optional[str]]],
+    ]:
         """
         Perform all validation checks and return (errors, warnings).
         Errors are fatal; warnings are informational.
@@ -344,11 +575,13 @@ class NameChecker(ast.NodeVisitor):
             if is_call:
                 # This name is used as a function call; we check functions separately.
                 continue
-            if (name not in self.assigned and 
-                name not in self.builtin_vars and 
-                name not in self.param_names and
-                name not in self.globals and
-                name not in self.builtin_funcs):
+            if (
+                name not in self.assigned
+                and name not in self.builtin_vars
+                and name not in self.param_names
+                and name not in self.globals
+                and name not in self.builtin_funcs
+            ):
                 suggestion = self._suggest_variable(name)
                 self.errors.append(
                     (f"Undefined variable '{name}'", lineno, col, suggestion)
@@ -357,21 +590,31 @@ class NameChecker(ast.NodeVisitor):
         # 2. Validate SDF function references passed to raymarch().
         for sdf_name in self.raymarch_sdf_names:
             if sdf_name not in self.user_functions:
-                self.errors.append((
-                    f"raymarch() references undefined SDF function '{sdf_name}'.",
-                    None, None, None
-                ))
+                self.errors.append(
+                    (
+                        f"raymarch() references undefined SDF function '{sdf_name}'.",
+                        None,
+                        None,
+                        None,
+                    )
+                )
             elif self.user_function_arities.get(sdf_name) != 1:
-                self.errors.append((
-                    f"SDF function '{sdf_name}' must accept exactly one parameter.",
-                    None, None, None
-                ))
+                self.errors.append(
+                    (
+                        f"SDF function '{sdf_name}' must accept exactly one parameter.",
+                        None,
+                        None,
+                        None,
+                    )
+                )
 
         # 3. Check undefined functions.
         for func_name in self.called_functions:
-            if (func_name not in self.builtin_funcs and
-                func_name not in self.user_functions and
-                func_name not in self.imported_names):
+            if (
+                func_name not in self.builtin_funcs
+                and func_name not in self.user_functions
+                and func_name not in self.imported_names
+            ):
                 suggestion = self._suggest_function(func_name)
                 self.errors.append(
                     (f"Undefined function '{func_name}'", None, None, suggestion)
@@ -386,7 +629,12 @@ class NameChecker(ast.NodeVisitor):
                     )
                 else:
                     self.warnings.append(
-                        (f"Variable '{var}' is assigned but never used.", None, None, None)
+                        (
+                            f"Variable '{var}' is assigned but never used.",
+                            None,
+                            None,
+                            None,
+                        )
                     )
 
         return self.errors, self.warnings
@@ -401,27 +649,27 @@ class GLSLGenerator(ast.NodeVisitor):
     Supports object, paint, agent, and per-fragment material modes.
     """
 
-    def __init__(self, debug: bool = False, mode: str = 'object') -> None:
+    def __init__(self, debug: bool = False, mode: str = "object") -> None:
         self.debug = debug
         self.mode = mode
         self.lines: List[str] = []
         self.indent: int = 0
-        self.globals: Dict[str, Any] = {}                   # user's global namespace
-        self.assigned_vars: Set[str] = set()                # variables that need declaration
-        self.var_types: Dict[str, str] = {}                 # variable -> GLSL type
-        self.complex_vars: Set[str] = set()                 # names known to be complex
+        self.globals: Dict[str, Any] = {}  # user's global namespace
+        self.assigned_vars: Set[str] = set()  # variables that need declaration
+        self.var_types: Dict[str, str] = {}  # variable -> GLSL type
+        self.complex_vars: Set[str] = set()  # names known to be complex
         self.inline_depth: int = 0
         self.max_inline_depth: int = 10
         self.inlined_functions: Set[str] = set()
-        self.rand_call_counter: int = 0                     # unique seed for each rand()
+        self.rand_call_counter: int = 0  # unique seed for each rand()
         self.user_handles_collisions: bool = False
         self.user_applies_constraints: bool = False
         self.sdf_functions: Dict[str, Tuple[ast.FunctionDef, List[str]]] = {}
         self.raymarch_functions: Dict[str, str] = {}
-        self.has_return: bool = False                       # whether function uses return
-        self.return_expr: Optional[ast.AST] = None          # captured return expression
-        self.param_names: List[str] = []                    # function parameter names
-        self.imported_names: Set[str] = set()               # names imported from hyperstellar.glsl
+        self.has_return: bool = False  # whether function uses return
+        self.return_expr: Optional[ast.AST] = None  # captured return expression
+        self.param_names: List[str] = []  # function parameter names
+        self.imported_names: Set[str] = set()  # names imported from hyperstellar.glsl
         self.root_function_name: Optional[str] = None
         self.loop_vars: Set[str] = set()
         self.in_sdf_function: bool = False
@@ -455,22 +703,30 @@ class GLSLGenerator(ast.NodeVisitor):
         self.in_sdf_function = False
 
         # Get source and AST
-        source = inspect.getsource(func)
+        source = textwrap.dedent(inspect.getsource(func))
         tree = ast.parse(source)
         if not isinstance(tree.body[0], ast.FunctionDef):
             raise ValueError("Not a function definition")
         func_node = tree.body[0]
         self.root_function_name = func_node.name
-        if self.mode == 'material':
+        if self.mode == "material":
             args = func_node.args
             positional = list(args.posonlyargs) + list(args.args)
-            if (args.posonlyargs or len(args.args) != 1 or args.args[0].arg != 'mesh_id' or
-                    args.defaults or args.kw_defaults or args.kwonlyargs or
-                    args.vararg is not None or args.kwarg is not None):
+            if (
+                args.posonlyargs
+                or len(args.args) != 1
+                or args.args[0].arg != "mesh_id"
+                or args.defaults
+                or args.kw_defaults
+                or args.kwonlyargs
+                or args.vararg is not None
+                or args.kwarg is not None
+            ):
                 raise SyntaxError(
                     "A material script must have exactly one parameter named 'mesh_id' "
                     "and no defaults or keyword-only parameters."
                 )
+
             def has_root_return(node: ast.AST) -> bool:
                 for child in ast.iter_child_nodes(node):
                     # Nested one-argument SDF functions have their own return
@@ -504,7 +760,9 @@ class GLSLGenerator(ast.NodeVisitor):
         # If there are errors, abort with a detailed summary
         if errors:
             error_summary = debug.format_error_summary(errors, source)
-            raise SyntaxError(f"JIT compilation failed due to the following errors:\n{error_summary}")
+            raise SyntaxError(
+                f"JIT compilation failed due to the following errors:\n{error_summary}"
+            )
 
         # ---- Proceed with generation ----
         self.param_names = [arg.arg for arg in func_node.args.args]
@@ -515,9 +773,9 @@ class GLSLGenerator(ast.NodeVisitor):
         # Detect if user calls collision or SSBO‑constraint functions
         for node in ast.walk(func_node):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                if node.func.id == 'apply_constraints':
+                if node.func.id == "apply_constraints":
                     self.user_applies_constraints = True
-                elif node.func.id == 'resolve_collision':
+                elif node.func.id == "resolve_collision":
                     self.user_handles_collisions = True
 
         # Check for return statement and capture its expression
@@ -525,47 +783,81 @@ class GLSLGenerator(ast.NodeVisitor):
 
         # Predefined variables must agree with NameChecker and the selected
         # shader wrapper; otherwise generated locals can shadow wrapper state.
-        common_predefined = {
-            'num_objects', 'dt', 'time', 'idx', 'group_count', 'i'
-        }
-        if self.mode == 'material':
+        common_predefined = {"num_objects", "dt", "time", "idx", "group_count", "i"}
+        if self.mode == "material":
             predefined = {
-                'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time'
+                "mesh_id",
+                "uv",
+                "world_pos",
+                "normal",
+                "view_dir",
+                "color",
+                "time",
             }
-        elif self.mode == 'paint':
+        elif self.mode == "paint":
             predefined = common_predefined | {
-                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
-                't', 'color',
+                "px",
+                "py",
+                "prev_r",
+                "prev_g",
+                "prev_b",
+                "prev_a",
+                "t",
+                "color",
             }
-        elif self.mode == 'agent':
+        elif self.mode == "agent":
             predefined = common_predefined | {
-                'signal_object_idx', 'signal_payload',
+                "signal_object_idx",
+                "signal_payload",
             }
-        elif self.mode == 'kernel':
+        elif self.mode == "kernel":
             predefined = common_predefined
         else:
             predefined = common_predefined | {
-                'p', 'x', 'y', 'vx', 'vy', 'z', 'vz',
-                'mass', 'charge', 'theta', 'omega', 'color', 'pos', 'vel',
-                'ax', 'ay', 'az', 'angular', 'wx', 'wy', 'wz',
-                'angular_x', 'angular_y', 'angular_z',
+                "p",
+                "x",
+                "y",
+                "vx",
+                "vy",
+                "z",
+                "vz",
+                "mass",
+                "charge",
+                "theta",
+                "omega",
+                "color",
+                "pos",
+                "vel",
+                "ax",
+                "ay",
+                "az",
+                "angular",
+                "wx",
+                "wy",
+                "wz",
+                "angular_x",
+                "angular_y",
+                "angular_z",
             }
-        
+
         self.assigned_vars = collector.vars - predefined - self.loop_vars
-        if self.mode == 'paint':
-            self.assigned_vars.add('color')
+        if self.mode == "paint":
+            self.assigned_vars.add("color")
         if self.has_return:
-            self.assigned_vars.add('ax')
-            self.assigned_vars.add('ay')
-            self.assigned_vars.add('angular')
-            if self.mode == 'paint':
-                self.assigned_vars.add('color')
+            self.assigned_vars.add("ax")
+            self.assigned_vars.add("ay")
+            self.assigned_vars.add("angular")
+            if self.mode == "paint":
+                self.assigned_vars.add("color")
 
         # Collect SDF functions
         for node in ast.walk(func_node):
             if isinstance(node, ast.FunctionDef) and node.name != func_node.name:
                 if len(node.args.args) == 1:
-                    self.sdf_functions[node.name] = (node, [arg.arg for arg in node.args.args])
+                    self.sdf_functions[node.name] = (
+                        node,
+                        [arg.arg for arg in node.args.args],
+                    )
 
         # Walk the AST (this builds self.lines with the user's code)
         self.visit(func_node)
@@ -586,6 +878,7 @@ class GLSLGenerator(ast.NodeVisitor):
 
         # Delegate shader wrapping to the separate module
         from . import shader
+
         return shader.wrap_shader(
             mode=self.mode,
             body=body,
@@ -595,7 +888,7 @@ class GLSLGenerator(ast.NodeVisitor):
             var_types=self.var_types,
             user_handles_collisions=self.user_handles_collisions,
             user_applies_constraints=self.user_applies_constraints,
-            debug=self.debug
+            debug=self.debug,
         )
 
     # ------------------------------------------------------------------------
@@ -607,36 +900,94 @@ class GLSLGenerator(ast.NodeVisitor):
             return ""
 
         mapping = {
-            'x': 'pos.x', 'y': 'pos.y',
-            'vx': 'vel.x', 'vy': 'vel.y',
-            'mass': 'mass', 'charge': 'charge',
-            'theta': 'theta', 'omega': 'omega',
-            'color': 'color',   # vec4
-            'pos': 'pos', 'vel': 'vel',
+            "x": "pos.x",
+            "y": "pos.y",
+            "vx": "vel.x",
+            "vy": "vel.y",
+            "mass": "mass",
+            "charge": "charge",
+            "theta": "theta",
+            "omega": "omega",
+            "color": "color",  # vec4
+            "pos": "pos",
+            "vel": "vel",
         }
 
         exposed = {
-            'object': {
-                'x', 'y', 'vx', 'vy', 'z', 'vz', 'wx', 'wy', 'wz',
-                'mass', 'charge', 'theta', 'omega', 'ax', 'ay', 'az',
-                'angular', 'angular_x', 'angular_y', 'angular_z',
-                'color', 'pos', 'vel', 'p', 'idx', 'num_objects',
-                'group_count', 'dt', 'time', 'i',
+            "object": {
+                "x",
+                "y",
+                "vx",
+                "vy",
+                "z",
+                "vz",
+                "wx",
+                "wy",
+                "wz",
+                "mass",
+                "charge",
+                "theta",
+                "omega",
+                "ax",
+                "ay",
+                "az",
+                "angular",
+                "angular_x",
+                "angular_y",
+                "angular_z",
+                "color",
+                "pos",
+                "vel",
+                "p",
+                "idx",
+                "num_objects",
+                "group_count",
+                "dt",
+                "time",
+                "i",
             },
-            'paint': {
-                'px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a',
-                'color', 't', 'idx', 'num_objects', 'group_count',
-                'dt', 'time', 'i',
+            "paint": {
+                "px",
+                "py",
+                "prev_r",
+                "prev_g",
+                "prev_b",
+                "prev_a",
+                "color",
+                "t",
+                "idx",
+                "num_objects",
+                "group_count",
+                "dt",
+                "time",
+                "i",
             },
-            'agent': {
-                'signal_object_idx', 'signal_payload', 'idx',
-                'num_objects', 'group_count', 'dt', 'time', 'i',
+            "agent": {
+                "signal_object_idx",
+                "signal_payload",
+                "idx",
+                "num_objects",
+                "group_count",
+                "dt",
+                "time",
+                "i",
             },
-            'kernel': {
-                'idx', 'num_objects', 'group_count', 'dt', 'time', 'i',
+            "kernel": {
+                "idx",
+                "num_objects",
+                "group_count",
+                "dt",
+                "time",
+                "i",
             },
-            'material': {
-                'mesh_id', 'uv', 'world_pos', 'normal', 'view_dir', 'color', 'time',
+            "material": {
+                "mesh_id",
+                "uv",
+                "world_pos",
+                "normal",
+                "view_dir",
+                "color",
+                "time",
             },
         }.get(self.mode, set())
 
@@ -644,14 +995,14 @@ class GLSLGenerator(ast.NodeVisitor):
         for pname in self.param_names:
             if pname in exposed:
                 continue
-            if pname in mapping and self.mode == 'object':
+            if pname in mapping and self.mode == "object":
                 expr = mapping[pname]
-                if pname == 'color':
-                    typ = 'vec4'
-                elif pname in ('pos', 'vel'):
-                    typ = 'vec2'
+                if pname == "color":
+                    typ = "vec4"
+                elif pname in ("pos", "vel"):
+                    typ = "vec2"
                 else:
-                    typ = 'float'
+                    typ = "float"
                 if pname in self.assigned_vars:
                     lines.append(f"    {pname} = {expr};")
                 else:
@@ -659,7 +1010,9 @@ class GLSLGenerator(ast.NodeVisitor):
             elif pname in self.assigned_vars:
                 lines.append(f"    {pname} = 0.0;")
             else:
-                lines.append(f"    // WARNING: parameter '{pname}' is not a known property; defaulting to 0.0")
+                lines.append(
+                    f"    // WARNING: parameter '{pname}' is not a known property; defaulting to 0.0"
+                )
                 lines.append(f"    float {pname} = 0.0;")
         return "\n".join(lines)
 
@@ -684,10 +1037,14 @@ class GLSLGenerator(ast.NodeVisitor):
     # ------------------------------------------------------------------------
     def _process_return(self, node: ast.AST) -> str:
         if not isinstance(node, (ast.Tuple, ast.List)):
-            raise SyntaxError("return must be a tuple of (ax, ay, angular) or (ax, ay, angular, color)")
+            raise SyntaxError(
+                "return must be a tuple of (ax, ay, angular) or (ax, ay, angular, color)"
+            )
         elems = node.elts
         if not (3 <= len(elems) <= 4):
-            raise SyntaxError("return must have 3 or 4 elements: (ax, ay, angular) or (ax, ay, angular, color)")
+            raise SyntaxError(
+                "return must have 3 or 4 elements: (ax, ay, angular) or (ax, ay, angular, color)"
+            )
 
         ax_glsl = self._expr_to_glsl(elems[0])
         ay_glsl = self._expr_to_glsl(elems[1])
@@ -714,7 +1071,7 @@ class GLSLGenerator(ast.NodeVisitor):
             temp_gen.imported_names = self.imported_names.copy()
             temp_gen.var_types = self.var_types.copy()
             temp_gen.complex_vars = self.complex_vars.copy()
-            temp_gen.var_types[param_name] = 'vec3'
+            temp_gen.var_types[param_name] = "vec3"
             temp_gen.in_sdf_function = True
             temp_gen.root_function_name = sdf_node.name
             temp_gen.loop_vars = {
@@ -732,7 +1089,9 @@ class GLSLGenerator(ast.NodeVisitor):
 
             local_collector = AssignCollector()
             local_collector.visit(sdf_node)
-            local_names = sorted(local_collector.vars - temp_gen.loop_vars - {param_name})
+            local_names = sorted(
+                local_collector.vars - temp_gen.loop_vars - {param_name}
+            )
             local_decls = [
                 f"    {temp_gen.var_types.get(var, 'float')} {var};"
                 for var in local_names
@@ -954,7 +1313,7 @@ float fbm(vec2 p, int octaves) {
             )
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if node.module == 'hyperstellar.glsl':
+        if node.module == "hyperstellar.glsl":
             for alias in node.names:
                 self.imported_names.add(alias.asname or alias.name)
 
@@ -964,111 +1323,153 @@ float fbm(vec2 p, int octaves) {
     def visit_Expr(self, node: ast.Expr) -> None:
         if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
             func_name = node.value.func.id
-            if func_name == 'apply_constraints':
-                if self.mode != 'object':
-                    raise SyntaxError("apply_constraints() is only available in 'object' scripts.")
+            if func_name == "apply_constraints":
+                if self.mode != "object":
+                    raise SyntaxError(
+                        "apply_constraints() is only available in 'object' scripts."
+                    )
                 if node.value.args or node.value.keywords:
                     raise SyntaxError("apply_constraints() takes no arguments")
                 ind = self.indent_str()
-                self.lines.extend([
-                    ind + "{",
-                    ind + "    pos = vec2(x, y);",
-                    ind + "    vel = vec2(vx, vy);",
-                    ind + "    applyConstraints(pos, vel, _self, _originalPos);",
-                    ind + "    x = pos.x; y = pos.y;",
-                    ind + "    vx = vel.x; vy = vel.y;",
-                    ind + "}",
-                ])
+                self.lines.extend(
+                    [
+                        ind + "{",
+                        ind + "    pos = vec2(x, y);",
+                        ind + "    vel = vec2(vx, vy);",
+                        ind + "    applyConstraints(pos, vel, _self, _originalPos);",
+                        ind + "    x = pos.x; y = pos.y;",
+                        ind + "    vx = vel.x; vy = vel.y;",
+                        ind + "}",
+                    ]
+                )
                 self.user_applies_constraints = True
                 return
-            if func_name == 'resolve_collision':
-                if self.mode != 'object':
-                    raise SyntaxError("resolve_collision() is only available in 'object' scripts.")
+            if func_name == "resolve_collision":
+                if self.mode != "object":
+                    raise SyntaxError(
+                        "resolve_collision() is only available in 'object' scripts."
+                    )
                 if len(node.value.args) != 1 or node.value.keywords:
-                    raise SyntaxError("resolve_collision(other) takes exactly one positional argument")
+                    raise SyntaxError(
+                        "resolve_collision(other) takes exactly one positional argument"
+                    )
                 other_expr = self._expr_to_glsl(node.value.args[0])
                 ind = self.indent_str()
-                self.lines.extend([
-                    ind + "{",
-                    ind + "    int _res_other = int(" + other_expr + ");",
-                    ind + "    if (_res_other >= 0 && _res_other < uNumObjects && _res_other != _self) {",
-                    ind + "        Object _o = objectsIn[_res_other];",
-                    ind + "        CollisionProperties _pa = collisionProps[_self];",
-                    ind + "        CollisionProperties _pb = collisionProps[_res_other];",
-                    ind + "        if (_pa.enabled != 0 && _pb.enabled != 0 &&",
-                    ind + "            _pa.shapeType != COLLISION_NONE && _pb.shapeType != COLLISION_NONE) {",
-                    ind + "            float _rest = min(_pa.restitution, _pb.restitution);",
-                    ind + "            float _fric = sqrt(_pa.friction * _pb.friction);",
-                    ind + "            float _mB   = max(EPSILON, _o.mass);",
-                    # Resolve 3D contacts using the current user-visible state.
-                    ind + "            if (_pa.shapeType >= COLLISION_SPHERE && _pb.shapeType >= COLLISION_SPHERE) {",
-                    ind + "                Object _me = p;",
-                    ind + "                _me.position    = vec4(x, y, z, 0.0);",
-                    ind + "                _me.orientation = _q;",
-                    ind + "                CollisionInfo3D _c3 = detectCollision3D(_me, _o, _pa.shapeType, _pb.shapeType);",
-                    ind + "                if (_c3.hasCollision) {",
-                    ind + "                    float _iA = getMomentOfInertia3D(mass, _pa.shapeType, p.visualData);",
-                    ind + "                    float _iB = getMomentOfInertia3D(_mB, _pb.shapeType, _o.visualData);",
-                    ind + "                    vec3 _pa3 = vec3(x, y, z), _va3 = vec3(vx, vy, vz), _wa3 = vec3(wx, wy, omega);",
-                    ind + "                    vec3 _pb3 = _o.position.xyz, _vb3 = _o.velocity.xyz, _wb3 = _o.spin.xyz;",
-                    ind + "                    resolveCollision3D(_pa3, _va3, _wa3, mass, _iA,",
-                    ind + "                                       _pb3, _vb3, _wb3, _mB,  _iB,",
-                    ind + "                                       _c3.normal, _c3.contactPoint, _c3.penetration, _rest, _fric);",
-                    ind + "                    x = _pa3.x; y = _pa3.y; z = _pa3.z;",
-                    ind + "                    vx = _va3.x; vy = _va3.y; vz = _va3.z;",
-                    ind + "                    wx = _wa3.x; wy = _wa3.y; omega = _wa3.z;",
-                    ind + "                }",
-                    ind + "            }",
-                    # Resolve 2D contacts using the current user-visible state.
-                    ind + "            else if (_pa.shapeType < COLLISION_SPHERE && _pb.shapeType < COLLISION_SPHERE) {",
-                    ind + "                Object _me = p;",
-                    ind + "                _me.position    = vec4(x, y, p.position.z, 0.0);",
-                    ind + "                _me.orientation = _q;",
-                    ind + "                CollisionInfo _col = detectCollision(_me, _o, _res_other, _self);",
-                    ind + "                if (_col.hasCollision) {",
-                    ind + "                    float _iA = getMomentOfInertia(mass, _pa.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);",
-                    ind + "                    float _iB = getMomentOfInertia(_mB, _pb.shapeType, _o.visualData.x, _o.visualData.y, _o.visualData.x * 0.5);",
-                    ind + "                    vec2 _pp = vec2(x, y), _pv = vec2(vx, vy);",
-                    ind + "                    vec2 _op = _o.position.xy, _ov = _o.velocity.xy;",
-                    ind + "                    float _ow = _o.spin.z;",
-                    ind + "                    resolveCollisionWithTorque(_pp, _pv, omega, mass, _iA,",
-                    ind + "                                               _op, _ov, _ow, _mB, _iB,",
-                    ind + "                                               _col.normal, _col.contactPoint, _col.penetration, _rest, _fric);",
-                    ind + "                    x = _pp.x; y = _pp.y; vx = _pv.x; vy = _pv.y;",
-                    ind + "                }",
-                    ind + "            }",
-                    # Keep angular velocity within the same bounds as the automatic path.
-                    ind + "            omega = clamp(omega, -100.0, 100.0);",
-                    ind + "            wx = clamp(wx, -100.0, 100.0);",
-                    ind + "            wy = clamp(wy, -100.0, 100.0);",
-                    ind + "        }",
-                    ind + "    }",
-                    ind + "}",
-                ])
+                self.lines.extend(
+                    [
+                        ind + "{",
+                        ind + "    int _res_other = int(" + other_expr + ");",
+                        ind
+                        + "    if (_res_other >= 0 && _res_other < uNumObjects && _res_other != _self) {",
+                        ind + "        Object _o = objectsIn[_res_other];",
+                        ind
+                        + "        CollisionProperties _pa = collisionProps[_self];",
+                        ind
+                        + "        CollisionProperties _pb = collisionProps[_res_other];",
+                        ind + "        if (_pa.enabled != 0 && _pb.enabled != 0 &&",
+                        ind
+                        + "            _pa.shapeType != COLLISION_NONE && _pb.shapeType != COLLISION_NONE) {",
+                        ind
+                        + "            float _rest = min(_pa.restitution, _pb.restitution);",
+                        ind
+                        + "            float _fric = sqrt(_pa.friction * _pb.friction);",
+                        ind + "            float _mB   = max(EPSILON, _o.mass);",
+                        # Resolve 3D contacts using the current user-visible state.
+                        ind
+                        + "            if (_pa.shapeType >= COLLISION_SPHERE && _pb.shapeType >= COLLISION_SPHERE) {",
+                        ind + "                Object _me = p;",
+                        ind + "                _me.position    = vec4(x, y, z, 0.0);",
+                        ind + "                _me.orientation = _q;",
+                        ind
+                        + "                CollisionInfo3D _c3 = detectCollision3D(_me, _o, _pa.shapeType, _pb.shapeType);",
+                        ind + "                if (_c3.hasCollision) {",
+                        ind
+                        + "                    float _iA = getMomentOfInertia3D(mass, _pa.shapeType, p.visualData);",
+                        ind
+                        + "                    float _iB = getMomentOfInertia3D(_mB, _pb.shapeType, _o.visualData);",
+                        ind
+                        + "                    vec3 _pa3 = vec3(x, y, z), _va3 = vec3(vx, vy, vz), _wa3 = vec3(wx, wy, omega);",
+                        ind
+                        + "                    vec3 _pb3 = _o.position.xyz, _vb3 = _o.velocity.xyz, _wb3 = _o.spin.xyz;",
+                        ind
+                        + "                    resolveCollision3D(_pa3, _va3, _wa3, mass, _iA,",
+                        ind
+                        + "                                       _pb3, _vb3, _wb3, _mB,  _iB,",
+                        ind
+                        + "                                       _c3.normal, _c3.contactPoint, _c3.penetration, _rest, _fric);",
+                        ind + "                    x = _pa3.x; y = _pa3.y; z = _pa3.z;",
+                        ind
+                        + "                    vx = _va3.x; vy = _va3.y; vz = _va3.z;",
+                        ind
+                        + "                    wx = _wa3.x; wy = _wa3.y; omega = _wa3.z;",
+                        ind + "                }",
+                        ind + "            }",
+                        # Resolve 2D contacts using the current user-visible state.
+                        ind
+                        + "            else if (_pa.shapeType < COLLISION_SPHERE && _pb.shapeType < COLLISION_SPHERE) {",
+                        ind + "                Object _me = p;",
+                        ind
+                        + "                _me.position    = vec4(x, y, p.position.z, 0.0);",
+                        ind + "                _me.orientation = _q;",
+                        ind
+                        + "                CollisionInfo _col = detectCollision(_me, _o, _res_other, _self);",
+                        ind + "                if (_col.hasCollision) {",
+                        ind
+                        + "                    float _iA = getMomentOfInertia(mass, _pa.shapeType, p.visualData.x, p.visualData.y, p.visualData.x * 0.5);",
+                        ind
+                        + "                    float _iB = getMomentOfInertia(_mB, _pb.shapeType, _o.visualData.x, _o.visualData.y, _o.visualData.x * 0.5);",
+                        ind
+                        + "                    vec2 _pp = vec2(x, y), _pv = vec2(vx, vy);",
+                        ind
+                        + "                    vec2 _op = _o.position.xy, _ov = _o.velocity.xy;",
+                        ind + "                    float _ow = _o.spin.z;",
+                        ind
+                        + "                    resolveCollisionWithTorque(_pp, _pv, omega, mass, _iA,",
+                        ind
+                        + "                                               _op, _ov, _ow, _mB, _iB,",
+                        ind
+                        + "                                               _col.normal, _col.contactPoint, _col.penetration, _rest, _fric);",
+                        ind
+                        + "                    x = _pp.x; y = _pp.y; vx = _pv.x; vy = _pv.y;",
+                        ind + "                }",
+                        ind + "            }",
+                        # Keep angular velocity within the same bounds as the automatic path.
+                        ind + "            omega = clamp(omega, -100.0, 100.0);",
+                        ind + "            wx = clamp(wx, -100.0, 100.0);",
+                        ind + "            wy = clamp(wy, -100.0, 100.0);",
+                        ind + "        }",
+                        ind + "    }",
+                        ind + "}",
+                    ]
+                )
                 self.user_handles_collisions = True
                 return
-            if func_name in ('spring', 'boundary', 'angle'):
-                if self.mode != 'object':
-                    raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
-                if func_name == 'spring':
+            if func_name in ("spring", "boundary", "angle"):
+                if self.mode != "object":
+                    raise SyntaxError(
+                        f"{func_name}() is only available in 'object' scripts."
+                    )
+                if func_name == "spring":
                     self._handle_spring(node.value)
-                elif func_name == 'boundary':
+                elif func_name == "boundary":
                     self._handle_boundary(node.value)
                 else:
                     self._handle_angle(node.value)
                 return
-            if func_name == 'distance' and any(
-                kw.arg in ('target', 'length') for kw in node.value.keywords
+            if func_name == "distance" and any(
+                kw.arg in ("target", "length") for kw in node.value.keywords
             ):
-                if self.mode != 'object':
-                    raise SyntaxError("distance constraint syntax is only available in 'object' scripts.")
+                if self.mode != "object":
+                    raise SyntaxError(
+                        "distance constraint syntax is only available in 'object' scripts."
+                    )
                 self._handle_distance(node.value)
                 return
         # These APIs are side-effecting GLSL calls whose return values are
         # intentionally unused in normal Python scripts.
         if isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name):
             func_name = node.value.func.id
-            if func_name in ('signal', 'scratchpad_write'):
+            if func_name in ("signal", "scratchpad_write"):
                 self.lines.append(
                     self.indent_str() + self._expr_to_glsl(node.value) + ";"
                 )
@@ -1079,10 +1480,10 @@ float fbm(vec2 p, int octaves) {
     # ---- Inline constraint handlers ----
     def _handle_spring(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
-        target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
-        stiffness = self._expr_to_glsl(kwargs.get('stiffness', ast.Constant(value=1.0)))
-        damping = self._expr_to_glsl(kwargs.get('damping', ast.Constant(value=0.0)))
-        rest = self._expr_to_glsl(kwargs.get('rest_length', ast.Constant(value=1.0)))
+        target = self._expr_to_glsl(kwargs.get("target", ast.Constant(value=0)))
+        stiffness = self._expr_to_glsl(kwargs.get("stiffness", ast.Constant(value=1.0)))
+        damping = self._expr_to_glsl(kwargs.get("damping", ast.Constant(value=0.0)))
+        rest = self._expr_to_glsl(kwargs.get("rest_length", ast.Constant(value=1.0)))
 
         code = f"""{{
     int _other = int({target});
@@ -1105,8 +1506,8 @@ float fbm(vec2 p, int octaves) {
 
     def _handle_distance(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
-        target = self._expr_to_glsl(kwargs.get('target', ast.Constant(value=0)))
-        length = self._expr_to_glsl(kwargs.get('length', ast.Constant(value=1.0)))
+        target = self._expr_to_glsl(kwargs.get("target", ast.Constant(value=0)))
+        length = self._expr_to_glsl(kwargs.get("length", ast.Constant(value=1.0)))
         beta, gamma = 0.2, 0.0
 
         code = f"""{{
@@ -1135,10 +1536,10 @@ float fbm(vec2 p, int octaves) {
 
     def _handle_boundary(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
-        min_x = self._expr_to_glsl(kwargs.get('min_x', ast.Constant(value=-1e10)))
-        max_x = self._expr_to_glsl(kwargs.get('max_x', ast.Constant(value=1e10)))
-        min_y = self._expr_to_glsl(kwargs.get('min_y', ast.Constant(value=-1e10)))
-        max_y = self._expr_to_glsl(kwargs.get('max_y', ast.Constant(value=1e10)))
+        min_x = self._expr_to_glsl(kwargs.get("min_x", ast.Constant(value=-1e10)))
+        max_x = self._expr_to_glsl(kwargs.get("max_x", ast.Constant(value=1e10)))
+        min_y = self._expr_to_glsl(kwargs.get("min_y", ast.Constant(value=-1e10)))
+        max_y = self._expr_to_glsl(kwargs.get("max_y", ast.Constant(value=1e10)))
         elasticity = 0.7
         friction = 0.95
 
@@ -1154,9 +1555,9 @@ float fbm(vec2 p, int octaves) {
 
     def _handle_angle(self, node: ast.Call) -> None:
         kwargs = {kw.arg: kw.value for kw in node.keywords}
-        target1 = self._expr_to_glsl(kwargs.get('target1', ast.Constant(value=0)))
-        target2 = self._expr_to_glsl(kwargs.get('target2', ast.Constant(value=0)))
-        target_angle = self._expr_to_glsl(kwargs.get('angle', ast.Constant(value=0.0)))
+        target1 = self._expr_to_glsl(kwargs.get("target1", ast.Constant(value=0)))
+        target2 = self._expr_to_glsl(kwargs.get("target2", ast.Constant(value=0)))
+        target_angle = self._expr_to_glsl(kwargs.get("angle", ast.Constant(value=0.0)))
         beta, gamma = 0.2, 0.0
 
         code = f"""{{
@@ -1222,12 +1623,14 @@ float fbm(vec2 p, int octaves) {
             self.lines.append(self.indent_str() + f"{varname} = {expr_str};")
         elif isinstance(target, ast.Tuple):
             rhs_type = self._infer_expr_type(node.value)
-            if rhs_type and rhs_type.startswith('vec'):
-                comps = ['x', 'y', 'z', 'w']
+            if rhs_type and rhs_type.startswith("vec"):
+                comps = ["x", "y", "z", "w"]
                 for i, elt in enumerate(target.elts):
                     if isinstance(elt, ast.Name):
                         var = elt.id
-                        self.lines.append(self.indent_str() + f"{var} = {expr_str}.{comps[i]};")
+                        self.lines.append(
+                            self.indent_str() + f"{var} = {expr_str}.{comps[i]};"
+                        )
                     else:
                         raise SyntaxError("Unpacking target must be simple names")
             elif isinstance(node.value, ast.Tuple):
@@ -1286,7 +1689,11 @@ float fbm(vec2 p, int octaves) {
         emit_if_chain(node)
 
     def visit_For(self, node: ast.For) -> None:
-        if not isinstance(node.iter, ast.Call) or not isinstance(node.iter.func, ast.Name) or node.iter.func.id != 'range':
+        if (
+            not isinstance(node.iter, ast.Call)
+            or not isinstance(node.iter.func, ast.Name)
+            or node.iter.func.id != "range"
+        ):
             raise SyntaxError("Only 'for i in range(...)' supported")
         args = node.iter.args
         if not (1 <= len(args) <= 3):
@@ -1294,7 +1701,11 @@ float fbm(vec2 p, int octaves) {
         var = node.target.id if isinstance(node.target, ast.Name) else "_i"
 
         start = self._expr_to_glsl(args[0]) if len(args) >= 1 else "0"
-        stop = self._expr_to_glsl(args[1]) if len(args) >= 2 else self._expr_to_glsl(args[0])
+        stop = (
+            self._expr_to_glsl(args[1])
+            if len(args) >= 2
+            else self._expr_to_glsl(args[0])
+        )
         step = self._expr_to_glsl(args[2]) if len(args) == 3 else "1"
 
         if len(args) == 1:
@@ -1357,10 +1768,12 @@ float fbm(vec2 p, int octaves) {
                     raise SyntaxError("Inconsistent matrix row lengths")
                 for e in row.elts:
                     elems.append(self._expr_to_glsl(e))
-            if n_rows == n_cols and n_rows in (2,3,4):
+            if n_rows == n_cols and n_rows in (2, 3, 4):
                 return f"mat{n_rows}({', '.join(elems)})"
             else:
-                raise NotImplementedError("Only square 2x2, 3x3, and 4x4 matrices are supported")
+                raise NotImplementedError(
+                    "Only square 2x2, 3x3, and 4x4 matrices are supported"
+                )
         else:
             raise NotImplementedError("Tensor rank > 2 not supported")
 
@@ -1388,7 +1801,7 @@ float fbm(vec2 p, int octaves) {
                 return None
             n_rows = len(rows)
             n_cols = len(rows[0].elts) if isinstance(rows[0], ast.List) else 0
-            if n_rows == n_cols and n_rows in (2,3,4):
+            if n_rows == n_cols and n_rows in (2, 3, 4):
                 return f"mat{n_rows}"
         return None
 
@@ -1401,8 +1814,19 @@ float fbm(vec2 p, int octaves) {
             return node.id in self.complex_vars
         if isinstance(node, ast.Call):
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
-            if func_name in ('cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp',
-                             'cPow', 'cSin', 'cCos', 'cTan', 'conj'):
+            if func_name in (
+                "cAdd",
+                "cSub",
+                "cMul",
+                "cDiv",
+                "cLog",
+                "cExp",
+                "cPow",
+                "cSin",
+                "cCos",
+                "cTan",
+                "conj",
+            ):
                 return True
             return False
         if isinstance(node, ast.BinOp):
@@ -1418,12 +1842,16 @@ float fbm(vec2 p, int octaves) {
         if isinstance(node, ast.Name):
             if node.id in self.imported_names:
                 return None
-            if node.id == 'i' and node.id not in self.loop_vars:
-                return 'vec2'
-            if self.mode == 'material':
+            if node.id == "i" and node.id not in self.loop_vars:
+                return "vec2"
+            if self.mode == "material":
                 material_types = {
-                    'mesh_id': 'int', 'uv': 'vec2', 'world_pos': 'vec3',
-                    'normal': 'vec3', 'view_dir': 'vec3', 'color': 'vec4',
+                    "mesh_id": "int",
+                    "uv": "vec2",
+                    "world_pos": "vec3",
+                    "normal": "vec3",
+                    "view_dir": "vec3",
+                    "color": "vec4",
                 }
                 if node.id in material_types:
                     return material_types[node.id]
@@ -1446,27 +1874,37 @@ float fbm(vec2 p, int octaves) {
             right_type = self._infer_expr_type(node.right)
             if left_type and right_type and left_type == right_type:
                 return left_type
-            if left_type and left_type.startswith('mat') and right_type and right_type.startswith('vec'):
+            if (
+                left_type
+                and left_type.startswith("mat")
+                and right_type
+                and right_type.startswith("vec")
+            ):
                 size = int(left_type[3])
                 if right_type == f"vec{size}":
                     return f"vec{size}"
-            if left_type and left_type.startswith('vec') and right_type and right_type.startswith('mat'):
+            if (
+                left_type
+                and left_type.startswith("vec")
+                and right_type
+                and right_type.startswith("mat")
+            ):
                 size = int(right_type[3])
                 if left_type == f"vec{size}":
                     return f"vec{size}"
-            if left_type == "float" and right_type and right_type.startswith('vec'):
+            if left_type == "float" and right_type and right_type.startswith("vec"):
                 return right_type
-            if right_type == "float" and left_type and left_type.startswith('vec'):
+            if right_type == "float" and left_type and left_type.startswith("vec"):
                 return left_type
-            if left_type == "float" and right_type and right_type.startswith('mat'):
+            if left_type == "float" and right_type and right_type.startswith("mat"):
                 return right_type
-            if right_type == "float" and left_type and left_type.startswith('mat'):
+            if right_type == "float" and left_type and left_type.startswith("mat"):
                 return left_type
             if isinstance(node.op, ast.MatMult):
                 if left_type and right_type:
-                    if left_type.startswith('mat') and right_type.startswith('mat'):
+                    if left_type.startswith("mat") and right_type.startswith("mat"):
                         return left_type
-                    if left_type.startswith('mat') and right_type.startswith('vec'):
+                    if left_type.startswith("mat") and right_type.startswith("vec"):
                         size = int(left_type[3])
                         if right_type == f"vec{size}":
                             return f"vec{size}"
@@ -1479,105 +1917,172 @@ float fbm(vec2 p, int octaves) {
             func_name = node.func.id if isinstance(node.func, ast.Name) else None
             if not func_name:
                 return None
-            if func_name == 'detect_collision':
-                return 'bool'
+            if func_name == "detect_collision":
+                return "bool"
             # Ray-tracing
-            if func_name in ('sphere', 'plane'):
+            if func_name in ("sphere", "plane"):
                 return "GeoObject"
-            if func_name in ('intersect', 'miss_hit', 'closest_hit', 'raymarch'):
+            if func_name in ("intersect", "miss_hit", "closest_hit", "raymarch"):
                 return "Hit"
-            if func_name == 'look_at':
+            if func_name == "look_at":
                 return "CameraBasis"
-            if func_name == 'camera_ray' or func_name == 'camera_ray_ndc':
+            if func_name == "camera_ray" or func_name == "camera_ray_ndc":
                 return "Ray"
-            if func_name in ('offset_ray_origin', 'reflect', 'refract'):
+            if func_name in ("offset_ray_origin", "reflect", "refract"):
                 return "vec3"
-            if func_name in ('vec2', 'vec3', 'vec4'):
+            if func_name in ("vec2", "vec3", "vec4"):
                 return func_name
             # Unary functions that return same type as argument
-            unary_return_same = {'normalize', 'reflect', 'abs', 'sign', 'floor', 'ceil', 'frac', 'fract',
-                                 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
-                                 'asinh', 'acosh', 'atanh', 'exp', 'exp2', 'log', 'log2', 'sqrt', 'inversesqrt',
-                                 'step', 'clamp', 'saturate', 'lerp', 'mix', 'smoothstep'}
+            unary_return_same = {
+                "normalize",
+                "reflect",
+                "abs",
+                "sign",
+                "floor",
+                "ceil",
+                "frac",
+                "fract",
+                "sin",
+                "cos",
+                "tan",
+                "asin",
+                "acos",
+                "atan",
+                "sinh",
+                "cosh",
+                "tanh",
+                "asinh",
+                "acosh",
+                "atanh",
+                "exp",
+                "exp2",
+                "log",
+                "log2",
+                "sqrt",
+                "inversesqrt",
+                "step",
+                "clamp",
+                "saturate",
+                "lerp",
+                "mix",
+                "smoothstep",
+            }
             if func_name in unary_return_same:
                 if len(node.args) >= 1:
                     arg_type = self._infer_expr_type(node.args[0])
-                    if arg_type and arg_type.startswith('vec'):
+                    if arg_type and arg_type.startswith("vec"):
                         return arg_type
                 return "float"
-            if func_name == 'cross':
+            if func_name == "cross":
                 return "vec3"
-            if func_name == 'mix':
+            if func_name == "mix":
                 if len(node.args) >= 3:
                     t1 = self._infer_expr_type(node.args[0])
                     t2 = self._infer_expr_type(node.args[1])
                     if t1 and t2 and t1 == t2:
                         return t1
-                    if t1 and t1.startswith('vec'):
+                    if t1 and t1.startswith("vec"):
                         return t1
-                    if t2 and t2.startswith('vec'):
+                    if t2 and t2.startswith("vec"):
                         return t2
                 return "float"
-            if func_name == 'smoothstep':
+            if func_name == "smoothstep":
                 if len(node.args) >= 3:
                     arg_type = self._infer_expr_type(node.args[2])
-                    if arg_type and arg_type.startswith('vec'):
+                    if arg_type and arg_type.startswith("vec"):
                         return arg_type
                 return "float"
-            if func_name in ('distance', 'length', 'dot', 'determinant', 'fbm', 'random', 'rand',
-                             'real', 'imag', 'arg', 'sum', 'len', 'atan2'):
+            if func_name in (
+                "distance",
+                "length",
+                "dot",
+                "determinant",
+                "fbm",
+                "random",
+                "rand",
+                "real",
+                "imag",
+                "arg",
+                "sum",
+                "len",
+                "atan2",
+            ):
                 return "float"
-            if func_name in ('cAdd', 'cSub', 'cMul', 'cDiv', 'cLog', 'cExp',
-                             'cPow', 'cSin', 'cCos', 'cTan', 'conj'):
+            if func_name in (
+                "cAdd",
+                "cSub",
+                "cMul",
+                "cDiv",
+                "cLog",
+                "cExp",
+                "cPow",
+                "cSin",
+                "cCos",
+                "cTan",
+                "conj",
+            ):
                 return "vec2"
             # Matrix functions
-            if func_name == 'outerProduct':
+            if func_name == "outerProduct":
                 if len(node.args) >= 2:
                     t1 = self._infer_expr_type(node.args[0])
                     t2 = self._infer_expr_type(node.args[1])
-                    if t1 and t1.startswith('vec') and t2 and t2.startswith('vec'):
+                    if t1 and t1.startswith("vec") and t2 and t2.startswith("vec"):
                         n = int(t1[3])
                         m = int(t2[3])
                         return f"mat{n}x{m}"
                 return "mat2"
-            if func_name == 'matrixCompMult':
+            if func_name == "matrixCompMult":
                 if len(node.args) >= 2:
                     t = self._infer_expr_type(node.args[0])
-                    if t and t.startswith('mat'):
+                    if t and t.startswith("mat"):
                         return t
                 return "mat2"
-            if func_name == 'transpose':
+            if func_name == "transpose":
                 if len(node.args) >= 1:
                     t = self._infer_expr_type(node.args[0])
-                    if t and t.startswith('mat'):
+                    if t and t.startswith("mat"):
                         return t
                 return "mat2"
-            if func_name == 'inverse':
+            if func_name == "inverse":
                 if len(node.args) >= 1:
                     t = self._infer_expr_type(node.args[0])
-                    if t and t.startswith('mat'):
+                    if t and t.startswith("mat"):
                         return t
                 return "mat2"
-            if func_name == 'faceforward':
+            if func_name == "faceforward":
                 if len(node.args) >= 3:
                     t = self._infer_expr_type(node.args[0])
-                    if t and t.startswith('vec'):
+                    if t and t.startswith("vec"):
                         return t
                 return "vec3"
-            if func_name in ('dot', 'length', 'distance', 'determinant'):
-                return 'float'
-            if func_name in ('max', 'min', 'clamp', 'mod', 'pow', 'sqrt', 'abs', 'sign', 'floor', 'ceil', 'fract', 'step'):
+            if func_name in ("dot", "length", "distance", "determinant"):
+                return "float"
+            if func_name in (
+                "max",
+                "min",
+                "clamp",
+                "mod",
+                "pow",
+                "sqrt",
+                "abs",
+                "sign",
+                "floor",
+                "ceil",
+                "fract",
+                "step",
+            ):
                 if len(node.args) >= 1:
                     arg_type = self._infer_expr_type(node.args[0])
-                    if arg_type and arg_type.startswith('vec'):
+                    if arg_type and arg_type.startswith("vec"):
                         return arg_type
-                return 'float'
+                return "float"
             return None
         if isinstance(node, ast.Subscript):
             value_type = self._infer_expr_type(node.value)
-            if value_type and value_type.startswith('vec'):
+            if value_type and value_type.startswith("vec"):
                 return "float"
-            if value_type and value_type.startswith('mat'):
+            if value_type and value_type.startswith("mat"):
                 size = int(value_type[3])
                 return f"vec{size}"
             return None
@@ -1585,17 +2090,27 @@ float fbm(vec2 p, int octaves) {
             base_type = self._infer_expr_type(node.value)
             if base_type:
                 field_type_map = {
-                    'Ray': {'origin': 'vec3', 'direction': 'vec3'},
-                    'Hit': {'point': 'vec3', 'normal': 'vec3', 'uv': 'vec2', 't': 'float', 'hit': 'bool', 'material': 'int'},
-                    'GeoObject': {'data': 'vec4', 'type': 'int'},
-                    'CameraBasis': {'right': 'vec3', 'up': 'vec3', 'forward': 'vec3'},
+                    "Ray": {"origin": "vec3", "direction": "vec3"},
+                    "Hit": {
+                        "point": "vec3",
+                        "normal": "vec3",
+                        "uv": "vec2",
+                        "t": "float",
+                        "hit": "bool",
+                        "material": "int",
+                    },
+                    "GeoObject": {"data": "vec4", "type": "int"},
+                    "CameraBasis": {"right": "vec3", "up": "vec3", "forward": "vec3"},
                 }
-                if base_type in field_type_map and node.attr in field_type_map[base_type]:
+                if (
+                    base_type in field_type_map
+                    and node.attr in field_type_map[base_type]
+                ):
                     return field_type_map[base_type][node.attr]
-                if base_type.startswith('vec'):
-                    if all(c in 'xyzwrgba' for c in node.attr) and len(node.attr) <= 4:
+                if base_type.startswith("vec"):
+                    if all(c in "xyzwrgba" for c in node.attr) and len(node.attr) <= 4:
                         if len(node.attr) == 1:
-                            return 'float'
+                            return "float"
                         else:
                             return base_type
             return None
@@ -1608,20 +2123,22 @@ float fbm(vec2 p, int octaves) {
         return None
 
     def _visit_subscript(self, node: ast.Subscript) -> str:
-        if isinstance(node.value, ast.Name) and node.value.id == 'p':
-            if self.mode == 'kernel':
-                raise SyntaxError("p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects.")
+        if isinstance(node.value, ast.Name) and node.value.id == "p":
+            if self.mode == "kernel":
+                raise SyntaxError(
+                    "p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects."
+                )
             slice_expr = self._get_slice_expr(node.slice)
             idx = self._expr_to_glsl(slice_expr)
-            return f"objectsIn[{idx}]"
+            return f"objectsIn[int({idx})]"
         if isinstance(node.value, ast.Name) and node.value.id in self.var_types:
             var = node.value.id
             typ = self.var_types[var]
             slice_expr = self._get_slice_expr(node.slice)
             idx = self._expr_to_glsl(slice_expr)
-            if typ.startswith('vec'):
+            if typ.startswith("vec"):
                 return f"{var}[{idx}]"
-            elif typ.startswith('mat'):
+            elif typ.startswith("mat"):
                 return f"{var}[{idx}]"
         if isinstance(node.value, ast.Subscript):
             base = self._visit_subscript(node.value)
@@ -1643,87 +2160,132 @@ float fbm(vec2 p, int octaves) {
         if isinstance(node.value, ast.Name):
             var_name = node.value.id
             typ = self._infer_expr_type(node.value)
-            if typ and typ.startswith('vec'):
+            if typ and typ.startswith("vec"):
                 attr = node.attr
-                valid_sets = ['xyzw', 'rgba', 'stpq']
+                valid_sets = ["xyzw", "rgba", "stpq"]
                 for swizzle_set in valid_sets:
                     if all(c in swizzle_set for c in attr) and 1 <= len(attr) <= 4:
                         return f"{var_name}.{attr}"
-        if isinstance(node.value, ast.Name) and node.value.id == 'p':
+        if isinstance(node.value, ast.Name) and node.value.id == "p":
             mapping = {
-                'x': 'x', 'y': 'y', 'z': 'z',
-                'vx': 'vx', 'vy': 'vy', 'vz': 'vz',
-                'mass': 'mass', 'charge': 'charge',
-                'theta': 'theta', 'omega': 'omega',
-                'wx': 'wx', 'wy': 'wy', 'wz': 'wz',
-                'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a',
+                "x": "x",
+                "y": "y",
+                "z": "z",
+                "vx": "vx",
+                "vy": "vy",
+                "vz": "vz",
+                "mass": "mass",
+                "charge": "charge",
+                "theta": "theta",
+                "omega": "omega",
+                "wx": "wx",
+                "wy": "wy",
+                "wz": "wz",
+                "r": "color.r",
+                "g": "color.g",
+                "b": "color.b",
+                "a": "color.a",
             }
             if node.attr in mapping:
                 return mapping[node.attr]
             raise SyntaxError(f"Unknown p attribute: {node.attr}")
         if isinstance(node.value, ast.Subscript):
-            if isinstance(node.value.value, ast.Name) and node.value.value.id == 'p':
-                if self.mode == 'kernel':
-                    raise SyntaxError("p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects.")
+            if isinstance(node.value.value, ast.Name) and node.value.value.id == "p":
+                if self.mode == "kernel":
+                    raise SyntaxError(
+                        "p[...] is not available in 'kernel' scripts (kernels have no object buffer); use scratchpads, or an 'agent' script to read objects."
+                    )
                 slice_expr = self._get_slice_expr(node.value.slice)
                 idx_expr = self._expr_to_glsl(slice_expr)
-                obj_ref = f"objectsIn[{idx_expr}]"
+                obj_ref = f"objectsIn[int({idx_expr})]"
                 field_map = {
-                    'x': 'position.x', 'y': 'position.y', 'z': 'position.z',
-                    'vx': 'velocity.x', 'vy': 'velocity.y', 'vz': 'velocity.z',
-                    'mass': 'mass', 'charge': 'charge',
-                    'omega': 'spin.z',
-                    'wx': 'spin.x', 'wy': 'spin.y', 'wz': 'spin.z',
-                    'qx': 'orientation.x', 'qy': 'orientation.y',
-                    'qz': 'orientation.z', 'qw': 'orientation.w',
-                    'spin_x': 'spin.x', 'spin_y': 'spin.y', 'spin_z': 'spin.z',
-                    'mesh_id': 'meshID',
-                    'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a',
+                    "x": "position.x",
+                    "y": "position.y",
+                    "z": "position.z",
+                    "vx": "velocity.x",
+                    "vy": "velocity.y",
+                    "vz": "velocity.z",
+                    "mass": "mass",
+                    "charge": "charge",
+                    "omega": "spin.z",
+                    "wx": "spin.x",
+                    "wy": "spin.y",
+                    "wz": "spin.z",
+                    "qx": "orientation.x",
+                    "qy": "orientation.y",
+                    "qz": "orientation.z",
+                    "qw": "orientation.w",
+                    "spin_x": "spin.x",
+                    "spin_y": "spin.y",
+                    "spin_z": "spin.z",
+                    "mesh_id": "meshID",
+                    "r": "color.r",
+                    "g": "color.g",
+                    "b": "color.b",
+                    "a": "color.a",
                 }
                 if node.attr in field_map:
                     return f"{obj_ref}.{field_map[node.attr]}"
-                if node.attr == 'theta':
+                if node.attr == "theta":
                     return f"quat_extract_2d_angle({obj_ref}.orientation)"
                 raise SyntaxError(f"Unknown property for p[index]: {node.attr}")
         base_str = self._expr_to_glsl(node.value)
         if self._is_complex_expr(node.value):
-            if node.attr == 'real':
+            if node.attr == "real":
                 return f"real({base_str})"
-            if node.attr == 'imag':
+            if node.attr == "imag":
                 return f"imag({base_str})"
-            if node.attr == 'conjugate':
+            if node.attr == "conjugate":
                 return f"conj({base_str})"
         base_var = node.value
         base_str = self._expr_to_glsl(base_var)
         base_type = self._infer_expr_type(base_var)
         if base_type:
             field_map = {
-                'Ray': {'origin': 'origin', 'direction': 'direction'},
-                'Hit': {'hit': 'hit', 't': 't', 'point': 'point', 'normal': 'normal', 'uv': 'uv', 'material': 'material'},
-                'GeoObject': {'type': 'type', 'data': 'data'},
-                'CameraBasis': {'right': 'right', 'up': 'up', 'forward': 'forward'},
-                'vec2': {'x': 'x', 'y': 'y'},
-                'vec3': {'x': 'x', 'y': 'y', 'z': 'z'},
-                'vec4': {'x': 'x', 'y': 'y', 'z': 'z', 'w': 'w'},
+                "Ray": {"origin": "origin", "direction": "direction"},
+                "Hit": {
+                    "hit": "hit",
+                    "t": "t",
+                    "point": "point",
+                    "normal": "normal",
+                    "uv": "uv",
+                    "material": "material",
+                },
+                "GeoObject": {"type": "type", "data": "data"},
+                "CameraBasis": {"right": "right", "up": "up", "forward": "forward"},
+                "vec2": {"x": "x", "y": "y"},
+                "vec3": {"x": "x", "y": "y", "z": "z"},
+                "vec4": {"x": "x", "y": "y", "z": "z", "w": "w"},
             }
             if base_type in field_map:
                 field = node.attr
                 if field in field_map[base_type]:
                     return f"{base_str}.{field_map[base_type][field]}"
-                elif base_type.startswith('vec') and all(c in 'xyzwrgba' for c in field) and len(field) <= 4:
+                elif (
+                    base_type.startswith("vec")
+                    and all(c in "xyzwrgba" for c in field)
+                    and len(field) <= 4
+                ):
                     return f"{base_str}.{field}"
                 raise SyntaxError(f"Unknown field {field} for type {base_type}")
         if isinstance(node.value, ast.Name):
             obj = node.value.id
             field_map = {
-                'x': 'position.x', 'y': 'position.y',
-                'vx': 'velocity.x', 'vy': 'velocity.y',
-                'mass': 'mass', 'charge': 'charge',
-                'theta': 'visualData.z', 'omega': 'visualData.w',
-                'r': 'color.r', 'g': 'color.g', 'b': 'color.b', 'a': 'color.a'
+                "x": "position.x",
+                "y": "position.y",
+                "vx": "velocity.x",
+                "vy": "velocity.y",
+                "mass": "mass",
+                "charge": "charge",
+                "theta": "visualData.z",
+                "omega": "visualData.w",
+                "r": "color.r",
+                "g": "color.g",
+                "b": "color.b",
+                "a": "color.a",
             }
             if node.attr in field_map:
-                if obj == 'color':
+                if obj == "color":
                     return field_map[node.attr]
                 else:
                     return f"{obj}.{field_map[node.attr]}"
@@ -1748,47 +2310,75 @@ float fbm(vec2 p, int octaves) {
                 return subst[name]
             if name in self.imported_names:
                 return name
-            if name == 'i' and name not in self.loop_vars:
+            if name == "i" and name not in self.loop_vars:
                 self.complex_vars.add(name)
                 self.var_types[name] = "vec2"
-                return '_imaginary_unit'
-            if name == 'num_objects':
-                return 'uNumObjects'
-            if name == 'dt':
-                return 'uDt'
-            if name == 'time':
-                return 'uTime'
-            if name == 'idx':
-                if self.mode == 'paint':
-                    return '(coord.y * uTexWidth + coord.x)'
-                if self.mode == 'agent':
-                    return 'int(gl_GlobalInvocationID.x)'
-                if self.mode == 'kernel':
-                    return '_kernel_index()'
-                return 'objectIndex'
-            if name == 'group_count':
-                if self.mode == 'paint':
-                    return '(uTexWidth * uTexHeight)'
-                if self.mode == 'agent':
-                    return 'uSignalCount'
-                if self.mode == 'kernel':
-                    return 'uThreadCount'
-                return 'uGroupCount'
-            if self.mode == 'agent' and name in ('signal_object_idx', 'signal_payload'):
+                return "_imaginary_unit"
+            if name == "num_objects":
+                return "uNumObjects"
+            if name == "dt":
+                return "uDt"
+            if name == "time":
+                return "uTime"
+            if name == "idx":
+                if self.mode == "paint":
+                    return "(coord.y * uTexWidth + coord.x)"
+                if self.mode == "agent":
+                    return "int(gl_GlobalInvocationID.x)"
+                if self.mode == "kernel":
+                    return "_kernel_index()"
+                return "objectIndex"
+            if name == "group_count":
+                if self.mode == "paint":
+                    return "(uTexWidth * uTexHeight)"
+                if self.mode == "agent":
+                    return "uSignalCount"
+                if self.mode == "kernel":
+                    return "uThreadCount"
+                return "uGroupCount"
+            if self.mode == "agent" and name in ("signal_object_idx", "signal_payload"):
                 return name
-            if self.mode == 'object':
+            if self.mode == "object":
                 if name in (
-                    'x', 'y', 'z', 'vx', 'vy', 'vz', 'wx', 'wy', 'wz',
-                    'mass', 'charge', 'theta', 'omega', 'az', 'ax', 'ay',
-                    'angular', 'angular_x', 'angular_y', 'angular_z',
-                    'color', 'pos', 'vel', 'p',
+                    "x",
+                    "y",
+                    "z",
+                    "vx",
+                    "vy",
+                    "vz",
+                    "wx",
+                    "wy",
+                    "wz",
+                    "mass",
+                    "charge",
+                    "theta",
+                    "omega",
+                    "az",
+                    "ax",
+                    "ay",
+                    "angular",
+                    "angular_x",
+                    "angular_y",
+                    "angular_z",
+                    "color",
+                    "pos",
+                    "vel",
+                    "p",
                 ):
                     return name
-            if self.mode == 'paint':
-                if name in ('px', 'py', 'prev_r', 'prev_g', 'prev_b', 'prev_a', 'color'):
+            if self.mode == "paint":
+                if name in (
+                    "px",
+                    "py",
+                    "prev_r",
+                    "prev_g",
+                    "prev_b",
+                    "prev_a",
+                    "color",
+                ):
                     return name
-                if name == 't':
-                    return 'uTime'
+                if name == "t":
+                    return "uTime"
             if name in self.globals and isinstance(self.globals[name], (int, float)):
                 return str(self.globals[name])
             return name
@@ -1852,81 +2442,99 @@ float fbm(vec2 p, int octaves) {
             args = [self._expr_to_glsl_with_subst(a, subst) for a in node.args]
 
             # ---- Mode-specific enforcement ----
-            if func_name == 'scratchpad_write':
-                if self.mode not in ('agent', 'kernel'):
-                    raise SyntaxError("scratchpad_write() is only available in 'agent' and 'kernel' scripts.")
+            if func_name == "scratchpad_write":
+                if self.mode not in ("agent", "kernel"):
+                    raise SyntaxError(
+                        "scratchpad_write() is only available in 'agent' and 'kernel' scripts."
+                    )
                 if len(args) == 3:
-                    return f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
+                    return (
+                        f"scratchpad_write(int({args[0]}), int({args[1]}), {args[2]})"
+                    )
                 raise SyntaxError("scratchpad_write(id, index, value)")
 
-            if func_name == 'signal':
-                if self.mode == 'agent':
-                    raise SyntaxError("signal() cannot be used in 'agent' scripts (agents receive signals, they do not enqueue).")
-                if self.mode == 'kernel':
-                    raise SyntaxError("signal() cannot be used in 'kernel' scripts (kernels have no signal queue).")
+            if func_name == "signal":
+                if self.mode == "agent":
+                    raise SyntaxError(
+                        "signal() cannot be used in 'agent' scripts (agents receive signals, they do not enqueue)."
+                    )
+                if self.mode == "kernel":
+                    raise SyntaxError(
+                        "signal() cannot be used in 'kernel' scripts (kernels have no signal queue)."
+                    )
                 if len(args) == 2:
                     return f"signal_enqueue(int({args[0]}), {args[1]})"
                 raise SyntaxError("signal(agent_id, payload)")
 
-            if func_name == 'detect_collision':
-                if self.mode != 'object':
-                    raise SyntaxError("detect_collision() is only available in 'object' scripts.")
+            if func_name == "detect_collision":
+                if self.mode != "object":
+                    raise SyntaxError(
+                        "detect_collision() is only available in 'object' scripts."
+                    )
                 if len(node.args) != 1 or node.keywords:
-                    raise SyntaxError("detect_collision(other) takes exactly one positional argument")
+                    raise SyntaxError(
+                        "detect_collision(other) takes exactly one positional argument"
+                    )
                 other_expr = self._expr_to_glsl(node.args[0])
                 return f"_dc_inline(int({other_expr}), _self, vec2(x, y), z, _q, p)"
 
-            if func_name in ('apply_constraints', 'resolve_collision'):
-                if self.mode != 'object':
-                    raise SyntaxError(f"{func_name}() is only available in 'object' scripts.")
+            if func_name in ("apply_constraints", "resolve_collision"):
+                if self.mode != "object":
+                    raise SyntaxError(
+                        f"{func_name}() is only available in 'object' scripts."
+                    )
 
             # ---- Ray‑tracing ----
-            if func_name == 'sphere':
+            if func_name == "sphere":
                 if len(args) == 2:
                     return f"sphere({args[0]}, {args[1]})"
                 raise SyntaxError("sphere(center, radius)")
-            if func_name == 'plane':
+            if func_name == "plane":
                 if len(args) == 2:
                     return f"plane({args[0]}, {args[1]})"
                 raise SyntaxError("plane(normal, d)")
-            if func_name == 'intersect':
+            if func_name == "intersect":
                 if len(args) == 2:
                     return f"intersect({args[0]}, {args[1]})"
                 raise SyntaxError("intersect(ray, object)")
-            if func_name == 'miss_hit':
+            if func_name == "miss_hit":
                 return "miss_hit()"
-            if func_name == 'closest_hit':
+            if func_name == "closest_hit":
                 if len(args) == 2:
                     return f"closest_hit({args[0]}, {args[1]})"
                 raise SyntaxError("closest_hit(a, b)")
-            if func_name == 'look_at':
+            if func_name == "look_at":
                 if len(args) == 3:
                     return f"look_at({args[0]}, {args[1]}, {args[2]})"
                 raise SyntaxError("look_at(eye, target, up)")
-            if func_name == 'camera_ray':
-                if self.mode != 'paint':
-                    raise SyntaxError("camera_ray() is only available in 'paint' scripts; use camera_ray_ndc() in other modes.")
+            if func_name == "camera_ray":
+                if self.mode != "paint":
+                    raise SyntaxError(
+                        "camera_ray() is only available in 'paint' scripts; use camera_ray_ndc() in other modes."
+                    )
                 if len(args) == 4:
                     return f"camera_ray({', '.join(args)})"
                 raise SyntaxError("camera_ray(eye, target, up, fov)")
-            if func_name == 'camera_ray_ndc':
+            if func_name == "camera_ray_ndc":
                 if len(args) == 7:
                     return f"camera_ray_ndc({', '.join(args)})"
                 else:
-                    raise SyntaxError("camera_ray_ndc(ndcX, ndcY, eye, target, up, fov, aspect)")
-            if func_name == 'offset_ray_origin':
+                    raise SyntaxError(
+                        "camera_ray_ndc(ndcX, ndcY, eye, target, up, fov, aspect)"
+                    )
+            if func_name == "offset_ray_origin":
                 if len(args) == 2:
                     return f"offset_ray_origin({args[0]}, {args[1]})"
                 raise SyntaxError("offset_ray_origin(position, normal)")
-            if func_name == 'reflect':
+            if func_name == "reflect":
                 if len(args) == 2:
                     return f"reflect({args[0]}, {args[1]})"
                 raise SyntaxError("reflect(direction, normal)")
-            if func_name == 'refract':
+            if func_name == "refract":
                 if len(args) == 3:
                     return f"refract({args[0]}, {args[1]}, {args[2]})"
                 raise SyntaxError("refract(direction, normal, eta)")
-            if func_name == 'raymarch':
+            if func_name == "raymarch":
                 if len(args) >= 3:
                     if isinstance(node.args[1], ast.Name):
                         sdf_name = node.args[1].id
@@ -1936,27 +2544,31 @@ float fbm(vec2 p, int octaves) {
                         elif len(args) == 5:
                             return f"{unique_name}({args[0]}, {args[2]}, {args[3]}, {args[4]}, 1e-4)"
                         else:
-                            raise SyntaxError("raymarch(ray, sdf, t_min, t_max, steps, eps)")
+                            raise SyntaxError(
+                                "raymarch(ray, sdf, t_min, t_max, steps, eps)"
+                            )
                     else:
-                        raise SyntaxError("raymarch second argument must be a function name")
+                        raise SyntaxError(
+                            "raymarch second argument must be a function name"
+                        )
                 else:
                     raise SyntaxError("raymarch(ray, sdf, t_min, t_max, steps, eps)")
 
             # ---- Scratchpad and signal (already handled above) ----
-            if func_name == 'scratchpad_read':
+            if func_name == "scratchpad_read":
                 if len(args) == 2:
                     return f"scratchpad_read(int({args[0]}), int({args[1]}))"
                 raise SyntaxError("scratchpad_read(id, index)")
 
             # ---- Derivative ----
-            if func_name == 'diff':
+            if func_name == "diff":
                 return self._emit_diff(node, subst)
 
             # ---- rand ----
-            if func_name == 'rand' and len(args) == 0:
+            if func_name == "rand" and len(args) == 0:
                 offset = self.rand_call_counter
                 self.rand_call_counter += 1
-                if self.mode == 'paint':
+                if self.mode == "paint":
                     seed = (
                         f"vec2(uTime + float(gl_GlobalInvocationID.x), "
                         f"float(gl_GlobalInvocationID.y) + {offset}.0)"
@@ -1966,44 +2578,44 @@ float fbm(vec2 p, int octaves) {
                 return f"rand({seed})"
 
             # ---- len ----
-            if func_name == 'len':
+            if func_name == "len":
                 if len(args) != 1:
                     raise SyntaxError("len() takes exactly one argument")
                 arg = node.args[0]
                 typ = self._infer_expr_type(arg)
-                if typ and typ.startswith('vec'):
+                if typ and typ.startswith("vec"):
                     return str(int(typ[3]))
-                if typ and typ.startswith('mat'):
+                if typ and typ.startswith("mat"):
                     size = int(typ[3])
                     return str(size * size)
                 if isinstance(arg, ast.List):
                     return str(len(arg.elts))
-                if typ == 'float[]':
+                if typ == "float[]":
                     return f"({args[0]}.length())"
                 return "float(-1.0)"
 
             # ---- sum ----
-            if func_name == 'sum':
+            if func_name == "sum":
                 if len(args) != 1:
                     raise SyntaxError("sum() takes exactly one argument")
                 arg = node.args[0]
                 arg_str = self._expr_to_glsl(arg)
                 typ = self._infer_expr_type(arg)
-                if typ and typ.startswith('vec'):
+                if typ and typ.startswith("vec"):
                     n = int(typ[3])
-                    comps = [f"{arg_str}.{chr(120+i)}" for i in range(n)]
+                    comps = [f"{arg_str}.{chr(120 + i)}" for i in range(n)]
                     return f"({' + '.join(comps)})"
                 raise SyntaxError("sum() only works on vectors (vec2/vec3/vec4)")
 
             # ---- min/max with vector reduction ----
-            if func_name == 'min':
+            if func_name == "min":
                 if len(args) == 1:
                     arg = node.args[0]
                     arg_str = self._expr_to_glsl(arg)
                     typ = self._infer_expr_type(arg)
-                    if typ and typ.startswith('vec'):
+                    if typ and typ.startswith("vec"):
                         n = int(typ[3])
-                        comps = [f"{arg_str}.{chr(120+i)}" for i in range(n)]
+                        comps = [f"{arg_str}.{chr(120 + i)}" for i in range(n)]
                         res = comps[0]
                         for c in comps[1:]:
                             res = f"min({res}, {c})"
@@ -2014,14 +2626,14 @@ float fbm(vec2 p, int octaves) {
                 else:
                     raise SyntaxError("min() takes 1 or 2 arguments")
 
-            if func_name == 'max':
+            if func_name == "max":
                 if len(args) == 1:
                     arg = node.args[0]
                     arg_str = self._expr_to_glsl(arg)
                     typ = self._infer_expr_type(arg)
-                    if typ and typ.startswith('vec'):
+                    if typ and typ.startswith("vec"):
                         n = int(typ[3])
-                        comps = [f"{arg_str}.{chr(120+i)}" for i in range(n)]
+                        comps = [f"{arg_str}.{chr(120 + i)}" for i in range(n)]
                         res = comps[0]
                         for c in comps[1:]:
                             res = f"max({res}, {c})"
@@ -2033,62 +2645,80 @@ float fbm(vec2 p, int octaves) {
                     raise SyntaxError("max() takes 1 or 2 arguments")
 
             # ---- pow, int, float ----
-            if func_name == 'pow':
+            if func_name == "pow":
                 if len(args) != 2:
                     raise SyntaxError("pow() takes exactly two arguments")
                 return f"safePow({args[0]}, {args[1]})"
 
-            if func_name == 'int':
+            if func_name == "int":
                 if len(args) != 1:
                     raise SyntaxError("int() takes exactly one argument")
                 return f"int({args[0]})"
 
-            if func_name == 'float':
+            if func_name == "float":
                 if len(args) != 1:
                     raise SyntaxError("float() takes exactly one argument")
                 return f"float({args[0]})"
 
             # ---- Paint helper functions ----
-            if self.mode == 'paint':
-                if func_name == 'sample_prev_r':
+            if self.mode == "paint":
+                if func_name == "sample_prev_r":
                     if len(args) != 1:
-                        raise SyntaxError("sample_prev_r(radius) takes exactly one argument")
+                        raise SyntaxError(
+                            "sample_prev_r(radius) takes exactly one argument"
+                        )
                     return f"sample_prev_r(vec2(px, py), {args[0]})"
-                if func_name == 'sample_prev_g':
+                if func_name == "sample_prev_g":
                     if len(args) != 1:
-                        raise SyntaxError("sample_prev_g(radius) takes exactly one argument")
+                        raise SyntaxError(
+                            "sample_prev_g(radius) takes exactly one argument"
+                        )
                     return f"sample_prev_g(vec2(px, py), {args[0]})"
-                if func_name == 'sample_prev_b':
+                if func_name == "sample_prev_b":
                     if len(args) != 1:
-                        raise SyntaxError("sample_prev_b(radius) takes exactly one argument")
+                        raise SyntaxError(
+                            "sample_prev_b(radius) takes exactly one argument"
+                        )
                     return f"sample_prev_b(vec2(px, py), {args[0]})"
-                if func_name == 'sample_prev_a':
+                if func_name == "sample_prev_a":
                     if len(args) != 1:
-                        raise SyntaxError("sample_prev_a(radius) takes exactly one argument")
+                        raise SyntaxError(
+                            "sample_prev_a(radius) takes exactly one argument"
+                        )
                     return f"sample_prev_a(vec2(px, py), {args[0]})"
-                if func_name == 'avg_prev_r':
+                if func_name == "avg_prev_r":
                     if args:
                         raise SyntaxError("avg_prev_r() takes no arguments")
                     return "avg_prev_r()"
-                if func_name == 'avg_prev_g':
+                if func_name == "avg_prev_g":
                     if args:
                         raise SyntaxError("avg_prev_g() takes no arguments")
                     return "avg_prev_g()"
-                if func_name == 'avg_prev_b':
+                if func_name == "avg_prev_b":
                     if args:
                         raise SyntaxError("avg_prev_b() takes no arguments")
                     return "avg_prev_b()"
-                if func_name == 'avg_prev_a':
+                if func_name == "avg_prev_a":
                     if args:
                         raise SyntaxError("avg_prev_a() takes no arguments")
                     return "avg_prev_a()"
 
             # ---- Complex functions ----
             complex_funcs = {
-                'cAdd': 'cAdd', 'cSub': 'cSub', 'cMul': 'cMul', 'cDiv': 'cDiv',
-                'cLog': 'cLog', 'cExp': 'cExp', 'cPow': 'cPow',
-                'cSin': 'cSin', 'cCos': 'cCos', 'cTan': 'cTan',
-                'real': 'real', 'imag': 'imag', 'conj': 'conj', 'arg': 'arg'
+                "cAdd": "cAdd",
+                "cSub": "cSub",
+                "cMul": "cMul",
+                "cDiv": "cDiv",
+                "cLog": "cLog",
+                "cExp": "cExp",
+                "cPow": "cPow",
+                "cSin": "cSin",
+                "cCos": "cCos",
+                "cTan": "cTan",
+                "real": "real",
+                "imag": "imag",
+                "conj": "conj",
+                "arg": "arg",
             }
             if func_name in complex_funcs:
                 return f"{complex_funcs[func_name]}({', '.join(args)})"
@@ -2117,32 +2747,69 @@ float fbm(vec2 p, int octaves) {
             if n in (2, 3, 4):
                 return f"vec{n}({', '.join(elems)})"
             else:
-                raise SyntaxError("Only tuples of length 2, 3, or 4 are supported as vector constructors")
+                raise SyntaxError(
+                    "Only tuples of length 2, 3, or 4 are supported as vector constructors"
+                )
         elif isinstance(node, ast.IfExp):
             return self.visit_IfExp(node)
         else:
             raise NotImplementedError(f"Unsupported expression: {type(node)}")
 
     _glsl_func_map = {
-        'sin': 'sin', 'cos': 'cos', 'tan': 'tan',
-        'asin': 'asin', 'acos': 'acos', 'atan': 'atan',
-        'sinh': 'sinh', 'cosh': 'cosh', 'tanh': 'tanh',
-        'asinh': 'asinh', 'acosh': 'acosh', 'atanh': 'atanh',
-        'sqrt': 'sqrt', 'inversesqrt': 'inversesqrt',
-        'log': 'log', 'log2': 'log2', 'exp': 'exp', 'exp2': 'exp2',
-        'abs': 'abs', 'floor': 'floor', 'ceil': 'ceil',
-        'frac': 'fract', 'fract': 'fract', 'sign': 'sign', 'step': 'step',
-        'min': 'min', 'max': 'max', 'clamp': 'clamp',
-        'mod': 'mod', 'atan2': 'atan',
-        'dot': 'dot', 'cross': 'cross', 'length': 'length', 'distance': 'distance',
-        'normalize': 'normalize', 'reflect': 'reflect', 'refract': 'refract', 'faceforward': 'faceforward',
-        'mix': 'mix', 'smoothstep': 'smoothstep',
-        'radians': 'radians', 'degrees': 'degrees',
-        'noise': 'noise', 'rand': 'rand', 'random': 'rand',
-        'conjugate': 'conj',
-        'transpose': 'transpose', 'inverse': 'inverse', 'determinant': 'determinant',
-        'outerProduct': 'outerProduct', 'matrixCompMult': 'matrixCompMult',
-        'saturate': 'saturate', 'lerp': 'lerp', 'fbm': 'fbm',
+        "sin": "sin",
+        "cos": "cos",
+        "tan": "tan",
+        "asin": "asin",
+        "acos": "acos",
+        "atan": "atan",
+        "sinh": "sinh",
+        "cosh": "cosh",
+        "tanh": "tanh",
+        "asinh": "asinh",
+        "acosh": "acosh",
+        "atanh": "atanh",
+        "sqrt": "sqrt",
+        "inversesqrt": "inversesqrt",
+        "log": "log",
+        "log2": "log2",
+        "exp": "exp",
+        "exp2": "exp2",
+        "abs": "abs",
+        "floor": "floor",
+        "ceil": "ceil",
+        "frac": "fract",
+        "fract": "fract",
+        "sign": "sign",
+        "step": "step",
+        "min": "min",
+        "max": "max",
+        "clamp": "clamp",
+        "mod": "mod",
+        "atan2": "atan",
+        "dot": "dot",
+        "cross": "cross",
+        "length": "length",
+        "distance": "distance",
+        "normalize": "normalize",
+        "reflect": "reflect",
+        "refract": "refract",
+        "faceforward": "faceforward",
+        "mix": "mix",
+        "smoothstep": "smoothstep",
+        "radians": "radians",
+        "degrees": "degrees",
+        "noise": "noise",
+        "rand": "rand",
+        "random": "rand",
+        "conjugate": "conj",
+        "transpose": "transpose",
+        "inverse": "inverse",
+        "determinant": "determinant",
+        "outerProduct": "outerProduct",
+        "matrixCompMult": "matrixCompMult",
+        "saturate": "saturate",
+        "lerp": "lerp",
+        "fbm": "fbm",
     }
 
     # ------------------------------------------------------------------------
@@ -2163,7 +2830,7 @@ float fbm(vec2 p, int octaves) {
                 order = order_arg.value
             else:
                 raise SyntaxError("Order must be an integer constant")
-        if order not in (1,2):
+        if order not in (1, 2):
             raise SyntaxError("Only order 1 and 2 supported")
         plus_subst = dict(subst)
         plus_subst[wrt] = f"({wrt} + EPSILON)"
@@ -2177,7 +2844,9 @@ float fbm(vec2 p, int octaves) {
             expr_center = self._expr_to_glsl_with_subst(expr_node, subst)
             return f"(({expr_plus} - 2.0*{expr_center} + {expr_minus}) / (EPSILON*EPSILON))"
 
-    def _inline_function_call(self, func_name: str, args: List[str], node: ast.Call) -> Optional[str]:
+    def _inline_function_call(
+        self, func_name: str, args: List[str], node: ast.Call
+    ) -> Optional[str]:
         if func_name not in self.globals:
             return None
         func_obj = self.globals[func_name]
@@ -2209,28 +2878,44 @@ float fbm(vec2 p, int octaves) {
         return result
 
     def _bin_op(self, op: ast.AST) -> str:
-        if isinstance(op, ast.Add): return "+"
-        if isinstance(op, ast.Sub): return "-"
-        if isinstance(op, ast.Mult): return "*"
-        if isinstance(op, ast.Div): return "/"
-        if isinstance(op, ast.FloorDiv): return "/"
-        if isinstance(op, ast.MatMult): return "*"
+        if isinstance(op, ast.Add):
+            return "+"
+        if isinstance(op, ast.Sub):
+            return "-"
+        if isinstance(op, ast.Mult):
+            return "*"
+        if isinstance(op, ast.Div):
+            return "/"
+        if isinstance(op, ast.FloorDiv):
+            return "/"
+        if isinstance(op, ast.MatMult):
+            return "*"
         raise SyntaxError("Unsupported binary operator")
 
     def _aug_op(self, op: ast.AST) -> str:
-        if isinstance(op, ast.Add): return "+"
-        if isinstance(op, ast.Sub): return "-"
-        if isinstance(op, ast.Mult): return "*"
-        if isinstance(op, ast.Div): return "/"
+        if isinstance(op, ast.Add):
+            return "+"
+        if isinstance(op, ast.Sub):
+            return "-"
+        if isinstance(op, ast.Mult):
+            return "*"
+        if isinstance(op, ast.Div):
+            return "/"
         raise SyntaxError("Unsupported augmented assignment")
 
     def _compare_op(self, op: ast.AST) -> str:
-        if isinstance(op, ast.Lt): return "<"
-        if isinstance(op, ast.LtE): return "<="
-        if isinstance(op, ast.Gt): return ">"
-        if isinstance(op, ast.GtE): return ">="
-        if isinstance(op, ast.Eq): return "=="
-        if isinstance(op, ast.NotEq): return "!="
+        if isinstance(op, ast.Lt):
+            return "<"
+        if isinstance(op, ast.LtE):
+            return "<="
+        if isinstance(op, ast.Gt):
+            return ">"
+        if isinstance(op, ast.GtE):
+            return ">="
+        if isinstance(op, ast.Eq):
+            return "=="
+        if isinstance(op, ast.NotEq):
+            return "!="
         raise SyntaxError("Unsupported comparison operator")
 
 
@@ -2278,23 +2963,25 @@ class AssignCollector(ast.NodeVisitor):
 # -----------------------------------------------------------------------------
 # User‑facing decorator
 # -----------------------------------------------------------------------------
-def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
+def script(sim: Any, debug: bool = False, mode: str = "object") -> Callable:
     """
     Decorator that compiles a Python function into a GPU shader for the selected mode.
     Material mode generates a fragment shader; the other modes generate compute shaders.
     """
-    if mode not in {'object', 'paint', 'agent', 'material', 'kernel'}:
-        raise ValueError("mode must be 'object', 'paint', 'agent', 'kernel', or 'material'")
+    if mode not in {"object", "paint", "agent", "material", "kernel"}:
+        raise ValueError(
+            "mode must be 'object', 'paint', 'agent', 'kernel', or 'material'"
+        )
 
     def decorator(func: Callable) -> Callable:
         generator = GLSLGenerator(debug=debug, mode=mode)
         shader_source = generator.generate(func)
 
-        if mode == 'agent':
-            script_id = sim.register_agent(shader_source)   # marks as agent
-        elif mode == 'material':
+        if mode == "agent":
+            script_id = sim.register_agent(shader_source)  # marks as agent
+        elif mode == "material":
             script_id = sim.register_material_script(shader_source)
-        elif mode == 'kernel':
+        elif mode == "kernel":
             # Plain compiled program; NOT marked as an agent, so dispatch_all_agents()
             # never touches it. Run it with sim.dispatch_kernel(id, thread_count).
             script_id = sim.register_script(shader_source)
@@ -2305,4 +2992,5 @@ def script(sim: Any, debug: bool = False, mode: str = 'object') -> Callable:
         func._script_id = script_id
         func._mode = mode
         return func
+
     return decorator

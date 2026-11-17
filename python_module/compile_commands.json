@@ -1,0 +1,128 @@
+[
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/axis.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/globals.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/objects.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/mesh.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/async_shader_loader.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/bindings.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/bindings.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/bindings.cpp",
+  "output": "CMakeFiles/stellar.dir/bindings.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/simulation_wrapper.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/simulation_wrapper.cpp",
+  "output": "CMakeFiles/stellar.dir/simulation_wrapper.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/cc -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -fPIC -Wall -Wextra -Wno-unused-parameter -O2 -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/glad.c.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_glfw.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_glfw.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_glfw.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_glfw.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_opengl3.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_opengl3.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_opengl3.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/backends/imgui_impl_opengl3.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_demo.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_demo.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_demo.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_demo.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_draw.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_draw.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_draw.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_draw.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_stdlib.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_tables.cpp.o"
+},
+{
+  "directory": "/home/jaybird/Aidens_stuff/hyperstellar-public/python_module",
+  "command": "/usr/bin/c++ -DNO_TEXT_RENDERING -DPYTHON_MODULE=1 -Dstellar_EXPORTS -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glm -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/glad/include -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui -I/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../lib/imgui/backends -isystem /usr/include/python3.13 -isystem /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/include -std=gnu++17 -fPIC -fvisibility=hidden -Wall -Wextra -Wno-unused-parameter -O2 -flto -fno-fat-lto-objects -o CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.o -c /home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp",
+  "file": "/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp",
+  "output": "CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/lib/imgui/imgui_widgets.cpp.o"
+}
+]

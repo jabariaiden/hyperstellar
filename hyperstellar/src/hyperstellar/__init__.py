@@ -98,6 +98,9 @@ try:
     else:
         __all__ = ['script', 'EquationPresets']
 
+    # Expose the module-level decorator so `from hyperstellar import *` works
+    script = _script_func
+
     # Attach @sim.script decorator to the Simulation class
     def _script_method(self, mode='object', debug=False):
         def decorator(func):

@@ -537,30 +537,6 @@ home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.s
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.cpp.s
 
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.o
-
-# target to build an object file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.o
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.i: home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.i
-
-# target to preprocess a source file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.i
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.s: home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.s
-
-# target to generate assembly for a file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.cpp.s
-
 home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.o
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.o
 
@@ -584,30 +560,6 @@ home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.s: home/jaybird
 home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.s
 .PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.cpp.s
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.o: home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.o
-
-# target to build an object file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.o
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.i: home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.i
-
-# target to preprocess a source file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.i
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.i
-
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.s: home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.s
-
-# target to generate assembly for a file
-home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/stellar.dir/build.make CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
-.PHONY : home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.cpp.s
 
 simulation_wrapper.o: simulation_wrapper.cpp.o
 .PHONY : simulation_wrapper.o
@@ -693,15 +645,9 @@ help:
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/parser.s"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.o"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.i"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/physics_system.s"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.o"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.i"
 	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/script_manager.s"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.o"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.i"
-	@echo "... home/jaybird/Aidens_stuff/hyperstellar-public/src/utils.s"
 	@echo "... simulation_wrapper.o"
 	@echo "... simulation_wrapper.i"
 	@echo "... simulation_wrapper.s"

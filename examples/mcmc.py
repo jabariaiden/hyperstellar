@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import hyperstellar as se
-import numpy as np
-import time
 import math
+import time
+
+import numpy as np
+
+import hyperstellar as se
+from hyperstellar import *
 
 # --------------------------------------------------------------------------
 # Constants (captured by JIT)

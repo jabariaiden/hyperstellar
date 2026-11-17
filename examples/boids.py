@@ -1,61 +1,93 @@
 #!/usr/bin/env python3
-"""3D boids flying between procedurally placed pillars.
-
-Boids use local separation/alignment/cohesion plus pillar avoidance.
-When a boid gets close to a pillar it signals one agent. The agent records
-that boid's last alert and pillar in a scratchpad; the boid reads that memory
-to briefly strengthen its avoidance steering.
 """
+3D Boids Chase
+==============
+A swarm of small dart-shaped boids chases a glowing target through 3D space.
 
+Every boid runs the same GPU (JIT) script each step:
+  * separation / alignment / cohesion against nearby boids
+  * pursuit of a point on a slowly rotating shell around the target
+    (so the swarm wraps around it instead of piling onto one point),
+    with lead prediction based on the target's velocity
+  * a soft speed band and a soft flight box
+  * nose alignment: the boid's +X axis is steered toward its heading by
+    accelerating the spin vector (angular_x / angular_y / angular_z)
+
+The target follows an analytic Lissajous-style path, also in a JIT script.
+
+Controls: WASD pan, Q/E zoom, left-mouse drag to look around, ESC to quit.
+"""
 import math
 import random
+
 import hyperstellar as se
+from hyperstellar import *
 
-# -----------------------------------------------------------------------------
-# Scene
-# -----------------------------------------------------------------------------
-WIDTH, HEIGHT = 1400, 1000
-NUM_BOIDS = 28
-NUM_PILLARS = 9
-MEMORY_PAD_SIZE = NUM_BOIDS * 2  # last alert time + pillar index per boid
+# ---------------------------------------------------------------------
+# Tunables. Plain numbers defined at module level are inlined into the
+# generated shader, so they can be used freely inside @sim.script().
+# ---------------------------------------------------------------------
+NUM_BOIDS = 400
+TARGET = NUM_BOIDS          # target is created right after the boids -> index NUM_BOIDS
 
-random.seed(12)
+MAX_SPEED = 13.0
+MIN_SPEED = 6.0
+
+NEIGHBOR_R = 4.0
+NEIGHBOR_R2 = NEIGHBOR_R * NEIGHBOR_R
+SEP_R = 1.1
+SEP_R2 = SEP_R * SEP_R
+
+W_COHESION = 0.55
+W_ALIGN = 1.3
+W_SEPARATION = 5.0
+W_SEEK = 2.2
+
+SHELL_RADIUS = 3.2          # radius of the shell the swarm tries to wrap around the target
+BOUND_X = 34.0
+BOUND_Y = 22.0
+BOUND_Z = 28.0
+
+TURN_RATE = 10.0            # how fast the nose is steered toward the heading (rad/s per rad of error)
+SPIN_DAMP = 25.0            # how quickly the spin vector follows the desired one
+
+BOID_SCALE = 1.3
+
+# ---------------------------------------------------------------------
+# Simulation setup
+# ---------------------------------------------------------------------
 sim = se.Simulation(
     headless=False,
     enable_grid=False,
-    width=WIDTH,
-    height=HEIGHT,
-    title="Boids Around Pillars",
+    width=1400,
+    height=900,
+    title="3D Boids Chase",
 )
 
 while not sim.are_all_shaders_ready():
     sim.update_shader_loading()
 
-sim.set_directional_light_enabled(False)
-sim.set_camera_zoom(27.0)
-sim.set_signal_queue_capacity(512)
-
-memory_pad = sim.create_scratchpad(MEMORY_PAD_SIZE)
-sim.upload_scratchpad(memory_pad, [0.0] * MEMORY_PAD_SIZE)
-
-# -----------------------------------------------------------------------------
-# Agent: remembers the most recent pillar alert from each boid.
-# A signal's object index is the boid's actual object slot.
-# -----------------------------------------------------------------------------
-@sim.script(mode="agent")
-def remember_pillar_alert():
-    boid_slot = float(signal_object_idx)
-    base = boid_slot * 2.0
-    scratchpad_write(memory_pad, base, time)
-    scratchpad_write(memory_pad, base + 1, signal_payload)
+sim.set_camera_projection(False)      # perspective
+sim.set_camera_zoom(75.0)             # in perspective mode this is the eye distance
+sim.set_directional_light_enabled(True)
+sim.set_light_direction((0.35, -0.8, -0.45))
 
 
-AGENT_ID = remember_pillar_alert._script_id
-
-
-# Static objects get an explicit zero-acceleration script.
+# ---------------------------------------------------------------------
+# JIT scripts
+# ---------------------------------------------------------------------
 @sim.script()
-def keep_pillar_still():
+def target_path():
+    # Position and velocity come straight from the analytic path, so the
+    # boids can read a clean velocity from p[TARGET] for lead prediction.
+    x = 16.0 * sin(0.41 * time) + 4.0 * sin(1.30 * time)
+    y = 8.0 * sin(0.57 * time + 1.0) + 2.0 * cos(1.10 * time)
+    z = 14.0 * sin(0.31 * time + 2.1)
+
+    vx = 16.0 * 0.41 * cos(0.41 * time) + 4.0 * 1.30 * cos(1.30 * time)
+    vy = 8.0 * 0.57 * cos(0.57 * time + 1.0) - 2.0 * 1.10 * sin(1.10 * time)
+    vz = 14.0 * 0.31 * cos(0.31 * time + 2.1)
+
     ax = 0.0
     ay = 0.0
     az = 0.0
@@ -64,33 +96,18 @@ def keep_pillar_still():
     angular_z = 0.0
 
 
-# -----------------------------------------------------------------------------
-# Boids: classic separation, alignment and cohesion, plus pillar avoidance.
-# Boids are created first, so p[0:NUM_BOIDS] are the flock and the pillars
-# occupy p[NUM_BOIDS:NUM_BOIDS + NUM_PILLARS].
-# -----------------------------------------------------------------------------
 @sim.script()
-def flock():
-    ax = 0.0
-    ay = 0.0
-    az = 0.0
-
-    # Read the agent's last alert for this boid.
-    memory_base = float(idx) * 2.0
-    last_alert = scratchpad_read(memory_pad, memory_base)
-    last_pillar = scratchpad_read(memory_pad, memory_base + 1.0)
-    alert_age = time - last_alert
-
-    # Separation, alignment and cohesion from nearby flockmates.
-    center_x = 0.0
-    center_y = 0.0
-    center_z = 0.0
-    average_vx = 0.0
-    average_vy = 0.0
-    average_vz = 0.0
-    separate_x = 0.0
-    separate_y = 0.0
-    separate_z = 0.0
+def boid_flock():
+    # ---- flocking: one pass over every boid ----
+    cx = 0.0
+    cy = 0.0
+    cz = 0.0
+    avx = 0.0
+    avy = 0.0
+    avz = 0.0
+    sx = 0.0
+    sy = 0.0
+    sz = 0.0
     neighbors = 0.0
 
     for j in range(NUM_BOIDS):
@@ -100,153 +117,258 @@ def flock():
             dz = p[j].z - z
             d2 = dx * dx + dy * dy + dz * dz
 
-            if d2 < 36.0 and d2 > 0.0001:
-                center_x += p[j].x
-                center_y += p[j].y
-                center_z += p[j].z
-                average_vx += p[j].vx
-                average_vy += p[j].vy
-                average_vz += p[j].vz
+            if d2 < NEIGHBOR_R2:
+                cx += p[j].x
+                cy += p[j].y
+                cz += p[j].z
+                avx += p[j].vx
+                avy += p[j].vy
+                avz += p[j].vz
                 neighbors += 1.0
 
-                if d2 < 2.25:
-                    separate_x -= dx / d2
-                    separate_y -= dy / d2
-                    separate_z -= dz / d2
+                if d2 < SEP_R2:
+                    inv = 1.0 / (d2 + 0.05)
+                    sx -= dx * inv
+                    sy -= dy * inv
+                    sz -= dz * inv
 
     if neighbors > 0.0:
-        center_x = center_x / neighbors - x
-        center_y = center_y / neighbors - y
-        center_z = center_z / neighbors - z
-        average_vx = average_vx / neighbors - vx
-        average_vy = average_vy / neighbors - vy
-        average_vz = average_vz / neighbors - vz
+        inv_n = 1.0 / neighbors
+        ax += (cx * inv_n - x) * W_COHESION + (avx * inv_n - vx) * W_ALIGN
+        ay += (cy * inv_n - y) * W_COHESION + (avy * inv_n - vy) * W_ALIGN
+        az += (cz * inv_n - z) * W_COHESION + (avz * inv_n - vz) * W_ALIGN
 
-        ax += center_x * 0.18 + average_vx * 0.55 + separate_x * 1.8
-        ay += center_y * 0.18 + average_vy * 0.55 + separate_y * 1.8
-        az += center_z * 0.18 + average_vz * 0.55 + separate_z * 1.8
+    ax += sx * W_SEPARATION
+    ay += sy * W_SEPARATION
+    az += sz * W_SEPARATION
 
-    # Steer away from the nearest part of each vertical pillar.
-    nearest_distance = 1000.0
-    nearest_pillar = -1.0
+    # ---- per-boid personality: slightly different top speeds ----
+    pace = 0.85 + 0.3 * fract(sin(float(idx) * 12.9898) * 43758.5453)
+    top_speed = MAX_SPEED * pace
 
-    for k in range(NUM_PILLARS):
-        pillar_x = p[NUM_BOIDS + k].x
-        pillar_y = p[NUM_BOIDS + k].y
-        pillar_z = p[NUM_BOIDS + k].z
-        dx = x - pillar_x
-        dz = z - pillar_z
-        horizontal_distance = sqrt(dx * dx + dz * dz)
-        vertical_distance = abs(y - pillar_y)
+    # ---- pursue a point on a rotating shell around the target ----
+    # Fibonacci-sphere slot for this boid, spun slowly around the Y axis.
+    shell_y = 1.0 - 2.0 * (float(idx) + 0.5) / NUM_BOIDS
+    shell_ring = sqrt(max(0.0, 1.0 - shell_y * shell_y))
+    shell_ang = float(idx) * 2.3999632 + time * 0.6
 
-        if vertical_distance < 4.8 and horizontal_distance < nearest_distance:
-            nearest_distance = horizontal_distance
-            nearest_pillar = float(k)
+    gx = p[TARGET].x + cos(shell_ang) * shell_ring * SHELL_RADIUS
+    gy = p[TARGET].y + shell_y * SHELL_RADIUS
+    gz = p[TARGET].z + sin(shell_ang) * shell_ring * SHELL_RADIUS
 
-        if vertical_distance < 4.8 and horizontal_distance < 3.8 and horizontal_distance > 0.001:
-            strength = (3.8 - horizontal_distance) * 2.0
-            if float(k) == last_pillar and last_alert > 0.001 and alert_age < 1.25:
-                strength *= 1.8
-            ax += (dx / horizontal_distance) * strength
-            az += (dz / horizontal_distance) * strength
+    # Lead: aim where the target will be after roughly the travel time.
+    to_tx = p[TARGET].x - x
+    to_ty = p[TARGET].y - y
+    to_tz = p[TARGET].z - z
+    target_dist = sqrt(to_tx * to_tx + to_ty * to_ty + to_tz * to_tz)
+    lead = clamp(target_dist / top_speed, 0.0, 1.2)
 
-    # Emit at most one alert per boid per 0.8 seconds. The agent writes the
-    # timestamp and pillar index back to this boid's scratchpad memory.
-    if nearest_distance < 4.2 and (last_alert < 0.001 or alert_age > 0.8):
-        signal(AGENT_ID, float(nearest_pillar))
+    gx += p[TARGET].vx * lead
+    gy += p[TARGET].vy * lead
+    gz += p[TARGET].vz * lead
 
-    # Keep the flock within a simple 3D flight volume.
-    if x < -12.0:
-        ax += (-12.0 - x) * 1.4
-    elif x > 12.0:
-        ax -= (x - 12.0) * 1.4
+    gdx = gx - x
+    gdy = gy - y
+    gdz = gz - z
+    gdist = sqrt(gdx * gdx + gdy * gdy + gdz * gdz) + 0.0001
 
-    if y < -4.5:
-        ay += (-4.5 - y) * 1.4
-    elif y > 4.5:
-        ay -= (y - 4.5) * 1.4
+    # Ease off when close to the goal point so they circle rather than overshoot wildly.
+    want = top_speed * clamp(gdist / 6.0, 0.45, 1.0)
 
-    if z < -11.0:
-        az += (-11.0 - z) * 1.4
-    elif z > 11.0:
-        az -= (z - 11.0) * 1.4
+    ax += (gdx / gdist * want - vx) * W_SEEK
+    ay += (gdy / gdist * want - vy) * W_SEEK
+    az += (gdz / gdist * want - vz) * W_SEEK
 
-    # Mild drag keeps the flock's speed from growing without bound.
-    ax -= vx * 0.12
-    ay -= vy * 0.12
-    az -= vz * 0.12
+    # ---- soft flight box ----
+    if x < -BOUND_X:
+        ax += (-BOUND_X - x) * 4.0
+    elif x > BOUND_X:
+        ax -= (x - BOUND_X) * 4.0
+
+    if y < -BOUND_Y:
+        ay += (-BOUND_Y - y) * 4.0
+    elif y > BOUND_Y:
+        ay -= (y - BOUND_Y) * 4.0
+
+    if z < -BOUND_Z:
+        az += (-BOUND_Z - z) * 4.0
+    elif z > BOUND_Z:
+        az -= (z - BOUND_Z) * 4.0
+
+    # ---- speed band (acts as a force, so it stays smooth) ----
+    speed = sqrt(vx * vx + vy * vy + vz * vz) + 0.0001
+
+    if speed > top_speed:
+        over = (speed - top_speed) / speed * 8.0
+        ax -= vx * over
+        ay -= vy * over
+        az -= vz * over
+
+    if speed < MIN_SPEED:
+        under = (MIN_SPEED - speed) / speed * 4.0
+        ax += vx * under
+        ay += vy * under
+        az += vz * under
+
+    # ---- nose alignment ----
+    # Current nose direction = orientation quaternion applied to +X.
+    qx = p[idx].qx
+    qy = p[idx].qy
+    qz = p[idx].qz
+    qw = p[idx].qw
+
+    fwd_x = 1.0 - 2.0 * (qy * qy + qz * qz)
+    fwd_y = 2.0 * (qx * qy + qz * qw)
+    fwd_z = 2.0 * (qx * qz - qy * qw)
+
+    # Heading = velocity nudged by the acceleration, so boids lean into turns.
+    hx = vx + ax * 0.1
+    hy = vy + ay * 0.1
+    hz = vz + az * 0.1
+    hlen = sqrt(hx * hx + hy * hy + hz * hz) + 0.0001
+    hx = hx / hlen
+    hy = hy / hlen
+    hz = hz / hlen
+
+    # Spin axis that rotates the nose toward the heading is fwd x heading.
+    want_wx = (fwd_y * hz - fwd_z * hy) * TURN_RATE
+    want_wy = (fwd_z * hx - fwd_x * hz) * TURN_RATE
+    want_wz = (fwd_x * hy - fwd_y * hx) * TURN_RATE
+
+    angular_x = (want_wx - wx) * SPIN_DAMP
+    angular_y = (want_wy - wy) * SPIN_DAMP
+    angular_z = (want_wz - omega) * SPIN_DAMP
 
 
-# -----------------------------------------------------------------------------
-# Geometry and materials
-# -----------------------------------------------------------------------------
-boid_material = se.create_material(
-    se.MaterialType.EMISSIVE, (0.15, 0.85, 1.0), intensity=1.8
+# ---------------------------------------------------------------------
+# Meshes and materials
+# ---------------------------------------------------------------------
+def build_boid_mesh(scale):
+    """
+    Small convex dart: nose along +X, two swept wing tips, a dorsal and a
+    ventral ridge. Triangles are wound outward automatically (the shape is
+    convex), because the renderer culls back faces.
+    """
+    verts = [
+        (0.50, 0.00, 0.00),    # 0 nose
+        (-0.25, 0.14, 0.00),   # 1 dorsal ridge
+        (-0.30, -0.07, 0.00),  # 2 ventral ridge
+        (-0.38, 0.02, 0.34),   # 3 left wing tip
+        (-0.38, 0.02, -0.34),  # 4 right wing tip
+    ]
+    tris = [
+        (0, 1, 3), (0, 4, 1),      # upper front
+        (0, 3, 2), (0, 2, 4),      # lower front
+        (1, 4, 3), (2, 3, 4),      # rear
+    ]
+
+    cx = sum(v[0] for v in verts) / len(verts)
+    cy = sum(v[1] for v in verts) / len(verts)
+    cz = sum(v[2] for v in verts) / len(verts)
+
+    indices = []
+    for a, b, c in tris:
+        va, vb, vc = verts[a], verts[b], verts[c]
+        e1 = (vb[0] - va[0], vb[1] - va[1], vb[2] - va[2])
+        e2 = (vc[0] - va[0], vc[1] - va[1], vc[2] - va[2])
+        n = (
+            e1[1] * e2[2] - e1[2] * e2[1],
+            e1[2] * e2[0] - e1[0] * e2[2],
+            e1[0] * e2[1] - e1[1] * e2[0],
+        )
+        mid = (
+            (va[0] + vb[0] + vc[0]) / 3.0 - cx,
+            (va[1] + vb[1] + vc[1]) / 3.0 - cy,
+            (va[2] + vb[2] + vc[2]) / 3.0 - cz,
+        )
+        if n[0] * mid[0] + n[1] * mid[1] + n[2] * mid[2] < 0.0:
+            b, c = c, b
+        indices.extend([a, b, c])
+
+    scaled = [(v[0] * scale, v[1] * scale, v[2] * scale) for v in verts]
+    return scaled, indices
+
+
+# A few cool colours so the flock reads as individuals. Each colour gets its
+# own mesh because a material is attached to a mesh, not to an object.
+BOID_COLORS = [
+    (0.20, 0.70, 1.00, 1.0),
+    (0.30, 0.90, 0.85, 1.0),
+    (0.55, 0.60, 1.00, 1.0),
+    (0.85, 0.95, 1.00, 1.0),
+    (0.35, 0.80, 0.55, 1.0),
+]
+
+boid_meshes = []
+for k, rgba in enumerate(BOID_COLORS):
+    material = se.create_material(se.MaterialType.SOLID_COLOR, rgba)
+    verts, indices = build_boid_mesh(BOID_SCALE * (0.9 + 0.08 * k))
+    boid_meshes.append(se.register_mesh(verts, indices, material_id=material))
+
+target_material = se.create_material(
+    se.MaterialType.EMISSIVE, (1.0, 0.35, 0.06), intensity=2.5
 )
-pillar_material = se.create_material(
-    se.MaterialType.EMISSIVE, (0.18, 0.32, 0.42), intensity=0.45
+target_mesh = se.register_sphere(
+    radius=0.9, segs=24, rings=14, material_id=target_material
 )
 
-# The triangular mesh lies in the XY plane and points along local +X.
-boid_mesh = se.register_polygon(radius=0.48, sides=3, material_id=boid_material)
-pillar_mesh = se.register_cylinder(
-    radius=0.65, height=8.0, segs=18, material_id=pillar_material
-)
 
-# Spawn a flock moving generally to the right, with small 3D variations.
-boids = []
-for _ in range(NUM_BOIDS):
-    x = random.uniform(-9.0, -5.0)
-    y = random.uniform(-2.2, 2.2)
-    z = random.uniform(-7.5, 7.5)
-    vx = random.uniform(2.0, 3.0)
-    vy = random.uniform(-0.5, 0.5)
-    vz = random.uniform(-0.8, 0.8)
-    heading = math.atan2(vy, vx)
-    orientation = (0.0, 0.0, math.sin(heading * 0.5), math.cos(heading * 0.5))
+# ---------------------------------------------------------------------
+# Objects: boids first (slots 0..NUM_BOIDS-1), then the target
+# ---------------------------------------------------------------------
+def nose_to_direction(dx, dy, dz):
+    """Quaternion (x, y, z, w) rotating +X onto the unit vector (dx, dy, dz)."""
+    w = 1.0 + dx
+    if w < 1e-6:                       # pointing straight back: half-turn about Z
+        return (0.0, 0.0, 1.0, 0.0)
+    qx, qy, qz = 0.0, -dz, dy          # cross(+X, d)
+    n = math.sqrt(qx * qx + qy * qy + qz * qz + w * w)
+    return (qx / n, qy / n, qz / n, w / n)
+
+
+random.seed(7)
+
+for i in range(NUM_BOIDS):
+    px = random.uniform(-32.0, -20.0)
+    py = random.uniform(-8.0, 8.0)
+    pz = random.uniform(-10.0, 10.0)
+
+    vx0 = random.uniform(7.0, 11.0)
+    vy0 = random.uniform(-2.0, 2.0)
+    vz0 = random.uniform(-2.0, 2.0)
+    speed0 = math.sqrt(vx0 * vx0 + vy0 * vy0 + vz0 * vz0)
 
     boid = sim.add_object(
-        x=x, y=y, z=z,
-        vx=vx, vy=vy, vz=vz,
+        x=px, y=py, z=pz,
+        vx=vx0, vy=vy0, vz=vz0,
         mass=1.0,
-        mesh_id=boid_mesh,
-        orientation=orientation,
-        r=0.15, g=0.85, b=1.0, a=1.0,
+        mesh_id=boid_meshes[i % len(boid_meshes)],
+        orientation=nose_to_direction(vx0 / speed0, vy0 / speed0, vz0 / speed0),
     )
+    if boid.slot != i:
+        raise RuntimeError(f"boid {i} landed in slot {boid.slot}; the scene was not empty")
     sim.set_collision_enabled(boid, False)
-    sim.set_script(boid, flock._script_id)
-    boids.append(boid)
+    sim.set_script(boid, boid_flock._script_id)
 
-# Procedurally distribute pillars through the flock's flight volume.
-pillar_positions = []
-while len(pillar_positions) < NUM_PILLARS:
-    candidate = (random.uniform(-8.5, 8.5), random.uniform(-8.5, 8.5))
-    if all(
-        (candidate[0] - px) ** 2 + (candidate[1] - pz) ** 2 > 20.0
-        for px, pz in pillar_positions
-    ):
-        pillar_positions.append(candidate)
+target = sim.add_object(
+    x=0.0, y=0.0, z=0.0,
+    mass=1.0,
+    mesh_id=target_mesh,
+)
+if target.slot != TARGET:
+    raise RuntimeError(f"target landed in slot {target.slot}, expected {TARGET}")
+sim.set_collision_enabled(target, False)
+sim.set_script(target, target_path._script_id)
 
-for pillar_x, pillar_z in pillar_positions:
-    pillar = sim.add_object(
-        x=pillar_x, y=0.0, z=pillar_z,
-        mass=1e12,
-        mesh_id=pillar_mesh,
-        r=0.18, g=0.35, b=0.46, a=1.0,
-    )
-    sim.set_collision_enabled(pillar, False)
-    sim.set_script(pillar, keep_pillar_still._script_id)
+print(f"3D boids chase: {NUM_BOIDS} boids pursuing one target")
+print("Controls: WASD pan, Q/E zoom, left-mouse drag to look, ESC to quit")
 
-print("Boids Around Pillars")
-print(f"{NUM_BOIDS} boids | {NUM_PILLARS} procedural pillars")
-print("Boids flock together and steer around pillars.")
-print("Near-pillar signals are processed by an agent and fed back through scratchpad memory.")
-print("Controls: WASD to pan, scroll to zoom. Close the window to exit.")
-
+# ---------------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------------
 while not sim.should_close():
     sim.default_input()
     sim.update(0.016)
-    sim.dispatch_agent(AGENT_ID, clear_after=True)
     sim.render()
 
 sim.cleanup()

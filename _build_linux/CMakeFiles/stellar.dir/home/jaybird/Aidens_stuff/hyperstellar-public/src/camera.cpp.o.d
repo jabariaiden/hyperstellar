@@ -275,14 +275,4 @@ CMakeFiles/stellar.dir/home/jaybird/Aidens_stuff/hyperstellar-public/src/camera.
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_clip_space.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.inl \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.inl \
- /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
- /usr/include/c++/16/bits/algorithmfwd.h \
- /usr/include/c++/16/bits/stl_heap.h \
- /usr/include/c++/16/bits/uniform_int_dist.h \
- /usr/include/c++/16/bits/stl_tempbuf.h /usr/include/c++/16/cstdlib \
- /usr/include/c++/16/pstl/glue_algorithm_defs.h \
- /usr/include/c++/16/pstl/execution_defs.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h
+ /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.inl

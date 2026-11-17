@@ -337,14 +337,12 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/integer.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/detail/func_integer.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/objects.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/common_definitions.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/parser.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/gpu_serializer.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/objects.h \
  /usr/include/c++/16/iostream \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/constraints.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/async_shader_loader.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/axis.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/camera.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.hpp \
@@ -360,15 +358,7 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.hpp \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../ext/matrix_transform.inl \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/matrix_transform.inl \
- /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
- /usr/include/c++/16/bits/algorithmfwd.h \
- /usr/include/c++/16/bits/stl_heap.h \
- /usr/include/c++/16/bits/uniform_int_dist.h \
- /usr/include/c++/16/bits/stl_tempbuf.h \
- /usr/include/c++/16/pstl/glue_algorithm_defs.h \
- /usr/include/c++/16/pstl/execution_defs.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/globals.h \
- /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/physics_system.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/mesh.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/_deps_linux/glfw-3.4/include/GLFW/glfw3.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.hpp \
@@ -410,6 +400,13 @@ CMakeFiles/stellar.dir/simulation_wrapper.cpp.o: \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/../gtc/../ext/vector_uint1_sized.hpp \
  /usr/include/c++/16/cstring /usr/include/string.h /usr/include/strings.h \
  /home/jaybird/Aidens_stuff/hyperstellar-public/python_module/../include/glm/gtc/type_ptr.inl \
- /usr/include/c++/16/sstream /usr/include/c++/16/bits/sstream.tcc \
- /usr/include/c++/16/atomic /usr/include/c++/16/bits/atomic_base.h \
+ /usr/include/c++/16/algorithm /usr/include/c++/16/bits/stl_algo.h \
+ /usr/include/c++/16/bits/algorithmfwd.h \
+ /usr/include/c++/16/bits/stl_heap.h \
+ /usr/include/c++/16/bits/uniform_int_dist.h \
+ /usr/include/c++/16/bits/stl_tempbuf.h \
+ /usr/include/c++/16/pstl/glue_algorithm_defs.h \
+ /usr/include/c++/16/pstl/execution_defs.h /usr/include/c++/16/sstream \
+ /usr/include/c++/16/bits/sstream.tcc /usr/include/c++/16/atomic \
+ /usr/include/c++/16/bits/atomic_base.h \
  /usr/include/c++/16/bits/atomic_lockfree_defines.h

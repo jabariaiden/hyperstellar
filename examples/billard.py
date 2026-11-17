@@ -6,14 +6,16 @@ Four particles move in straight lines, bouncing off a ±3 boundary box.
 The paint shader produces glowing trails that fade quickly.
 """
 
-import hyperstellar as se
 import time
+
+import hyperstellar as se
+from hyperstellar import *
 
 sim = se.Simulation(
     headless=False,
     width=1400,
     height=900,
-    title="Billiard Trails",
+    title="Billiard Trails Demo",
     enable_grid=False
 )
 
@@ -93,7 +95,7 @@ def glow_trails():
     color.b = clamp(b_new, 0.0, 1.0)
     color.a = 1.0
 
-sim.set_paint_script(glow_trails._script_id)
+sim.paint(glow_trails._script_id)
 
 sim.set_speed(1.5)
 print("Billiard demo running – particles bounce, no spring forces.")

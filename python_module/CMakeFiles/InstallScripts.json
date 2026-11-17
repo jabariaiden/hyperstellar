@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/cmake_install.cmake",
+		"/home/jaybird/Aidens_stuff/hyperstellar-public/python_module/pybind11/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

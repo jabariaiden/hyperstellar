@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-import hyperstellar as se, time, math
+import math
+import time
+
+import hyperstellar as se
+from hyperstellar import *
 
 sim = se.Simulation(headless=False, title="3D Raycasting Example")
 while not sim.are_all_shaders_ready():

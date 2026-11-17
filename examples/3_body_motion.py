@@ -1,22 +1,22 @@
+#!/usr/bin/env python3
 # This demo simulates the classic three-body problem, specifically the figure-eight orbit.
 # Three bodies of equal mass chase each other in a stable loop due to their mutual gravity.
-
 import hyperstellar as se
-import time
+from hyperstellar import *
 
 # Create the simulation window without the grid
-sim = se.Simulation(headless=False, enable_grid=False)
+sim = se.Simulation(headless=False, enable_grid=False, title="Three-Body Motion Demo", width=1400, height=900)
 
 # Wait for shaders to load
 while not sim.are_all_shaders_ready():
     sim.update_shader_loading()
-    time.sleep(0.01)
 
 # Set a low resolution for the paint shader to keep the background simple
 sim.set_paint_resolution(80, 60)
 
 # Gravitational constant and mass for all bodies
 G, M = 1.0, 1.0
+EPSILON = 1e-6
 
 # Create three bodies explicitly with specific initial positions and velocities.
 # These exact values produce the figure-eight orbit. Colors are passed here.
@@ -26,20 +26,21 @@ body_0 = sim.add_object(
     mass=M, skin=se.SkinType.CIRCLE, size=0.1, 
     r=1.0, g=0.3, b=0.3, a=1.0
 )
-
+sim.set_collision_enabled(body_0, False)  
 body_1 = sim.add_object(
     x=0.97000436, y=-0.24308753, 
     vx=0.46620368, vy=0.43236573, 
     mass=M, skin=se.SkinType.CIRCLE, size=0.1, 
     r=0.3, g=1.0, b=0.3, a=1.0
 )
-
+sim.set_collision_enabled(body_1, False)  
 body_2 = sim.add_object(
     x=0.0, y=0.0, 
     vx=-0.93240737, vy=-0.86473146, 
     mass=M, skin=se.SkinType.CIRCLE, size=0.1, 
     r=0.3, g=0.6, b=1.0, a=1.0
 )
+sim.set_collision_enabled(body_2, False)  
 
 # JIT physics scripts for each body
 # Body 0 is pulled by bodies 1 and 2
@@ -53,8 +54,8 @@ def grav_script_0():
     r2_a = dx_a*dx_a + dy_a*dy_a
     r2_b = dx_b*dx_b + dy_b*dy_b
 
-    denom_a = r2_a ** 1.5
-    denom_b = r2_b ** 1.5
+    denom_a = (r2_a + EPSILON) ** 1.5
+    denom_b = (r2_b + EPSILON) ** 1.5
 
     ax = G * M * dx_a / denom_a + G * M * dx_b / denom_b
     ay = G * M * dy_a / denom_a + G * M * dy_b / denom_b
@@ -71,8 +72,8 @@ def grav_script_1():
     r2_a = dx_a*dx_a + dy_a*dy_a
     r2_b = dx_b*dx_b + dy_b*dy_b
 
-    denom_a = r2_a ** 1.5
-    denom_b = r2_b ** 1.5
+    denom_a = (r2_a + EPSILON) ** 1.5
+    denom_b = (r2_b + EPSILON) ** 1.5
 
     ax = G * M * dx_a / denom_a + G * M * dx_b / denom_b
     ay = G * M * dy_a / denom_a + G * M * dy_b / denom_b
@@ -89,8 +90,8 @@ def grav_script_2():
     r2_a = dx_a*dx_a + dy_a*dy_a
     r2_b = dx_b*dx_b + dy_b*dy_b
 
-    denom_a = r2_a ** 1.5
-    denom_b = r2_b ** 1.5
+    denom_a = (r2_a + EPSILON) ** 1.5
+    denom_b = (r2_b + EPSILON) ** 1.5
 
     ax = G * M * dx_a / denom_a + G * M * dx_b / denom_b
     ay = G * M * dy_a / denom_a + G * M * dy_b / denom_b
@@ -128,7 +129,7 @@ sim.paint(gravity_field._script_id)
 
 # Speed up the simulation and zoom out to see the full orbit
 sim.set_speed(50.0)
-sim.set_camera_zoom(0.01)
+sim.set_camera_zoom(3.0)
 
 print("Running three-body simulation with JIT scripts.")
 print("Controls: WASD to pan, scroll to zoom. Close to exit.")

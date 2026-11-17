@@ -97,11 +97,9 @@ set(CORE_SOURCES
     ../src/globals.cpp
     ../src/objects.cpp
     ../src/parser.cpp
-    ../src/utils.cpp
     ../src/script_manager.cpp
     ../src/mesh.cpp
     ../src/async_shader_loader.cpp
-    ../src/physics_system.cpp
 )
 
 set(PYTHON_SOURCES

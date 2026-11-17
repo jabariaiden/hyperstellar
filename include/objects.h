@@ -6,10 +6,8 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include "common_definitions.h"
 #include "parser.h"
 #include "constraints.h"
-
 // Forward declaration for JIT script manager
 class ScriptManager;
 

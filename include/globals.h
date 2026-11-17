@@ -1,8 +1,34 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "camera.h"           // Include full definitions
-#include "physics_system.h"   // Include full definitions
-#include "common_definitions.h"
+
+// Visual Skin Types
+enum visualSkinType
+{
+    SKIN_CIRCLE = 0,      
+    SKIN_RECTANGLE = 1,   
+    SKIN_POLYGON = 2      
+};
+
+struct PhysicsSystem {
+    int defaultvisualSkinType = SKIN_CIRCLE;
+    float gravity = 9.81f;
+    glm::vec2 gravityDir = glm::vec2(0.0f, -1.0f);
+    float damping = 0.1f;
+    float stiffness = 1.0f;
+    float restitution = 0.8f;
+    float coupling = 0.0f;
+    glm::vec2 externalForce = glm::vec2(0.0f);
+    float driveFreq = 1.0f;
+    float driveAmp = 0.0f;
+    bool showTrails = true;
+    bool showPhaseSpace = true;
+    bool simulationPaused = false;
+    float globalTime = 0.0f;
+
+    void UpdateSystemParameters();
+    void ResetTime();
+};
 
 // Constants
 const unsigned int SCR_WIDTH = 1200;

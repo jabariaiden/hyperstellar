@@ -4,7 +4,6 @@
 #include "../include/gpu_serializer.h"
 #include "../include/parser.h"
 #include "../include/constraints.h"
-#include "../include/async_shader_loader.h"
 #include "../include/axis.h"
 #include "../include/camera.h"
 #include "../include/globals.h"
@@ -750,6 +749,35 @@ void SimulationWrapper::default_input()
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
+static glm::vec3 ScreenToWorldPlane(
+    float screenX, float screenY, int width, int height)
+{
+    if (width <= 0 || height <= 0)
+        return glm::vec3(0.0f);
+
+    float x = (screenX / width) * 2.0f - 1.0f;
+    float y = 1.0f - (screenY / height) * 2.0f;
+
+    glm::mat4 invVP = glm::inverse(
+        g_camera3d.ViewProj(width, height));
+
+    glm::vec4 nearPoint = invVP * glm::vec4(x, y, -1.0f, 1.0f);
+    glm::vec4 farPoint  = invVP * glm::vec4(x, y,  1.0f, 1.0f);
+
+    nearPoint /= nearPoint.w;
+    farPoint /= farPoint.w;
+
+    glm::vec3 origin(nearPoint);
+    glm::vec3 direction = glm::normalize(
+        glm::vec3(farPoint) - origin);
+
+    if (std::abs(direction.z) < 1e-6f)
+        return glm::vec3(0.0f);
+
+    float t = -origin.z / direction.z;
+    return origin + direction * t;
+}
+
 std::pair<float, float> SimulationWrapper::get_mouse_position() const
 {
     if (!m_window)
@@ -761,21 +789,15 @@ std::pair<float, float> SimulationWrapper::get_mouse_position() const
     // Convert to world coordinates
     int w, h;
     glfwGetFramebufferSize(glfwWindow, &w, &h);
-    if (w == 0 || h == 0)
-        return {0.0f, 0.0f};
+    glm::vec3 world = ScreenToWorldPlane(
+        static_cast<float>(x),
+        static_cast<float>(y),
+        w, h);
 
-    float ndcX = (float)x / w * 2.0f - 1.0f;
-    float ndcY = 1.0f - (float)y / h * 2.0f;
-
-    float aspect = (float)w / (float)h;
-    float halfWidth = g_camera.zoom * aspect;
-    float halfHeight = g_camera.zoom;
-
-    float worldX = g_camera.position.x + ndcX * halfWidth;
-    float worldY = g_camera.position.y + ndcY * halfHeight;
-
-    return {worldX, worldY};
+    return {world.x, world.y};
 }
+
+
 
 std::pair<float, float> SimulationWrapper::get_mouse_delta() const
 {
@@ -851,22 +873,37 @@ void SimulationWrapper::set_key_state(int key, bool pressed)
 
 void SimulationWrapper::set_camera_position(float x, float y)
 {
-    g_camera.position = glm::vec2(x, y);
+    glm::vec3 offset = g_camera3d.target - g_camera3d.eye;
+    g_camera3d.target.x = x;
+    g_camera3d.target.y = y;
+    g_camera3d.eye = g_camera3d.target - offset;
 }
 
 std::pair<float, float> SimulationWrapper::get_camera_position() const
 {
-    return {g_camera.position.x, g_camera.position.y};
+    return {g_camera3d.target.x, g_camera3d.target.y};
 }
 
 void SimulationWrapper::set_camera_zoom(float zoom)
 {
-    g_camera.zoom = zoom;
+    if (g_camera3d.use_ortho)
+        g_camera3d.zoom = zoom;
+    else
+    {
+        // Preserve FOV and change perspective distance.
+        glm::vec3 direction = glm::normalize(
+            g_camera3d.target - g_camera3d.eye);
+
+        float distance = zoom;
+        g_camera3d.eye = g_camera3d.target - direction * distance;
+    }
 }
 
 float SimulationWrapper::get_camera_zoom() const
 {
-    return g_camera.zoom;
+    return g_camera3d.use_ortho
+        ? g_camera3d.zoom
+        : glm::length(g_camera3d.target - g_camera3d.eye);
 }
 
 // Check if window should close
@@ -1005,7 +1042,7 @@ void SimulationWrapper::update(float dt)
                         for (int c = 0; c < 4; ++c)
                         {
                             int idx = base + c;
-                            if (idx * sizeof(ContactPoint) >= size)
+                            if (static_cast<GLsizeiptr>(idx) * static_cast<GLsizeiptr>(sizeof(ContactPoint)) >= size)
                                 break;
                             ContactPoint &cp = contacts[idx];
                             if (cp.frameCount > 0)
@@ -1182,7 +1219,7 @@ void SimulationWrapper::get_full_frame(std::vector<unsigned char> &jpeg_data, in
         w = g_paintWidth;
         h = g_paintHeight;
     }
-    glm::mat4 projection = g_camera.GetProjectionMatrix(w, h);
+    glm::mat4 projection = g_camera3d.Projection(w, h);
 
     // Call the objects system to capture the frame
     Objects::GetFullFrameImage(jpeg_data, quality, m_currentBuffer, projection,
@@ -2389,9 +2426,17 @@ void SimulationWrapper::save_to_file(
     fprintf(file, "stiffness = %.6f\n\n", get_parameter("stiffness"));
 
     fprintf(file, "[CAMERA]\n");
-    fprintf(file, "position = %.6f %.6f\n",
-            g_camera.position.x, g_camera.position.y);
-    fprintf(file, "zoom = %.6f\n\n", g_camera.zoom);
+    fprintf(file, "eye = %.6f %.6f %.6f\n",
+        g_camera3d.eye.x, g_camera3d.eye.y, g_camera3d.eye.z);
+    fprintf(file, "target = %.6f %.6f %.6f\n",
+        g_camera3d.target.x, g_camera3d.target.y, g_camera3d.target.z);
+    fprintf(file, "up = %.6f %.6f %.6f\n",
+        g_camera3d.up.x, g_camera3d.up.y, g_camera3d.up.z);
+    fprintf(file, "orthographic = %d\n", g_camera3d.use_ortho);
+    fprintf(file, "zoom = %.6f\n", g_camera3d.zoom);
+    fprintf(file, "fov = %.6f\n", g_camera3d.fov);
+    fprintf(file, "near = %.6f\n", g_camera3d.near_z);
+    fprintf(file, "far = %.6f\n\n", g_camera3d.far_z);
 
     fprintf(file, "[OBJECTS]\n");
     int numObjects = object_count();
@@ -3138,48 +3183,37 @@ void SimulationWrapper::clear_agents()
 // SCREEN↔WORLD CONVERSION
 // ============================================================================
 
-std::pair<float, float> SimulationWrapper::screen_to_world(float screen_x, float screen_y) const
+std::pair<float, float> SimulationWrapper::screen_to_world(
+    float screen_x, float screen_y) const
 {
     ensure_initialized();
-    int w = g_width;
-    int h = g_height;
 
-    if (w == 0 || h == 0)
-        return {0.0f, 0.0f};
+    glm::vec3 world = ScreenToWorldPlane(
+        screen_x, screen_y, g_width, g_height);
 
-    float ndcX = (screen_x / w) * 2.0f - 1.0f;
-    float ndcY = 1.0f - (screen_y / h) * 2.0f;
-
-    float aspect = (float)w / (float)h;
-    float halfWidth = g_camera.zoom * aspect;
-    float halfHeight = g_camera.zoom;
-
-    float worldX = g_camera.position.x + ndcX * halfWidth;
-    float worldY = g_camera.position.y + ndcY * halfHeight;
-
-    return {worldX, worldY};
+    return {world.x, world.y};
 }
 
-std::pair<float, float> SimulationWrapper::world_to_screen(float world_x, float world_y) const
+std::pair<float, float> SimulationWrapper::world_to_screen(
+    float world_x, float world_y) const
 {
     ensure_initialized();
-    int w = g_width;
-    int h = g_height;
 
-    if (w == 0 || h == 0)
+    if (g_width <= 0 || g_height <= 0)
         return {0.0f, 0.0f};
 
-    float aspect = (float)w / (float)h;
-    float halfWidth = g_camera.zoom * aspect;
-    float halfHeight = g_camera.zoom;
+    glm::vec4 clip = g_camera3d.ViewProj(g_width, g_height) *
+        glm::vec4(world_x, world_y, 0.0f, 1.0f);
 
-    float ndcX = (world_x - g_camera.position.x) / halfWidth;
-    float ndcY = (world_y - g_camera.position.y) / halfHeight;
+    if (clip.w <= 0.0f)
+        return {-1.0f, -1.0f};
 
-    float screenX = (ndcX + 1.0f) * 0.5f * w;
-    float screenY = (1.0f - ndcY) * 0.5f * h;
+    glm::vec3 ndc = glm::vec3(clip) / clip.w;
 
-    return {screenX, screenY};
+    return {
+        (ndc.x + 1.0f) * 0.5f * g_width,
+        (1.0f - ndc.y) * 0.5f * g_height
+    };
 }
 
 // ============================================================================
@@ -3190,42 +3224,52 @@ void SimulationWrapper::fit_camera_to_objects(float padding)
 {
     ensure_initialized();
 
-    int count = object_count();
-    if (count == 0)
+    auto states = get_all_objects();
+    if (states.empty())
         return;
 
-    // Get all object positions
-    std::vector<ObjectState> states = get_all_objects();
-
-    float minX = states[0].x, maxX = states[0].x;
-    float minY = states[0].y, maxY = states[0].y;
+    glm::vec3 minPos(
+        states[0].x, states[0].y, states[0].z);
+    glm::vec3 maxPos = minPos;
 
     for (const auto &s : states)
     {
-        minX = std::min(minX, s.x);
-        maxX = std::max(maxX, s.x);
-        minY = std::min(minY, s.y);
-        maxY = std::max(maxY, s.y);
+        glm::vec3 p(s.x, s.y, s.z);
+        minPos = glm::min(minPos, p);
+        maxPos = glm::max(maxPos, p);
     }
 
-    float centerX = (minX + maxX) * 0.5f;
-    float centerY = (minY + maxY) * 0.5f;
-    float rangeX = (maxX - minX) * (1.0f + padding);
-    float rangeY = (maxY - minY) * (1.0f + padding);
+    glm::vec3 center = (minPos + maxPos) * 0.5f;
+    glm::vec3 extents = (maxPos - minPos) * 0.5f;
 
-    // Set camera position
-    g_camera.position.x = centerX;
-    g_camera.position.y = centerY;
+    float aspect = (g_height > 0)
+        ? static_cast<float>(g_width) / g_height
+        : 1.0f;
 
-    // Set zoom to fit both axes
-    int w = g_width;
-    int h = g_height;
-    if (w > 0 && h > 0)
+    padding = 1.0f + padding;
+
+    glm::vec3 direction = glm::normalize(
+        g_camera3d.eye - g_camera3d.target);
+
+    g_camera3d.target = center;
+
+    if (g_camera3d.use_ortho)
     {
-        float aspect = (float)w / (float)h;
-        float zoomX = rangeX * 0.5f;
-        float zoomY = rangeY * 0.5f;
-        g_camera.zoom = std::max(zoomX / aspect, zoomY);
+        g_camera3d.zoom = std::max(
+            extents.y,
+            extents.x / aspect) * padding;
+
+        g_camera3d.eye = center +
+            direction * glm::max(extents.z * 2.0f, 1.0f);
+    }
+    else
+    {
+        float radius = glm::length(extents);
+        float halfFov = glm::radians(g_camera3d.fov) * 0.5f;
+        float distance = radius / std::sin(halfFov);
+
+        g_camera3d.eye = center +
+            direction * distance * padding;
     }
 }
 
@@ -3238,11 +3282,13 @@ void SimulationWrapper::follow_object(int index, float smoothing)
 
     ObjectState state = get_object(index);
 
-    float dx = state.x - g_camera.position.x;
-    float dy = state.y - g_camera.position.y;
+    glm::vec3 objectPosition(state.x, state.y, state.z);
+    glm::vec3 delta = objectPosition - g_camera3d.target;
 
-    g_camera.position.x += dx * (1.0f - smoothing);
-    g_camera.position.y += dy * (1.0f - smoothing);
+    glm::vec3 movement = delta * (1.0f - smoothing);
+
+    g_camera3d.eye += movement;
+    g_camera3d.target += movement;
 }
 
 // ============================================================================

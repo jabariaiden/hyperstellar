@@ -21,10 +21,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "objects.h"
-#include "shader_utils.h"
 #include "globals.h"
-#include "utils.h"
-#include "debug_helpers.h"
 #include "gpu_serializer.h"
 #include "constraints.h"
 #include "async_shader_loader.h"
@@ -39,8 +36,6 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
-#include <map>
-#include <atomic>
 #include <cstdint> // for uint32_t
 #include <thread>
 #include <mutex>
@@ -76,12 +71,12 @@ static const size_t MAX_SCRATCHPAD_POOL_SIZE = 64 * 1024 * 1024;
 static GLuint g_signalQueueBuffer = 0;
 static size_t g_signalQueueCapacity = 1024;
 static int g_signalQueueOverflowPolicy = 0; // 0=drop, 1=block
-static size_t g_signalQueueCount = 0;       // read from GPU
+//static size_t g_signalQueueCount = 0;       // read from GPU
 
-static size_t HashCombine(size_t a, size_t b)
+/* tatic size_t HashCombine(size_t a, size_t b)
 {
     return a ^ (b + 0x9E3779B97F4A7C15ULL + (a << 6) + (a >> 2));
-}
+} */
 
 // Scratchpad binding point (consistent with shader)
 static const GLuint SCRATCHPAD_BINDING = 10;
@@ -96,7 +91,7 @@ static const GLuint SIGNAL_QUEUE_BINDING = 11;
 // ============================================================================
 static std::unordered_map<int, std::vector<int>> g_meshGroups;
 static bool g_meshGroupsDirty = true;
-static int g_meshGroupsBuffer = -1;
+//static int g_meshGroupsBuffer = -1;
 
 // ============================================================================
 // EXISTING STATIC VARIABLES
@@ -700,7 +695,7 @@ static void SafeDeleteBuffers(GLuint *buf, GLsizei n)
 }
 
 // Helper function to safely delete vertex arrays
-static void SafeDeleteVertexArrays(GLuint *arr, GLsizei n)
+/* static void SafeDeleteVertexArrays(GLuint *arr, GLsizei n)
 {
     if (n <= 0)
         return;
@@ -713,7 +708,7 @@ static void SafeDeleteVertexArrays(GLuint *arr, GLsizei n)
     for (GLsizei i = 0; i < n; ++i)
         arr[i] = 0;
 }
-
+ */
 // Clamp a value between min and max
 static float clamp(float value, float min, float max)
 {
